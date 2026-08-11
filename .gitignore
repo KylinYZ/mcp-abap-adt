@@ -1,5 +1,7 @@
 .env
 dist
 node_modules
+.npm-cache
+coverage
 package-lock.json
 *.code-workspace

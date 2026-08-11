@@ -36,11 +36,20 @@ import { AtcHandlers } from './handlers/AtcHandlers.js';
 import { TraceHandlers } from './handlers/TraceHandlers.js';
 import { RefactorHandlers } from './handlers/RefactorHandlers.js';
 import { RevisionHandlers } from './handlers/RevisionHandlers.js';
+import { SafeAbapHandlers, selectProfileTools } from './handlers/SafeAbapHandlers.js';
+import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
+import { AbapObjectResolver } from './safe/AbapObjectResolver.js';
+import { AuditLogger } from './safe/AuditLogger.js';
+import { ChangePlanStore } from './safe/ChangePlanStore.js';
+import { SafeAbapError } from './safe/errors.js';
+import { SafetyPolicy } from './safe/SafetyPolicy.js';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
 export class AbapAdtServer extends Server {
   private adtClient: ADTClient;
+  private safetyPolicy: SafetyPolicy;
+  private safeAbapHandlers: SafeAbapHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
   private objectHandlers: ObjectHandlers;
@@ -71,7 +80,7 @@ export class AbapAdtServer extends Server {
     super(
       {
         name: "mcp-abap-abap-adt-api",
-        version: "0.1.0",
+        version: "0.1.1",
       },
       {
         capabilities: {
@@ -93,6 +102,7 @@ export class AbapAdtServer extends Server {
       process.env.SAP_LANGUAGE as string
     );
     this.adtClient.stateful = session_types.stateful
+    this.safetyPolicy = SafetyPolicy.fromEnvironment();
     
     // Initialize handlers
     this.authHandlers = new AuthHandlers(this.adtClient);
@@ -120,6 +130,23 @@ export class AbapAdtServer extends Server {
     this.traceHandlers = new TraceHandlers(this.adtClient);
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
+    const objectResolver = new AbapObjectResolver(this.adtClient);
+    const changePlans = new ChangePlanStore(this.safetyPolicy.planTtlMs);
+    const auditLogger = new AuditLogger(
+      this.safetyPolicy.auditPath || path.resolve(process.cwd(), '.sap-mcp-audit-disabled')
+    );
+    const changeWorkflow = new AbapChangeWorkflow(
+      this.adtClient,
+      objectResolver,
+      this.safetyPolicy,
+      changePlans,
+      auditLogger
+    );
+    this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
+      allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: params => this.elicitInput(params)
+    });
 
 
         // Setup tool handlers
@@ -156,6 +183,15 @@ export class AbapAdtServer extends Server {
     if (!(error instanceof Error)) {
       error = new Error(String(error));
     }
+    if (error instanceof SafeAbapError) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(error.toResponse())
+        }],
+        isError: true
+      };
+    }
     if (error instanceof McpError) {
       return {
         content: [{
@@ -182,49 +218,64 @@ export class AbapAdtServer extends Server {
 
   private setupToolHandlers() {
     this.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: [
-          ...this.authHandlers.getTools(),
-          ...this.transportHandlers.getTools(),
-          ...this.objectHandlers.getTools(),
-          ...this.classHandlers.getTools(),
-          ...this.codeAnalysisHandlers.getTools(),
-          ...this.objectLockHandlers.getTools(),
-          ...this.objectSourceHandlers.getTools(),
-          ...this.objectDeletionHandlers.getTools(),
-          ...this.objectManagementHandlers.getTools(),
-          ...this.objectRegistrationHandlers.getTools(),
-            ...this.nodeHandlers.getTools(),
-            ...this.discoveryHandlers.getTools(),
-            ...this.unitTestHandlers.getTools(),
-            ...this.prettyPrinterHandlers.getTools(),
-            ...this.gitHandlers.getTools(),
-            ...this.ddicHandlers.getTools(),
-            ...this.serviceBindingHandlers.getTools(),
-            ...this.queryHandlers.getTools(),
-            ...this.feedHandlers.getTools(),
-            ...this.debugHandlers.getTools(),
-            ...this.renameHandlers.getTools(),
-            ...this.atcHandlers.getTools(),
-            ...this.traceHandlers.getTools(),
-            ...this.refactorHandlers.getTools(),
-            ...this.revisionHandlers.getTools(),
-            {
-            name: 'healthcheck',
-            description: 'Check server health and connectivity',
-            inputSchema: {
-              type: 'object',
-              properties: {}
-            }
+      const safeTools = this.safeAbapHandlers.getTools();
+      const legacyTools = this.safetyPolicy.toolProfile === 'legacy-full' ? [
+        ...this.authHandlers.getTools(),
+        ...this.transportHandlers.getTools(),
+        ...this.objectHandlers.getTools(),
+        ...this.classHandlers.getTools(),
+        ...this.codeAnalysisHandlers.getTools(),
+        ...this.objectLockHandlers.getTools(),
+        ...this.objectSourceHandlers.getTools(),
+        ...this.objectDeletionHandlers.getTools(),
+        ...this.objectManagementHandlers.getTools(),
+        ...this.objectRegistrationHandlers.getTools(),
+        ...this.nodeHandlers.getTools(),
+        ...this.discoveryHandlers.getTools(),
+        ...this.unitTestHandlers.getTools(),
+        ...this.prettyPrinterHandlers.getTools(),
+        ...this.gitHandlers.getTools(),
+        ...this.ddicHandlers.getTools(),
+        ...this.serviceBindingHandlers.getTools(),
+        ...this.queryHandlers.getTools(),
+        ...this.feedHandlers.getTools(),
+        ...this.debugHandlers.getTools(),
+        ...this.renameHandlers.getTools(),
+        ...this.atcHandlers.getTools(),
+        ...this.traceHandlers.getTools(),
+        ...this.refactorHandlers.getTools(),
+        ...this.revisionHandlers.getTools(),
+        {
+          name: 'healthcheck',
+          description: 'Check server health and connectivity',
+          inputSchema: {
+            type: 'object',
+            properties: {}
           }
-        ]
+        }
+      ] : [];
+      return {
+        tools: selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools)
       };
     });
 
     this.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         let result: any;
-        
+        if (this.safeAbapHandlers.supports(request.params.name)) {
+          result = await this.safeAbapHandlers.handle(
+            request.params.name,
+            (request.params.arguments || {}) as Record<string, unknown>
+          );
+          return this.serializeResult(result);
+        }
+        if (this.safetyPolicy.toolProfile === 'safe') {
+          throw new McpError(
+            ErrorCode.MethodNotFound,
+            `Tool '${request.params.name}' is unavailable in the safe tool profile.`
+          );
+        }
+
         switch (request.params.name) {
             case 'login':
             case 'logout':
@@ -420,6 +471,9 @@ export class AbapAdtServer extends Server {
     const transport = new StdioServerTransport();
     await this.connect(transport);
     console.error('MCP ABAP ADT API server running on stdio');
+    if (this.safetyPolicy.toolProfile === 'legacy-full') {
+      console.error('WARNING: SAP_MCP_TOOL_PROFILE=legacy-full exposes raw mutating and destructive ADT tools.');
+    }
     
     // Handle shutdown
     process.on('SIGINT', async () => {

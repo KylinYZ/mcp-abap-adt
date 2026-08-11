@@ -12,12 +12,27 @@ The server is published on npm as [`mcp-abap-abap-adt-api`](https://www.npmjs.co
 
 ## Features
 
+- **Safe by default**: Exposes four high-level tools for inspected, previewed, explicitly confirmed ABAP source changes.
+- **Cross-client confirmation**: Uses native MCP form elicitation when supported, with an explicitly enabled text challenge fallback for incompatible clients.
+- **Guardrails**: Enforces DEV host/client/namespace allowlists, existing unreleased transports, and rejects `$TMP`.
+- **Recovery and audit**: Detects source drift, checks syntax, activates, verifies, attempts rollback on failure, and writes sanitized JSONL audit events.
 - **Authentication**: Securely authenticate with ABAP systems using the `login` tool.
 - **Object Management**: Create, read, update, and delete ABAP objects seamlessly.
 - **Transport Handling**: Manage transport requests with tools like `createTransport` and `transportInfo`.
 - **Code Analysis**: Perform syntax checks and retrieve code completion suggestions.
 - **Extensibility**: Easily extend the server with additional tools and resources as needed.
 - **Session Management**: Handle session caching and termination using `dropSession` and `logout`.
+
+## Safe ABAP change profile
+
+`SAP_MCP_TOOL_PROFILE=safe` is the default and exposes only these tools:
+
+- `inspectAbapObject`: returns the complete source and metadata for one exact, allow-listed `PROGRAM`, `INCLUDE`, `CLASS`, or `FUNCTION_MODULE`.
+- `previewAbapChange`: validates the target, existing transport, proposed complete source, and syntax; then returns a complete diff and short-lived plan.
+- `applyAbapChange`: applies only the previously previewed plan after explicit user confirmation, with drift detection, activation, verification, rollback, and unlock handling.
+- `getAbapChangeStatus`: returns local plan status without complete source, credentials, cookies, or lock handles.
+
+Set `SAP_MCP_TOOL_PROFILE=legacy-full` only for explicit compatibility needs. It additionally exposes all original low-level tools, including raw mutation and deletion operations that do not pass through the safe workflow.
 
 ## Prerequisites
 
@@ -71,7 +86,15 @@ The server is published on npm, so you don't need to clone or build anything —
         "SAP_USER": "YOUR_SAP_USERNAME",
         "SAP_PASSWORD": "YOUR_SAP_PASSWORD",
         "SAP_CLIENT": "100",
-        "SAP_LANGUAGE": "EN"
+        "SAP_LANGUAGE": "EN",
+        "SAP_MCP_TOOL_PROFILE": "safe",
+        "SAP_MCP_SYSTEM_ROLE": "DEV",
+        "SAP_MCP_ALLOWED_HOSTS": "your-sap-server.com",
+        "SAP_MCP_ALLOWED_CLIENTS": "100",
+        "SAP_MCP_ALLOWED_NAMESPACES": "Z,Y",
+        "SAP_MCP_CHANGE_PLAN_TTL_SECONDS": "900",
+        "SAP_MCP_AUDIT_PATH": "C:\\sap-mcp-audit",
+        "SAP_MCP_ALLOW_TEXT_CONFIRMATION": "false"
       }
     }
   }
@@ -114,9 +137,19 @@ If your SAP system uses a self-signed certificate, add `"NODE_TLS_REJECT_UNAUTHO
       SAP_PASSWORD=YOUR_SAP_PASSWORD
       SAP_CLIENT=YOUR_SAP_CLIENT
       SAP_LANGUAGE=YOUR_SAP_LANGUAGE
+      SAP_MCP_TOOL_PROFILE=safe
+      SAP_MCP_SYSTEM_ROLE=DEV
+      SAP_MCP_ALLOWED_HOSTS=your-sap-server.com
+      SAP_MCP_ALLOWED_CLIENTS=100
+      SAP_MCP_ALLOWED_NAMESPACES=Z,Y
+      SAP_MCP_CHANGE_PLAN_TTL_SECONDS=900
+      SAP_MCP_AUDIT_PATH=C:\sap-mcp-audit
+      SAP_MCP_ALLOW_TEXT_CONFIRMATION=false
       ```
 
-   Note: The SAP_CLIENT and SAP_LANGUAGE variables are optional but recommended.
+   `SAP_CLIENT` and `SAP_LANGUAGE` are optional for legacy read operations. Source changes in the safe profile fail closed unless every `SAP_MCP_*` boundary is configured. The audit path must be writable by the MCP process.
+
+   Native MCP `elicitation.form` confirmation is always preferred. Keep `SAP_MCP_ALLOW_TEXT_CONFIRMATION=false` unless the client lacks form elicitation and you explicitly accept the weaker chat-based challenge. When enabled, the first apply call returns a one-time phrase bound to the plan; the client must submit that exact phrase as `textConfirmation` in a second call.
 
    If you're using self-signed certificates, you can also set:
 
@@ -158,66 +191,20 @@ Use this Custom Instruction to explain the tool to your model:
 ```
 ## mcp-abap-abap-adt-api Server
 
-This server provides tools for interacting with an SAP system via ADT (ABAP Development Tools) APIs. It allows you to retrieve information about ABAP objects, modify source code, and manage transports.
+The default `safe` profile supports controlled source changes for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE` objects.
 
-**Key Tools and Usage:**
+**Required workflow:**
 
-*   **`searchObject`:** Finds ABAP objects based on a query string (e.g., class name).
-    *   `query`: (string, required) The search term.
-    *   Returns the object's URI.  Example: `/sap/bc/adt/oo/classes/zcl_invoice_xml_gen_model`
+1. Use `inspectAbapObject` to read the complete current source and metadata of the exact allow-listed object.
+2. Call `previewAbapChange` with the exact object, complete proposed source, and an existing unreleased transport request.
+3. Show the complete returned diff to the user. Do not call the apply tool until the user explicitly confirms that plan.
+4. Call `applyAbapChange` with only the returned `changePlanId`. If the client supports MCP form elicitation, present the server's native confirmation form and submit the user's decision.
+5. If form elicitation is unavailable and `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true`, show the returned one-time confirmation phrase to the user, then call `applyAbapChange` again with the same `changePlanId` and the exact phrase as `textConfirmation`.
+6. Use `getAbapChangeStatus` to inspect plan stages and recovery results without exposing complete source.
 
-*   **`transportInfo`:** Retrieves transport information for a given object.
-    *   `objSourceUrl`: (string, required) The object's URI (obtained from `searchObject`).
-    *   Returns transport details, including the transport request number (`TRKORR` or `transportInfo.LOCKS.HEADER.TRKORR` in the JSON response).
+Never pass or trust a model-supplied `confirmedByUser` flag. Do not claim success unless the apply result reports successful syntax checking, activation, source-hash verification, and unlock handling. If the source changed after preview, create a new preview. If rollback or unlock fails, tell the user to inspect the inactive object, lock, and transport in ADT/SAP.
 
-*   **`lock`:** Locks an ABAP object for editing.
-    *   `objectUrl`: (string, required) The object's URI.
-    *   Returns a `lockHandle`, which is required for subsequent modifications.
-
-*   **`unLock`:** Unlocks a previously locked ABAP object.
-    *   `objectUrl`: (string, required) The object's URI.
-    *   `lockHandle`: (string, required) The lock handle obtained from the `lock` operation.
-
-*   **`setObjectSource`:** Modifies the source code of an ABAP object.
-    *   `objectSourceUrl`: (string, required) The object's URI *with the suffix `/source/main`*.  Example: `/sap/bc/adt/oo/classes/zcl_invoice_xml_gen_model/source/main`
-    *   `lockHandle`: (string, required) The lock handle obtained from the `lock` operation.
-    *   `source`: (string, required) The complete, modified ABAP source code.
-    *   `transport`: (string, optional) The transport request number.
-
-*   **`syntaxCheckCode`:** Performs a syntax check on a given ABAP source code.
-    *   `code`: (string, required) The ABAP source code to check.
-    *   `url`: (string, optional) The URL of the object.
-    *   `mainUrl`: (string, optional) The main URL.
-    *   `mainProgram`: (string, optional) The main program.
-    *   `version`: (string, optional) The version.
-    *   Returns syntax check results, including any errors.
-
-*   **`activate`:** Activates an ABAP object. (See notes below on activation/unlocking.)
-    *    `object`: The object to be activated.
-
-*   **`getObjectSource`:** Retrieves the source code of an ABAP object.
-    *   `objectSourceUrl`: (string, required) The object's URI *with the suffix `/source/main`*.
-
-**Workflow for Modifying ABAP Code:**
-
-1.  **Find the object URI:** Use `searchObject`.
-2.  **Read the original source code:** Use `getObjectSource` (with the `/source/main` suffix).
-3.  **Clone and Modify the source code locally:** (e.g., `write_to_file` for creating a local copy, and using `read_file`, `replace_in_file` for modifying this local copy).
-4.  **Get transport information:** Use `transportInfo`.
-5.  **Lock the object:** Use `lock`.
-6.  **Set the modified source code:** Use `setObjectSource` (with the `/source/main` suffix).
-7.  **Perform a syntax check:** Use `syntaxCheckCode`.
-8.  **Activate** the object, Use `activate`..
-9.  **unLock the object:** Use `unLock`.
-
-**Important Notes:**
-*   **File Handling:** SAP is completly de-coupled from the local file system. Reading source code will only return the code as tool result - it has no effect on file. Files are not synchronized with SAP but merely a local copy for our reference. FYI: It's not strictly necessary for you to create local copies of source codes, as they have no effect on SAP, but it helps us track changes. 
-*   **File Handling:** The local filenames you will use will not contain any paths, but only a filename! It's preferable to use a pattern like "[ObjectName].[ObjectType].abap". (e.g., SAPMV45A.prog.abap for a ABAP Program SAPMV45A, CL_IXML.clas.abap for a Class CL_IXML)
-*   **URL Suffix:**  Remember to add `/source/main` to the object URI when using `setObjectSource` and `getObjectSource`.
-*   **Transport Request:** Obtain the transport request number (e.g., from `transportInfo` or from the user) and include it in relevant operations.
-*   **Lock Handle:**  The `lockHandle` obtained from the `lock` operation is crucial for `setObjectSource` and `unLock`. Ensure you are using a valid `lockHandle`. If a lock fails, you may need to re-acquire the lock. Locks can expire or be released by other users.
-*   **Activation/Unlocking Order:** The exact order of `activate` and `unLock` operations might need clarification. Refer to the tool descriptions or ask the user. It appears `activate` can be used without unlocking first.
-* **Error Handling:** The tools return JSON responses. Check for error messages within these responses.
+The `legacy-full` profile also exposes the original low-level ADT tools. Treat those tools as compatibility-only because raw mutation and deletion operations bypass the safe workflow.
 ```
 
 ## Efficient Database Access
