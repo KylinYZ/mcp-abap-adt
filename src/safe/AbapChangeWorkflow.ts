@@ -353,10 +353,13 @@ export class AbapChangeWorkflow {
     try {
       // Eclipse ADT activates function modules with the minimal name-and-URI
       // reference; their interface remains part of source/main.
+      const activationMainProgram = object.objectType === 'FUNCTION_MODULE'
+        ? undefined
+        : object.mainProgram;
       const activation = await this.client.activate(
         object.activationName,
         object.activationUrl,
-        object.mainProgram,
+        activationMainProgram,
         true
       );
       if (!activation.success) {
