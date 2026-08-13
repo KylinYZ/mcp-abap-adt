@@ -8,13 +8,22 @@ DISCLAIMER: This server is still experimental. The default `safe` profile adds a
 
 The MCP-Server `mcp-abap-abap-adt-api` is a Model Context Protocol (MCP) server designed to facilitate seamless communication between ABAP systems and MCP clients. It is a wrapper for [abap-adt-api](https://github.com/marcellourbani/abap-adt-api/) and provides a suite of tools and resources for managing ABAP objects, handling transport requests, performing code analysis, and more, enhancing the efficiency and effectiveness of ABAP development workflows.
 
-> **Distribution status (2026-08-12):** this modified version has **not** been published to npm or the MCP Registry. Install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The npm and registry fields in `package.json` and `server.json` are release metadata for a possible future publication, not proof of a live package.
+> **Distribution status (2026-08-13):** this modified version has **not** been published to npm or the MCP Registry. Install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The npm and registry fields in `package.json` and `server.json` are release metadata for a possible future publication, not proof of a live package.
 
 For a complete Windows setup and operating walkthrough, see the [Chinese Usage Guide](docs/使用指南.md).
 
 > **Related project:** For higher-level, read-oriented ABAP tools (`GetProgram`, `GetClass`, `GetTable`, …) see the separate [`mcp-abap-adt`](https://github.com/mario-andreschak/mcp-abap-adt) server. **This** server (`mcp-abap-abap-adt-api`) exposes the lower-level ADT API (lock/unlock, edit source, transports, activation, syntax checks, DDIC access, …) for full read/write development workflows.
 
 ## Features
+
+The current code registers two tool surfaces:
+
+| Profile | Tool count | Scope | Recommended use |
+| --- | ---: | --- | --- |
+| `safe` (default) | 7 | Guarded read/change workflows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE`, plus guarded creation of `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE` | Normal AI-assisted ABAP development |
+| `legacy-full` | 136 | 7 safe tools + 2 SM21/ST22 tools + 127 original low-level ADT tools | Compatibility and specialized diagnostics |
+
+The low-level surface covers authentication/session handling, object discovery/structure/source/locks/creation/deletion/activation, transports, syntax and code analysis, DDIC, queries, unit tests, formatting, Git integration, service bindings, dumps/feeds, debugging, ATC, traces, rename/refactor operations, and revisions. The [Chinese Usage Guide](docs/使用指南.md#4-mcp-功能与工具清单) contains the exhaustive tool catalog and configuration reference.
 
 ### Default `safe` profile
 
@@ -29,7 +38,7 @@ For a complete Windows setup and operating walkthrough, see the [Chinese Usage G
 
 ### Compatibility `legacy-full` profile
 
-Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the original low-level ADT surface is explicitly required. It adds authentication, object CRUD, transport, activation, DDIC, code-analysis, debugging, tracing, and other legacy tools. Those raw mutation and deletion tools bypass the safe source-change workflow.
+Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the original low-level ADT surface is explicitly required. It registers 136 tools in total: the seven safe tools, two SM21/ST22 tools, and 127 original low-level ADT tools. Raw mutation and deletion tools bypass the safe source-change workflow.
 
 ### Optional SM21 runtime-log analysis
 
@@ -114,7 +123,7 @@ Change plans are in-memory, short-lived, and single-use. They are lost when the 
 
 As of 2026-08-13, the first-phase safe workflow and the main read-only runtime guardrails are functionally complete for their stated scope:
 
-- Automated verification: 18 Jest suites and 131 tests cover the safe workflow plus runtime configuration, FIFO execution gating, request/response limits, bounded source caching, plan retention, source normalization, logging, and serialized audit writes. TypeScript build and `git diff --check` pass.
+- Automated verification: 26 Jest suites and 193 tests cover the safe workflow plus runtime configuration, FIFO execution gating, request/response limits, bounded source caching, plan retention, source normalization, SM21 request/analysis behavior, logging, and serialized audit writes.
 - Real SAP DEV verification: successful inspect, preview, lock, write, syntax check, unlock, activation, reread, and audit flows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE` test objects.
 - Real protection verification: preview syntax rejection, user-held lock rejection, source drift rejection before lock, plan invalidation after MCP restart, natural plan expiry, single-use enforcement, native confirmation apply/cancel behavior, and confirmation timeout behavior.
 - Real rollback verification: a controlled one-time activation failure after the source write triggered a new recovery lock, original-source restoration, unlock, real reactivation, original-hash verification, and `ROLLED_BACK`; no residual lock or matching inactive object remained.
@@ -187,6 +196,10 @@ This is currently the only supported installation path for the modified version.
       SAP_MCP_CHANGE_PLAN_MAX_ENTRIES=100
       SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS=86400
       SAP_MCP_LOG_LEVEL=warn
+      SAP_MCP_SM21_TIMEZONE=UTC
+      SAP_MCP_SM21_MAX_WINDOW_HOURS=24
+      SAP_MCP_SM21_DEFAULT_PAGE_SIZE=100
+      SAP_MCP_SM21_MAX_PAGE_SIZE=500
       ```
 
    `SAP_CLIENT` and `SAP_LANGUAGE` are optional for some legacy read operations. Safe source mutation requires `SAP_MCP_SYSTEM_ROLE=DEV`, non-empty host/client/namespace allowlists matching the target, and a writable `SAP_MCP_AUDIT_PATH`. The profile and plan TTL have safe defaults, but explicit values are recommended for auditable deployments.
@@ -228,7 +241,7 @@ This is currently the only supported installation path for the modified version.
    }
    ```
 
-Restart the MCP client after changing `.env`, rebuilding `dist`, or changing its MCP configuration. See [docs/使用指南.md](docs/使用指南.md) for Codex/Claude examples, verification steps, safe workflows, confirmation behavior, and troubleshooting.
+Restart the MCP client after changing `.env`, rebuilding `dist`, or changing its MCP configuration. See [docs/使用指南.md](docs/使用指南.md) for the authoritative environment-variable reference, the exhaustive tool catalog, Codex/Claude examples, verification steps, safe workflows, confirmation behavior, and troubleshooting.
 
 ## Custom Instruction
 Use this Custom Instruction to explain the tool to your model:

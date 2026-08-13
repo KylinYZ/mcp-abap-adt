@@ -8,13 +8,22 @@
 
 `mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。它基于 [`abap-adt-api`](https://github.com/marcellourbani/abap-adt-api/)，提供 ABAP 对象读取、安全源码修改、受控对象创建、传输校验、语法检查、激活、失败恢复和审计能力。
 
-> **分发状态（2026-08-12）：** 当前修改版**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
+> **分发状态（2026-08-13）：** 当前修改版**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
 
 完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
 
 > **相关项目：** 如果需要更高层、以只读为主的 ABAP 工具（例如 `GetProgram`、`GetClass`、`GetTable`），请使用独立的 [`mcp-abap-adt`](https://github.com/mario-andreschak/mcp-abap-adt) 项目。本项目提供的是较底层的 ADT 能力，并在其上增加了默认启用的安全源码变更门面。
 
 ## 功能
+
+当前代码按 profile 注册两套工具面：
+
+| Profile | 工具数 | 功能范围 | 建议用途 |
+| --- | ---: | --- | --- |
+| `safe`（默认） | 7 | 受控读取/修改 `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`，以及受控创建 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` | 日常 AI 辅助 ABAP 开发 |
+| `legacy-full` | 136 | 7 个安全工具 + 2 个 SM21/ST22 工具 + 127 个原始低层 ADT 工具 | 兼容已有低层 ADT 工作流和专项诊断 |
+
+`legacy-full` 的低层能力覆盖认证与会话、对象发现/结构/源码/锁/创建/删除/激活、传输、语法和代码分析、DDIC、查询、单元测试、格式化、Git、服务绑定、dump/feed、调试、ATC、trace、重命名、重构和版本历史。完整的逐工具名称、功能分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 
 ### 默认 `safe` 模式
 
@@ -29,7 +38,7 @@
 
 ### 兼容 `legacy-full` 模式
 
-只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。该模式会在七个安全工具之外开放原有的认证、对象 CRUD、传输、激活、DDIC、代码分析、调试和跟踪等工具。
+只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。该模式共注册 136 个工具：七个安全工具、两个 SM21/ST22 工具，以及 127 个原始低层 ADT 工具。
 
 低层写入和删除工具不会经过安全源码变更流程，因此只应作为兼容能力使用。
 
@@ -89,7 +98,7 @@
 4. 直接使用返回的 `changePlanId` 调用 `applyAbapChange`，不要再要求一次聊天文字确认。唯一确认由服务器通过 MCP 客户端获取，不能由模型自行声明。
 5. 需要查看执行阶段、错误、解锁或回滚结果时，调用 `getAbapChangeStatus`。
 
-创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。单独空 `FUNCTION_GROUP` 会在预览阶段拒绝。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#9-安全创建对象)。
+创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。单独空 `FUNCTION_GROUP` 会在预览阶段拒绝。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#10-安全创建对象)。
 
 函数模块接口参数属于完整 `source/main` 源码中 `FUNCTION ... .` 的签名部分，可与实现代码一起预览、写入和复读验证。当前尚未提供“结构化参数数组自动生成 ABAP 签名”的高级工具，调用方必须提交完整可审阅源码；函数组源码仍由 SAP 生成。创建失败后的删除是尽力补偿，不是数据库事务，结果不确定时必须人工检查而不能盲目重试。
 
@@ -119,7 +128,7 @@
 
 截至 2026-08-13，第一阶段安全工作流及主要只读运行护栏已在约定范围内完成实现和核心验收：
 
-- **自动化验证**：22 个 Jest 测试套件、167 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、日志和审计串行写入；TypeScript 构建与 `git diff --check` 通过。
+- **自动化验证**：26 个 Jest 测试套件、193 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、SM21 请求与分析、日志和审计串行写入。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
@@ -185,6 +194,12 @@ SAP_MCP_SOURCE_CACHE_TTL_SECONDS=900
 SAP_MCP_CHANGE_PLAN_MAX_ENTRIES=100
 SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS=86400
 SAP_MCP_LOG_LEVEL=warn
+
+# 仅 legacy-full 的可选 SM21/ST22 运行日志分析
+SAP_MCP_SM21_TIMEZONE=Asia/Shanghai
+SAP_MCP_SM21_MAX_WINDOW_HOURS=24
+SAP_MCP_SM21_DEFAULT_PAGE_SIZE=100
+SAP_MCP_SM21_MAX_PAGE_SIZE=500
 ```
 
 不要将 `.env` 提交到版本库。`SAP_MCP_AUDIT_PATH` 必须允许 MCP 进程写入。安全源码修改要求角色、主机、客户端、命名空间白名单和审计目录全部满足策略。
@@ -204,7 +219,7 @@ SAP_MCP_LOG_LEVEL=warn
 }
 ```
 
-修改 `.env`、重新构建 `dist` 或调整 MCP 配置后，需要重启 MCP 客户端。Codex/Claude 配置示例、验证步骤、安全源码修改、对象创建和错误处理见 [使用指南](docs/使用指南.md)。
+修改 `.env`、重新构建 `dist` 或调整 MCP 配置后，需要重启 MCP 客户端。连接变量、安全白名单、性能护栏和 SM21 配置的完整说明，以及 Codex/Claude 配置示例、验证步骤、安全源码修改、对象创建和错误处理见 [使用指南](docs/使用指南.md)。
 
 ## 推荐给模型的自定义指令
 
