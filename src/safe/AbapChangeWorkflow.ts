@@ -70,7 +70,12 @@ export class AbapChangeWorkflow {
       throw new SafeAbapError('VERIFY_FAILED', 'preview', 'The proposed source is identical to the current SAP source.');
     }
 
-    const syntaxMessages = await this.syntaxCheck(object, input.newSource);
+    // SAP checkrun ignores candidate source for function modules and validates
+    // the active version instead. Validate them after the source is written,
+    // before Eclipse-compatible activation, so the checked source is the planned one.
+    const syntaxMessages = object.objectType === 'FUNCTION_MODULE'
+      ? []
+      : await this.syntaxCheck(object, input.newSource);
     assertSyntaxSuccess(syntaxMessages, 'preview');
     const { diff, summary } = createUnifiedDiff(originalSource, input.newSource);
     const plan = this.plans.create({
@@ -341,23 +346,14 @@ export class AbapChangeWorkflow {
 
   private async activateOrThrow(object: ResolvedAbapObject): Promise<void> {
     try {
-      // Function modules require an ADT object reference with their function-group parent.
-      const activation = object.objectType === 'FUNCTION_MODULE'
-        ? await this.client.activate({
-          'adtcore:uri': object.activationUrl,
-          'adtcore:type': object.adtType,
-          'adtcore:name': object.activationName,
-          'adtcore:parentUri': object.activationParentUrl || functionGroupActivationUrl(object.activationUrl)
-        // ADT preaudit compiles the function source as a standalone program,
-        // where FUNCTION is invalid. The typed activation below remains the
-        // authoritative activation path for the function module.
-        }, false)
-        : await this.client.activate(
-          object.activationName,
-          object.activationUrl,
-          object.mainProgram,
-          true
-        );
+      // Eclipse ADT activates function modules with the minimal name-and-URI
+      // reference; their interface remains part of source/main.
+      const activation = await this.client.activate(
+        object.activationName,
+        object.activationUrl,
+        object.mainProgram,
+        true
+      );
       if (!activation.success) {
         throw new SafeAbapError(
           'ACTIVATION_FAILED',
@@ -425,14 +421,6 @@ export class AbapChangeWorkflow {
       confirmationMode: plan.confirmationMode
     };
   }
-}
-
-function functionGroupActivationUrl(functionModuleUrl: string): string {
-  const match = functionModuleUrl.match(/^(.*\/functions\/groups\/[^/]+)\/fmodules\/[^/]+$/i);
-  if (!match) {
-    throw new SafeAbapError('ACTIVATION_FAILED', 'activate', 'SAP ADT did not provide a function-group parent URL.');
-  }
-  return match[1];
 }
 
 function assertSyntaxSuccess(messages: SyntaxCheckResult[], stage: string): void {

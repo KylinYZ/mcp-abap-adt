@@ -56,6 +56,36 @@ describe('AbapCreationResolver', () => {
     expect(result[1]).toMatchObject({ parentFunctionGroup: 'ZFG', activationParentUrl: '/sap/bc/adt/functions/groups/zfg' });
   });
 
+  it('accepts function-module parameters as part of the complete source signature', async () => {
+    const adt = client();
+    adt.searchObject.mockImplementation(async query => query === 'ZFG' ? [{
+      'adtcore:name': 'ZFG', 'adtcore:type': 'FUGR/F',
+      'adtcore:uri': '/sap/bc/adt/functions/groups/zfg', 'adtcore:packageName': 'Z001'
+    }] as never : []);
+    const source = [
+      'FUNCTION z_fm',
+      '  IMPORTING',
+      '    VALUE(iv_input) TYPE string',
+      '  EXPORTING',
+      '    VALUE(ev_output) TYPE string.',
+      '',
+      '  ev_output = iv_input.',
+      'ENDFUNCTION.'
+    ].join('\n');
+
+    await expect(new AbapCreationResolver(adt, policy).resolve([{
+      objectType: 'FUNCTION_MODULE', objectName: 'Z_FM', description: 'Module',
+      parentFunctionGroup: 'ZFG', source
+    }])).resolves.toEqual([expect.objectContaining({ source, sourceHash: expect.any(String) })]);
+  });
+
+  it('rejects standalone function-group creation until its Eclipse activation protocol is captured', async () => {
+    const resolver = new AbapCreationResolver(client(), policy);
+    await expect(resolver.resolve([{
+      objectType: 'FUNCTION_GROUP', objectName: 'ZFG', description: 'Group', packageName: 'Z001'
+    }])).rejects.toMatchObject({ code: 'INVALID_CREATION_GRAPH', stage: 'validate' });
+  });
+
   it('rejects unsupported graphs, generated group source, and invalid source framing', async () => {
     const resolver = new AbapCreationResolver(client(), policy);
     await expect(resolver.resolve([])).rejects.toMatchObject({ code: 'INVALID_CREATION_GRAPH' });

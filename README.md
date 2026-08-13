@@ -19,7 +19,7 @@ For a complete Windows setup and operating walkthrough, see the [Chinese Usage G
 ### Default `safe` profile
 
 - **Four supported source objects**: `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE`.
-- **Controlled object creation**: Adds previewed and confirmed creation for `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE`, including a new group with its first module. Function-module interface metadata remains out of scope.
+- **Controlled object creation**: Adds previewed and confirmed creation for `PROGRAM`, a `FUNCTION_MODULE` in an existing group, or a new group with its first module. Function-module parameters are maintained in the complete `source/main`; standalone empty-group creation remains disabled pending captured Eclipse activation evidence.
 - **Review before mutation**: Reads the exact current source, validates the complete proposed source, performs a syntax check, and returns a complete diff before any SAP lock or write.
 - **Cross-client confirmation**: Uses native MCP `elicitation.form` when supported, with an explicitly enabled one-time text challenge fallback for incompatible clients.
 - **Policy boundaries**: Requires a DEV role, allow-listed host/client/namespace, a transportable package, and an existing unreleased transport reported by SAP for the object.

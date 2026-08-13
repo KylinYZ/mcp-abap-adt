@@ -144,7 +144,7 @@ describe('AbapChangeWorkflow', () => {
     })).resolves.toMatchObject({ status: 'preview' });
   });
 
-  it('activates function modules through a typed ADT object reference', async () => {
+  it('activates function modules with the Eclipse ADT name-and-URI request', async () => {
     const test = harness();
     const functionModule = {
       ...object,
@@ -164,10 +164,44 @@ describe('AbapChangeWorkflow', () => {
       objectType: 'FUNCTION_MODULE', objectName: 'Z_MCP_TEST', newSource: 'FUNCTION z_mcp_test.', transportRequest: 'DEVK900001'
     });
     await test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' });
-    expect(test.client.activate).toHaveBeenCalledWith(expect.objectContaining({
-      'adtcore:type': 'FUGR/FF',
-      'adtcore:parentUri': '/sap/bc/adt/functions/groups/zmcp_tools'
-    }), false);
+    expect(test.client.activate).toHaveBeenCalledWith(
+      'Z_MCP_TEST',
+      '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      undefined,
+      true
+    );
+    expect(test.client.syntaxCheck).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the same Eclipse request when restoring a function module', async () => {
+    const test = harness({ activationResults: [false, true] });
+    const functionModule = {
+      ...object,
+      objectType: 'FUNCTION_MODULE' as const,
+      objectName: 'Z_MCP_TEST',
+      adtType: 'FUGR/FF',
+      objectUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      sourceUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test/source/main',
+      lockUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      activationName: 'Z_MCP_TEST',
+      activationUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      activationParentUrl: '/sap/bc/adt/functions/groups/zmcp_tools'
+    };
+    (test.workflow as any).resolver.resolve.mockResolvedValue(functionModule);
+    await test.workflow.preview({
+      objectType: 'FUNCTION_MODULE', objectName: 'Z_MCP_TEST',
+      newSource: 'FUNCTION z_mcp_test.\nENDFUNCTION.', transportRequest: 'DEVK900001'
+    });
+
+    await expect(test.workflow.apply({
+      changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({ code: 'ACTIVATION_FAILED', details: { plan: { status: 'ROLLED_BACK' } } });
+    expect(test.client.activate).toHaveBeenNthCalledWith(
+      1, 'Z_MCP_TEST', functionModule.objectUrl, undefined, true
+    );
+    expect(test.client.activate).toHaveBeenNthCalledWith(
+      2, 'Z_MCP_TEST', functionModule.objectUrl, undefined, true
+    );
   });
 
   it('accepts SAP line-ending normalization without rolling back', async () => {

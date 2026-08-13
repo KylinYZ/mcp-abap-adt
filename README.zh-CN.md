@@ -19,7 +19,7 @@
 ### 默认 `safe` 模式
 
 - **支持四类源码对象**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`。
-- **支持三类对象创建**：`PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE`，也可一次预览“新函数组 + 首个函数模块”。
+- **支持受控对象创建**：可创建 `PROGRAM`、已有函数组中的 `FUNCTION_MODULE`，以及一次预览“新函数组 + 首个函数模块”；单独空 `FUNCTION_GROUP` 暂停开放，等待目标系统 Eclipse 激活协议证据。
 - **先审阅、后修改**：读取精确对象的完整当前源码，验证完整目标源码，执行语法检查并返回完整 diff；预览阶段不会锁定、写入或激活 SAP 对象。
 - **跨客户端确认**：客户端支持 MCP `elicitation.form` 时使用原生弹框；不支持时，可按配置启用绑定计划的一次性文字确认。
 - **策略边界**：只允许 DEV 角色、白名单主机、客户端和命名空间；拒绝 `$TMP`，并要求 SAP 为目标对象返回一个已有且未释放的传输请求。
@@ -67,6 +67,9 @@
 - `previewAbapChange`：校验目标对象、传输请求、完整目标源码和语法，返回完整 diff 和短时变更计划；不修改 SAP。
 - `applyAbapChange`：在用户明确确认后执行先前生成的计划，包含源码漂移检查、锁定、写入、语法检查、解锁、激活、复读校验和失败恢复。
 - `getAbapChangeStatus`：读取本地计划状态和阶段结果，不返回完整源码、凭据、Cookie 或锁句柄。
+- `previewAbapObjectCreation`：只读校验并冻结 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` 创建计划；不创建、锁定、写入或激活 SAP 对象。
+- `applyAbapObjectCreation`：用户明确确认后，按依赖顺序创建、写入、检查、激活和复读；失败时只对当前计划能证明归属的对象尝试反向删除补偿。
+- `getAbapObjectCreationStatus`：读取创建计划、已创建对象和补偿状态，不返回完整源码、确认短语或锁句柄。
 
 ### 标准操作流程
 
@@ -76,10 +79,11 @@
 4. 使用返回的 `changePlanId` 调用 `applyAbapChange`。用户确认由服务器通过 MCP 客户端获取，不能由模型自行声明。
 5. 需要查看执行阶段、错误、解锁或回滚结果时，调用 `getAbapChangeStatus`。
 
+创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。单独空 `FUNCTION_GROUP` 会在预览阶段拒绝。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#9-安全创建对象)。
+
+函数模块接口参数属于完整 `source/main` 源码中 `FUNCTION ... .` 的签名部分，可与实现代码一起预览、写入和复读验证。当前尚未提供“结构化参数数组自动生成 ABAP 签名”的高级工具，调用方必须提交完整可审阅源码；函数组源码仍由 SAP 生成。创建失败后的删除是尽力补偿，不是数据库事务，结果不确定时必须人工检查而不能盲目重试。
+
 变更计划只保存在当前 MCP 进程内，具有有效期且只能消费一次。MCP 重启后计划会丢失。默认有效期为 900 秒，允许配置为 60–3600 秒。计划不存在、已过期、已消费或出现源码漂移时均不能写入 SAP，必须重新预览。
-- `previewAbapObjectCreation`：只读校验并冻结 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` 创建计划；不创建、锁定、写入或激活 SAP 对象。
-- `applyAbapObjectCreation`：用户明确确认后，按依赖顺序创建、写入、检查、激活和复读；失败时只对当前计划能证明归属的对象尝试反向删除补偿。
-- `getAbapObjectCreationStatus`：读取创建计划、已创建对象和补偿状态，不返回完整源码、确认短语或锁句柄。
 
 ### 确认交互
 
@@ -88,10 +92,6 @@
 - 原生弹框最多等待 15 分钟，同时不会超过计划剩余有效期。超时按取消处理，计划保持 `PREVIEWED`；只要计划仍有效，用户可以再次调用应用工具重新弹框。
 - 客户端不支持 form elicitation 时，只有设置 `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true` 才能应用。第一次调用会返回绑定计划的一次性短语，第二次调用必须提交完全一致的 `textConfirmation`。
 - 支持原生弹框的客户端始终使用更强的弹框确认，并忽略文字确认参数。两种确认机制都不可用时，服务返回 `CONFIRMATION_UNSUPPORTED` 并拒绝写入。
-
-创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、单个 `FUNCTION_GROUP`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#9-安全创建对象)。
-
-函数模块接口参数维护仍未接入。首期只创建函数模块及其完整实现源码；函数组源码由 SAP 生成。创建失败后的删除是尽力补偿，不是数据库事务，结果不确定时必须人工检查而不能盲目重试。
 
 ### 计划与恢复状态
 
@@ -109,13 +109,13 @@
 
 截至 2026-08-13，第一阶段安全工作流及主要只读运行护栏已在约定范围内完成实现和核心验收：
 
-- **自动化验证**：22 个 Jest 测试套件、164 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、日志和审计串行写入；TypeScript 构建与 `git diff --check` 通过。
+- **自动化验证**：22 个 Jest 测试套件、167 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、日志和审计串行写入；TypeScript 构建与 `git diff --check` 通过。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
 - **真实 SAP DEV 运行护栏**：已验证查询/搜索超限在访问 SAP 前拒绝、搜索默认数量、查询数量参数透传、1 MiB 响应替换为 `413`、源码分页缓存命中、LRU 淘汰、60 秒 TTL 过期，以及同一 MCP 进程内单并发 FIFO 和队列满 `429`。当前 SAP ADT 表预览会稳定返回请求数量外加一条 lookahead 行，例如请求 `5` 行返回 `6` 条。
 - **换行规范化**：`ZCODEX_MCP_TEST` 已真实得到 `LINE_ENDING_NORMALIZED`，计划进入 `APPLIED`，且激活、解锁和复读哈希均成功。
-- **对象创建实测**：`PROGRAM ZMCP_CREATE_TEST` 已在客户端 `300`、开发包 `Z001`、传输 `S4HK900011` 中完成创建、写入、语法检查、解锁、激活和复读验证并保留。首次创建 `FUNCTION_GROUP ZMCP_IF_TEST` 时，旧实现的字符串激活返回失败；工作流已证明对象归属并删除补偿成功，终态为 `COMPENSATED`，`FUNCTION_MODULE Z_MCP_IF_TEST` 尚未创建且只读复查无残留。函数组 typed activation 修复已通过自动化与构建，仍需重新启动 MCP 后做真实 DEV 复测。
+- **对象创建与抓包实测**：`PROGRAM ZMCP_CREATE_TEST` 已在客户端 `300`、开发包 `Z001`、传输 `S4HK900011` 中完成创建、写入、语法检查、解锁、激活和复读验证并保留。历史 `ZMCP_IF_TEST` 计划在函数组独立激活失败后安全补偿，终态为 `COMPENSATED`。随后 Eclipse ADT 3.60.2 对 `ZMCP_ADT_TRACE + Z_MCP_ADT_TRACE` 的真实会话证明：组合创建不单独激活函数组，函数参数直接写入 `source/main`，函数模块使用仅含 `uri + name` 且 `preauditRequested=true` 的激活请求。MCP 已按此协议完成代码与定向测试修正，仍需重启后使用新对象做真实 DEV 复测。
 - **激活未知结果保护**：激活请求抛出超时或连接异常时，先只读核对 active/inactive 版本；无法确定远端结果时撤销自动删除资格并进入人工检查状态，禁止盲目重试。
 - **HTTP 超时**：已使用本机停滞 HTTP 端点端到端确认底层 ADT 客户端在配置 `5000 ms` 时约 5 秒取消请求；没有通过故意运行慢查询压测 SAP。
 - **待专项验证**：调试、ATC、trace 等长任务的专用超时，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。
@@ -167,6 +167,7 @@ SAP_MCP_QUERY_DEFAULT_ROWS=200
 SAP_MCP_QUERY_MAX_ROWS=5000
 SAP_MCP_SEARCH_DEFAULT_RESULTS=50
 SAP_MCP_SEARCH_MAX_RESULTS=500
+SAP_MCP_MAX_ARGUMENT_BYTES=5242880
 SAP_MCP_MAX_RESPONSE_BYTES=10485760
 SAP_MCP_SOURCE_CACHE_MAX_ENTRIES=20
 SAP_MCP_SOURCE_CACHE_MAX_ITEM_BYTES=2097152
@@ -208,6 +209,8 @@ SAP_MCP_MAX_ARGUMENT_BYTES=5242880
 5. 客户端不支持 form 且服务器启用了文字降级时，先展示服务器返回的一次性短语，再用同一个 changePlanId 和完全一致的 textConfirmation 调用一次。
 6. 使用 getAbapChangeStatus 检查阶段、解锁和恢复结果，不暴露完整源码。
 
+创建对象时，先调用 previewAbapObjectCreation 展示完整对象图、源码、传输和补偿警告；用户明确同意后只使用 creationPlanId 调用 applyAbapObjectCreation，再用 getAbapObjectCreationStatus 检查创建与补偿状态。不要给 FUNCTION_GROUP 传 source；FUNCTION_MODULE 的参数签名必须包含在完整 source 中，不能只提交实现代码或结构化参数数组。
+
 不要传入或信任模型生成的 confirmedByUser。只有应用结果明确表示语法检查、激活、源码哈希复核和解锁均成功时，才能声明修改成功。出现源码漂移时重新读取和预览。回滚或解锁失败时，要求用户在 ADT/SAP 中人工检查非活动对象、锁和传输。
 
 legacy-full 会额外开放原有低层 ADT 工具。原始写入和删除操作绕过安全流程，只能作为兼容能力使用。
@@ -218,8 +221,6 @@ legacy-full 会额外开放原有低层 ADT 工具。原始写入和删除操作
 默认七工具 `safe` 模式不开放数据库查询工具。使用 `legacy-full` 时：
 
 - 始终使用明确的 `WHERE` 条件，避免无边界读取。
-创建对象时，先调用 previewAbapObjectCreation 展示完整对象图、源码、传输和补偿警告；用户明确同意后只使用 creationPlanId 调用 applyAbapObjectCreation，再用 getAbapObjectCreationStatus 检查创建与补偿状态。不要给 FUNCTION_GROUP 传 source，不要声称可以维护 FUNCTION_MODULE 接口参数。
-
 - 只查询实际需要的字段。
 - 确定提供完整主键时使用 `SELECT SINGLE`。
 - 不能保证完整主键但只需要一条记录时，使用 `UP TO 1 ROWS`。

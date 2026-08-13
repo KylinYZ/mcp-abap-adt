@@ -266,7 +266,7 @@ describe('AbapObjectCreationWorkflow', () => {
     expect(test.auditEvents.at(-1)).toMatchObject({ activationOutcome: 'UNKNOWN' });
   });
 
-  it('uses typed activation for the object graph and compensates in reverse order', async () => {
+  it('uses Eclipse function-module activation, verifies the parent, and compensates in reverse order', async () => {
     const functionGroup: ResolvedCreationObject = {
       objectType: 'FUNCTION_GROUP',
       objectName: 'ZNEW_FG',
@@ -297,14 +297,16 @@ describe('AbapObjectCreationWorkflow', () => {
     const existing = new Set<string>();
     const calls: string[] = [];
     const activationArguments: unknown[][] = [];
+    const resolvedVersions: string[] = [];
     const resolver = {
       resolve: jest.fn(async () => objects.map(value => ({ ...value }))),
       assertTargetsAbsent: jest.fn(async (targets: ResolvedCreationObject[]) => {
         const found = targets.find(target => existing.has(target.objectName));
         if (found) throw new Error(`${found.objectName} already exists`);
       }),
-      resolveCreated: jest.fn(async (expected: ResolvedCreationObject) => {
+      resolveCreated: jest.fn(async (expected: ResolvedCreationObject, version = 'inactive') => {
         if (!existing.has(expected.objectName)) throw new Error('not found');
+        resolvedVersions.push(`${expected.objectName}:${version}`);
         return { ...expected };
       })
     };
@@ -336,14 +338,11 @@ describe('AbapObjectCreationWorkflow', () => {
       unLock: jest.fn(async () => { calls.push('unlock:ZNEW_FM'); return ''; }),
       getObjectSource: jest.fn(async () => {
         calls.push('getSource:ZNEW_FM');
-        return 'FUNCTION znew_fm.\nWRITE / different.\nENDFUNCTION.';
+        return functionModule.source as string;
       }),
       activate: jest.fn(async (...args: unknown[]) => {
         activationArguments.push(args);
-        const type = typeof args[0] === 'string'
-          ? 'PROGRAM'
-          : String((args[0] as Record<string, unknown>)['adtcore:type']);
-        calls.push(type === 'FUGR/F' ? 'activate:ZNEW_FG' : 'activate:ZNEW_FM');
+        calls.push(`activate:${String(args[0])}`);
         return { success: true, messages: [], inactive: [] };
       }),
       deleteObject: jest.fn(async (url: string) => {
@@ -361,7 +360,12 @@ describe('AbapObjectCreationWorkflow', () => {
       resolver as unknown as AbapCreationResolver,
       policy,
       new CreationPlanStore(60_000, () => 1_000, () => 'creation-graph'),
-      { append: async () => undefined }
+      {
+        append: async event => {
+          // Exercise recovery after both the module and its new parent are proven active.
+          if (event.eventType === 'OBJECT_VERIFIED:ZNEW_FG') throw new Error('audit unavailable');
+        }
+      }
     );
 
     await expect(workflow.preview({
@@ -376,12 +380,12 @@ describe('AbapObjectCreationWorkflow', () => {
     await expect(workflow.apply({
       creationPlanId: 'creation-graph', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
-      code: 'SOURCE_VERIFY_FAILED',
+      code: 'OBJECT_CREATION_FAILED',
       details: { plan: { status: 'COMPENSATED', compensationSucceeded: true } }
     });
     expect(calls).toEqual([
       'validate:ZNEW_FG',
-      'validate:ZNEW_FG', 'create:ZNEW_FG', 'activate:ZNEW_FG',
+      'validate:ZNEW_FG', 'create:ZNEW_FG',
       'validate:ZNEW_FM', 'create:ZNEW_FM',
       `lock:${functionModule.objectUrl}`, 'write:ZNEW_FM', 'syntax:ZNEW_FM', 'unlock:ZNEW_FM',
       'activate:ZNEW_FM', 'getSource:ZNEW_FM',
@@ -389,17 +393,46 @@ describe('AbapObjectCreationWorkflow', () => {
       `lock:${functionGroup.objectUrl}`, 'delete:ZNEW_FG'
     ]);
     expect(existing.size).toBe(0);
-    expect(activationArguments[0]).toEqual([{
-      'adtcore:uri': functionGroup.objectUrl,
-      'adtcore:type': 'FUGR/F',
-      'adtcore:name': 'ZNEW_FG',
-      'adtcore:parentUri': functionGroup.parentPath
-    }, true]);
-    expect(activationArguments[1]).toEqual([{
-      'adtcore:uri': functionModule.objectUrl,
-      'adtcore:type': 'FUGR/FF',
-      'adtcore:name': 'ZNEW_FM',
-      'adtcore:parentUri': functionGroup.objectUrl
-    }, false]);
+    expect(activationArguments).toEqual([[
+      'ZNEW_FM', functionModule.objectUrl, undefined, true
+    ]]);
+    expect(resolvedVersions).toEqual([
+      'ZNEW_FG:inactive',
+      'ZNEW_FM:inactive',
+      'ZNEW_FM:active',
+      'ZNEW_FG:active'
+    ]);
+
+    calls.length = 0;
+    activationArguments.length = 0;
+    resolvedVersions.length = 0;
+    const successWorkflow = new AbapObjectCreationWorkflow(
+      client,
+      resolver as unknown as AbapCreationResolver,
+      policy,
+      new CreationPlanStore(60_000, () => 1_000, () => 'creation-success'),
+      { append: async () => undefined }
+    );
+    await successWorkflow.preview({
+      objects: [
+        { objectType: 'FUNCTION_GROUP', objectName: 'ZNEW_FG', description: 'New group', packageName: 'Z001' },
+        { objectType: 'FUNCTION_MODULE', objectName: 'ZNEW_FM', description: 'New module', parentFunctionGroup: 'ZNEW_FG', source: functionModule.source }
+      ],
+      transportRequest: 'DEVK900001'
+    });
+
+    await expect(successWorkflow.apply({
+      creationPlanId: 'creation-success', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+    expect(existing).toEqual(new Set(['ZNEW_FG', 'ZNEW_FM']));
+    expect(activationArguments).toEqual([[
+      'ZNEW_FM', functionModule.objectUrl, undefined, true
+    ]]);
+    expect(resolvedVersions).toEqual([
+      'ZNEW_FG:inactive',
+      'ZNEW_FM:inactive',
+      'ZNEW_FM:active',
+      'ZNEW_FG:active'
+    ]);
   });
 });

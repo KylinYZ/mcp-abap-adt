@@ -134,6 +134,11 @@ function normalizeGraph(inputs: CreationObjectInput[], policy: SafetyPolicy): Re
   if (!['PROGRAM', 'FUNCTION_GROUP', 'FUNCTION_MODULE', 'FUNCTION_GROUP,FUNCTION_MODULE'].includes(graph)) {
     throw invalidGraph('Unsupported object creation graph.');
   }
+  if (graph === 'FUNCTION_GROUP') {
+    throw invalidGraph(
+      'Standalone FUNCTION_GROUP creation is disabled until its Eclipse ADT activation protocol is captured.'
+    );
+  }
   if (graph === 'FUNCTION_GROUP,FUNCTION_MODULE'
     && normalized[1].parentFunctionGroup !== normalized[0].objectName) {
     throw invalidGraph('The function module must name the new function group as its parent.');
@@ -232,9 +237,9 @@ function assertSourceFrame(objectType: CreationObjectType, objectName: string, s
     throw invalidGraph(`Program source must start with REPORT or PROGRAM ${objectName}.`);
   }
   if (objectType === 'FUNCTION_MODULE') {
-    if (!new RegExp(`^\\s*FUNCTION\\s+${escaped}\\s*\\.`, 'i').test(source)
+    if (!new RegExp(`^\\s*FUNCTION\\s+${escaped}(?:\\s|\\.)`, 'i').test(source)
       || !/ENDFUNCTION\s*\.\s*$/i.test(source)) {
-      throw invalidGraph(`Function-module source must be framed by FUNCTION ${objectName}. and ENDFUNCTION.`);
+      throw invalidGraph(`Function-module source must start with FUNCTION ${objectName} and end with ENDFUNCTION.`);
     }
   }
 }

@@ -166,24 +166,42 @@ export class AbapObjectCreationWorkflow {
           await this.recordStage(plan, `OBJECT_UNLOCKED:${created.objectName}`, true, undefined, true, created);
         }
 
+        if (created.objectType === 'FUNCTION_GROUP') {
+          // Eclipse leaves the new group inactive until its first function module is activated.
+          continue;
+        }
+
         await this.activate(created);
         await this.recordStage(plan, `OBJECT_ACTIVATED:${created.objectName}`, true, undefined, true, created);
 
-        if (created.objectType === 'FUNCTION_GROUP') {
-          await this.resolver.resolveCreated(created, 'active');
-        } else {
-          const actualSource = await this.client.getObjectSource(created.actualSourceUrl as string);
-          const comparison = compareSources(created.source as string, actualSource);
-          created.verifiedSourceHash = comparison.actualHash;
-          created.sourceMatchType = comparison.matchType;
-          if (!comparison.matches) {
-            throw new SafeAbapError(
-              'SOURCE_VERIFY_FAILED',
-              'verify',
-              `Activated source for ${created.objectName} does not match the confirmed creation plan.`,
-              { expectedHash: comparison.expectedHash, actualHash: comparison.actualHash, sourceMatchType: comparison.matchType }
-            );
-          }
+        await this.resolver.resolveCreated(created, 'active');
+        const actualSource = await this.client.getObjectSource(created.actualSourceUrl as string);
+        const comparison = compareSources(created.source as string, actualSource);
+        created.verifiedSourceHash = comparison.actualHash;
+        created.sourceMatchType = comparison.matchType;
+        if (!comparison.matches) {
+          throw new SafeAbapError(
+            'SOURCE_VERIFY_FAILED',
+            'verify',
+            `Activated source for ${created.objectName} does not match the confirmed creation plan.`,
+            { expectedHash: comparison.expectedHash, actualHash: comparison.actualHash, sourceMatchType: comparison.matchType }
+          );
+        }
+
+        const createdParent = plan.createdObjects.find(candidate =>
+          candidate.objectType === 'FUNCTION_GROUP'
+          && candidate.objectName === created.parentFunctionGroup
+        );
+        if (createdParent) {
+          await this.resolver.resolveCreated(createdParent, 'active');
+          await this.recordStage(
+            plan,
+            `OBJECT_VERIFIED:${createdParent.objectName}`,
+            true,
+            undefined,
+            true,
+            createdParent
+          );
         }
         await this.recordStage(plan, `OBJECT_VERIFIED:${created.objectName}`, true, undefined, true, created);
       }
@@ -287,9 +305,7 @@ export class AbapObjectCreationWorkflow {
 
   private async activate(object: CreatedObjectRecord): Promise<void> {
     try {
-      const result = object.objectType === 'PROGRAM'
-        ? await this.client.activate(object.objectName, object.actualObjectUrl, undefined, true)
-        : await this.client.activate(activationReference(object), object.objectType === 'FUNCTION_GROUP');
+      const result = await this.client.activate(object.objectName, object.actualObjectUrl, undefined, true);
       if (!result.success) {
         const details = activationFailureDetails(result, object);
         throw new SafeAbapError(
@@ -474,22 +490,6 @@ function newObjectOptions(object: ResolvedCreationObject, transport: string): Ne
     description: object.description,
     parentPath: object.parentPath,
     transport
-  };
-}
-
-function activationReference(object: CreatedObjectRecord): {
-  'adtcore:uri': string;
-  'adtcore:type': string;
-  'adtcore:name': string;
-  'adtcore:parentUri': string;
-} {
-  return {
-    'adtcore:uri': object.actualObjectUrl,
-    'adtcore:type': object.adtType,
-    'adtcore:name': object.objectName,
-    'adtcore:parentUri': object.objectType === 'FUNCTION_GROUP'
-      ? object.parentPath
-      : object.activationParentUrl as string
   };
 }
 
