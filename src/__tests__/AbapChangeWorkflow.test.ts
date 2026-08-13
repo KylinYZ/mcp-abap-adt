@@ -1,3 +1,4 @@
+import type { SyntaxCheckResult } from 'abap-adt-api';
 import { AbapChangeWorkflow, type AuditSink } from '../safe/AbapChangeWorkflow';
 import { ChangePlanStore } from '../safe/ChangePlanStore';
 import { SafetyPolicy } from '../safe/SafetyPolicy';
@@ -31,6 +32,7 @@ function policy(): SafetyPolicy {
 function harness(options: {
   activationResults?: boolean[];
   successfulActivationTransforms?: Array<(source: string) => string>;
+  syntaxMessages?: SyntaxCheckResult[];
 } = {}) {
   let source = 'REPORT ztest.';
   const calls: string[] = [];
@@ -58,7 +60,7 @@ function harness(options: {
     }),
     syntaxCheck: jest.fn(async () => {
       calls.push('syntaxCheck');
-      return [];
+      return options.syntaxMessages || [];
     }),
     lock: jest.fn(async () => {
       calls.push('lock');
@@ -126,6 +128,46 @@ describe('AbapChangeWorkflow', () => {
     expect(test.workflow.status('plan-1').status).toBe('APPLIED');
     await expect(test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' }))
       .rejects.toThrow('already applied');
+  });
+
+  it('does not reject a WARNING severity label during syntax validation', async () => {
+    const test = harness({ syntaxMessages: [{
+      severity: 'WARNING',
+      line: 1,
+      offset: 0,
+      uri: object.sourceUrl,
+      text: 'warning only'
+    }] });
+
+    await expect(test.workflow.preview({
+      objectType: 'PROGRAM', objectName: 'ZTEST', newSource: 'REPORT ztest.\nWRITE / test.', transportRequest: 'DEVK900001'
+    })).resolves.toMatchObject({ status: 'preview' });
+  });
+
+  it('activates function modules through a typed ADT object reference', async () => {
+    const test = harness();
+    const functionModule = {
+      ...object,
+      objectType: 'FUNCTION_MODULE' as const,
+      objectName: 'Z_MCP_TEST',
+      adtType: 'FUGR/FF',
+      objectUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      sourceUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test/source/main',
+      lockUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      activationName: 'Z_MCP_TEST',
+      activationUrl: '/sap/bc/adt/functions/groups/zmcp_tools/fmodules/z_mcp_test',
+      activationParentUrl: '/sap/bc/adt/functions/groups/zmcp_tools'
+    };
+    jest.mocked(test.client.searchObject).mockResolvedValue([]);
+    (test.workflow as any).resolver.resolve.mockResolvedValue(functionModule);
+    await test.workflow.preview({
+      objectType: 'FUNCTION_MODULE', objectName: 'Z_MCP_TEST', newSource: 'FUNCTION z_mcp_test.', transportRequest: 'DEVK900001'
+    });
+    await test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' });
+    expect(test.client.activate).toHaveBeenCalledWith(expect.objectContaining({
+      'adtcore:type': 'FUGR/FF',
+      'adtcore:parentUri': '/sap/bc/adt/functions/groups/zmcp_tools'
+    }), false);
   });
 
   it('accepts SAP line-ending normalization without rolling back', async () => {

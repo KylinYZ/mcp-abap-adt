@@ -34,6 +34,10 @@ export interface SafeAdtClient {
   ): Promise<SyntaxCheckResult[]>;
   lock(objectUrl: string, accessMode?: string): Promise<AdtLock>;
   unLock(objectUrl: string, lockHandle: string): Promise<string>;
+  activate(
+    object: { 'adtcore:uri': string; 'adtcore:type': string; 'adtcore:name': string; 'adtcore:parentUri': string },
+    preauditRequested?: boolean
+  ): Promise<ActivationResult>;
   activate(objectName: string, objectUrl: string, mainInclude?: string, preauditRequested?: boolean): Promise<ActivationResult>;
 }
 
@@ -49,6 +53,7 @@ export interface ResolvedAbapObject {
   mainProgram?: string;
   packageName?: string;
   parentObject?: string;
+  activationParentUrl?: string;
 }
 
 export interface DiffSummary {

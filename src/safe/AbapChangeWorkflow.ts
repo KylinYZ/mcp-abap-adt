@@ -341,12 +341,23 @@ export class AbapChangeWorkflow {
 
   private async activateOrThrow(object: ResolvedAbapObject): Promise<void> {
     try {
-      const activation = await this.client.activate(
-        object.activationName,
-        object.activationUrl,
-        object.mainProgram,
-        true
-      );
+      // Function modules require an ADT object reference with their function-group parent.
+      const activation = object.objectType === 'FUNCTION_MODULE'
+        ? await this.client.activate({
+          'adtcore:uri': object.activationUrl,
+          'adtcore:type': object.adtType,
+          'adtcore:name': object.activationName,
+          'adtcore:parentUri': object.activationParentUrl || functionGroupActivationUrl(object.activationUrl)
+        // ADT preaudit compiles the function source as a standalone program,
+        // where FUNCTION is invalid. The typed activation below remains the
+        // authoritative activation path for the function module.
+        }, false)
+        : await this.client.activate(
+          object.activationName,
+          object.activationUrl,
+          object.mainProgram,
+          true
+        );
       if (!activation.success) {
         throw new SafeAbapError(
           'ACTIVATION_FAILED',
@@ -416,8 +427,16 @@ export class AbapChangeWorkflow {
   }
 }
 
+function functionGroupActivationUrl(functionModuleUrl: string): string {
+  const match = functionModuleUrl.match(/^(.*\/functions\/groups\/[^/]+)\/fmodules\/[^/]+$/i);
+  if (!match) {
+    throw new SafeAbapError('ACTIVATION_FAILED', 'activate', 'SAP ADT did not provide a function-group parent URL.');
+  }
+  return match[1];
+}
+
 function assertSyntaxSuccess(messages: SyntaxCheckResult[], stage: string): void {
-  const errors = messages.filter(message => /[EAX]/i.test(String(message.severity || '')));
+  const errors = messages.filter(message => isErrorSeverity(message.severity));
   if (errors.length > 0) {
     throw new SafeAbapError(
       'SYNTAX_CHECK_FAILED',
@@ -426,6 +445,10 @@ function assertSyntaxSuccess(messages: SyntaxCheckResult[], stage: string): void
       { errors }
     );
   }
+}
+
+function isErrorSeverity(value: string): boolean {
+  return ['E', 'A', 'X', 'ERROR', 'ABORT', 'EXIT'].includes(String(value || '').trim().toUpperCase());
 }
 
 function transportNumbers(info: TransportInfo): Set<string> {

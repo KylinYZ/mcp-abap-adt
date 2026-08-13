@@ -39,9 +39,12 @@ import { RevisionHandlers } from './handlers/RevisionHandlers.js';
 import { SafeAbapHandlers, selectProfileTools } from './handlers/SafeAbapHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapObjectResolver } from './safe/AbapObjectResolver.js';
+import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
+import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
 import { AuditLogger } from './safe/AuditLogger.js';
 import { ChangePlanStore } from './safe/ChangePlanStore.js';
 import { SafeAbapError } from './safe/errors.js';
+import { CreationPlanStore } from './safe/CreationPlanStore.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
 import { ToolExecutionGate } from './lib/ToolExecutionGate.js';
@@ -166,19 +169,35 @@ export class AbapAdtServer extends Server {
       changePlans,
       auditLogger
     );
+    const creationWorkflow = new AbapObjectCreationWorkflow(
+      this.adtClient,
+      new AbapCreationResolver(this.adtClient, this.safetyPolicy),
+      this.safetyPolicy,
+      new CreationPlanStore(
+        this.safetyPolicy.planTtlMs,
+        () => Date.now(),
+        undefined,
+        this.guardrails.changePlanMaxEntries,
+        this.guardrails.rollbackFailedRetentionMs
+      ),
+      auditLogger
+    );
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
       elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
       applyConfirmed: input => this.executionGate.run(() => changeWorkflow.apply(input))
+    }, creationWorkflow, {
+      allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      applyConfirmed: input => this.executionGate.run(() => creationWorkflow.apply(input))
     });
 
-
-        // Setup tool handlers
+    // Setup tool handlers
     this.toolCatalog = this.createToolCatalog();
     this.setupToolHandlers();
   }
-
   private serializeResult(result: unknown) {
     try {
       // Handlers already return a well-formed MCP tool result

@@ -8,6 +8,7 @@ export interface RuntimeGuardrailValues {
   queryMaxRows: number;
   searchDefaultResults: number;
   searchMaxResults: number;
+  maxArgumentBytes: number;
   maxResponseBytes: number;
   sourceCacheMaxEntries: number;
   sourceCacheMaxItemBytes: number;
@@ -39,6 +40,7 @@ export class RuntimeGuardrails {
       queryMaxRows: integer(environment, 'SAP_MCP_QUERY_MAX_ROWS', 5_000, 1, 100_000),
       searchDefaultResults: integer(environment, 'SAP_MCP_SEARCH_DEFAULT_RESULTS', 50, 1, 10_000),
       searchMaxResults: integer(environment, 'SAP_MCP_SEARCH_MAX_RESULTS', 500, 1, 10_000),
+      maxArgumentBytes: integer(environment, 'SAP_MCP_MAX_ARGUMENT_BYTES', 5_242_880, 65_536, 52_428_800),
       maxResponseBytes: integer(environment, 'SAP_MCP_MAX_RESPONSE_BYTES', 10_485_760, 1_048_576, 104_857_600),
       sourceCacheMaxEntries: integer(environment, 'SAP_MCP_SOURCE_CACHE_MAX_ENTRIES', 20, 0, 1_000),
       sourceCacheMaxItemBytes: integer(environment, 'SAP_MCP_SOURCE_CACHE_MAX_ITEM_BYTES', 2_097_152, 65_536, 20_971_520),

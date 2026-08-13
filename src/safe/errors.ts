@@ -2,6 +2,14 @@ export type SafeErrorCode =
   | 'POLICY_DENIED'
   | 'CONFIRMATION_UNSUPPORTED'
   | 'OBJECT_RESOLUTION_FAILED'
+  | 'INVALID_CREATION_GRAPH'
+  | 'OBJECT_ALREADY_EXISTS'
+  | 'PARENT_NOT_FOUND'
+  | 'OBJECT_VALIDATION_FAILED'
+  | 'OBJECT_CREATION_FAILED'
+  | 'SOURCE_WRITE_FAILED'
+  | 'SOURCE_VERIFY_FAILED'
+  | 'COMPENSATION_FAILED'
   | 'TRANSPORT_INVALID'
   | 'SYNTAX_CHECK_FAILED'
   | 'SOURCE_DRIFT'
@@ -50,6 +58,19 @@ function nextStepFor(code: SafeErrorCode): string {
       return 'Use an MCP client with form elicitation support or explicitly enable SAP_MCP_ALLOW_TEXT_CONFIRMATION.';
     case 'OBJECT_RESOLUTION_FAILED':
       return 'Verify the exact object type and name in ADT, then create a new preview.';
+    case 'INVALID_CREATION_GRAPH':
+      return 'Correct the object graph, parent fields, and complete source, then create a new creation preview.';
+    case 'OBJECT_ALREADY_EXISTS':
+      return 'Inspect the existing SAP object; safe creation will not overwrite or adopt it.';
+    case 'PARENT_NOT_FOUND':
+      return 'Verify the exact transportable package or parent function group before creating a new preview.';
+    case 'OBJECT_VALIDATION_FAILED':
+      return 'Correct the SAP object name or parent metadata reported by ADT, then create a new preview.';
+    case 'OBJECT_CREATION_FAILED':
+    case 'SOURCE_WRITE_FAILED':
+    case 'SOURCE_VERIFY_FAILED':
+    case 'COMPENSATION_FAILED':
+      return 'Check the creation plan status and inspect the listed objects, locks, and transport in ADT before retrying.';
     case 'TRANSPORT_INVALID':
       return 'Choose an existing unreleased transport that SAP reports as available for this object.';
     case 'SYNTAX_CHECK_FAILED':

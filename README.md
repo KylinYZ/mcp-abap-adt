@@ -19,6 +19,7 @@ For a complete Windows setup and operating walkthrough, see the [Chinese Usage G
 ### Default `safe` profile
 
 - **Four supported source objects**: `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE`.
+- **Controlled object creation**: Adds previewed and confirmed creation for `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE`, including a new group with its first module. Function-module interface metadata remains out of scope.
 - **Review before mutation**: Reads the exact current source, validates the complete proposed source, performs a syntax check, and returns a complete diff before any SAP lock or write.
 - **Cross-client confirmation**: Uses native MCP `elicitation.form` when supported, with an explicitly enabled one-time text challenge fallback for incompatible clients.
 - **Policy boundaries**: Requires a DEV role, allow-listed host/client/namespace, a transportable package, and an existing unreleased transport reported by SAP for the object.
@@ -32,7 +33,7 @@ Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the original low-level ADT surf
 
 ### Performance and resource guardrails
 
-Central argument and response limits protect every tool in both `safe` and `legacy-full`. The FIFO execution gate protects operations that use the shared stateful ADT client; native confirmation waiting, local `getAbapChangeStatus`, and `healthcheck` do not occupy a SAP slot. After confirmation succeeds, the complete apply, verification, and rollback workflow runs atomically inside that same gate. The default concurrency is `1` because ADT operations share cookies, CSRF token, session type, and lock lifecycle. Increase it only after controlled SAP DEV validation.
+Central argument and response limits protect every tool in both `safe` and `legacy-full`. The FIFO execution gate protects operations that use the shared stateful ADT client; native confirmation waiting, local status tools, and `healthcheck` do not occupy a SAP slot. After confirmation succeeds, the complete source-change or creation workflow runs atomically inside that same gate. The default concurrency is `1` because ADT operations share cookies, CSRF token, session type, and lock lifecycle. Increase it only after controlled SAP DEV validation.
 
 | Environment variable | Default | Accepted range | Purpose |
 | --- | ---: | --- | --- |
@@ -49,6 +50,7 @@ Central argument and response limits protect every tool in both `safe` and `lega
 | `SAP_MCP_SOURCE_CACHE_TTL_SECONDS` | `900` | 60–3600 | Source-cache lifetime. |
 | `SAP_MCP_CHANGE_PLAN_MAX_ENTRIES` | `100` | 1–1000 | Maximum in-memory change-plan records. |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | Recovery-source retention after rollback failure. |
+| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | UTF-8 JSON argument limit per tool call, including complete source. |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`, `warn`, `info`, `debug` | Minimum ordinary stderr log level. |
 
 Invalid values fail startup. Explicit query or search limits above the configured maximum are rejected before SAP is called; results are never silently truncated and SQL is never rewritten. `getObjectSource` pagination uses a bounded in-process session cache after the first full SAP read, not SAP server-side pagination. A write timeout means the remote result is unknown: inspect the object or change-plan state before deciding whether to retry, and never blindly replay a mutation.
@@ -73,6 +75,9 @@ Set `SAP_MCP_TOOL_PROFILE=legacy-full` only for explicit compatibility needs. It
 3. Show the complete returned diff to the user. Preview performs no lock, write, or activation.
 4. Call `applyAbapChange` with the returned `changePlanId`. The server, not the model, obtains the user's confirmation.
 5. Call `getAbapChangeStatus` when stage, error, unlock, or rollback details are needed.
+- `previewAbapObjectCreation`: validates and freezes a non-mutating creation plan for `PROGRAM`, `FUNCTION_GROUP`, or `FUNCTION_MODULE`.
+- `applyAbapObjectCreation`: creates only a confirmed plan, verifies source and activation, and attempts bounded reverse compensation after failure.
+- `getAbapObjectCreationStatus`: returns local creation and compensation status without complete source or confirmation secrets.
 
 Change plans are in-memory, short-lived, and single-use. They are lost when the MCP process restarts. The default lifetime is 900 seconds; accepted values are 60–3600 seconds. An expired, missing, already consumed, or source-drifted plan cannot write SAP and requires a new preview.
 
@@ -213,7 +218,7 @@ This is currently the only supported installation path for the modified version.
    }
    ```
 
-Restart the MCP client after changing `.env`, rebuilding `dist`, or changing its MCP configuration. See [docs/使用指南.md](docs/使用指南.md) for Codex/Claude examples, verification steps, the four-tool workflow, confirmation behavior, and troubleshooting.
+Restart the MCP client after changing `.env`, rebuilding `dist`, or changing its MCP configuration. See [docs/使用指南.md](docs/使用指南.md) for Codex/Claude examples, verification steps, safe workflows, confirmation behavior, and troubleshooting.
 
 ## Custom Instruction
 Use this Custom Instruction to explain the tool to your model:
@@ -238,7 +243,7 @@ The `legacy-full` profile also exposes the original low-level ADT tools. Treat t
 
 ## Efficient Database Access (`legacy-full`)
 
-The database/query tools described below are exposed only by the compatibility `legacy-full` profile. They are not available in the default four-tool `safe` profile.
+The database/query tools described below are exposed only by the compatibility `legacy-full` profile. They are not available in the default seven-tool `safe` profile.
 
 SAP systems contain vast amounts of data.  It's crucial to write ABAP code that accesses the database efficiently to minimize performance impact and network traffic.  Avoid selecting entire tables or using broad `WHERE` clauses when you only need specific data.
 

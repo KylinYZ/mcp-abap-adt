@@ -1,0 +1,268 @@
+import { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkflow';
+import { CreationPlanStore } from '../safe/CreationPlanStore';
+import { SafetyPolicy } from '../safe/SafetyPolicy';
+import type { AbapCreationResolver } from '../safe/AbapCreationResolver';
+import type { CreationAdtClient, ResolvedCreationObject } from '../safe/creationTypes';
+
+const object: ResolvedCreationObject = {
+  objectType: 'PROGRAM',
+  objectName: 'ZNEW',
+  description: 'New program',
+  adtType: 'PROG/P',
+  packageName: 'Z001',
+  parentName: 'Z001',
+  parentPath: '/sap/bc/adt/packages/z001',
+  objectUrl: '/sap/bc/adt/programs/programs/znew',
+  sourceUrl: '/sap/bc/adt/programs/programs/znew/source/main',
+  source: 'REPORT znew.\nWRITE / test.',
+  sourceHash: 'target-hash'
+};
+
+function harness(options: { syntaxError?: boolean; syntaxWarning?: boolean; uncertainCreate?: boolean; resolveCreatedFails?: boolean } = {}) {
+  const calls: string[] = [];
+  let exists = false;
+  let source = '';
+  const resolver = {
+    resolve: jest.fn(async () => [{ ...object }]),
+    assertTargetsAbsent: jest.fn(async () => {
+      if (exists) throw new Error('already exists');
+    }),
+    resolveCreated: jest.fn(async () => {
+      if (!exists) throw new Error('not found');
+      if (options.resolveCreatedFails) throw new Error('object structure unavailable');
+      return { ...object };
+    })
+  };
+  const client = {
+    searchObject: jest.fn(),
+    objectStructure: jest.fn(),
+    mainPrograms: jest.fn(),
+    transportInfo: jest.fn(async () => ({
+      DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
+    })),
+    transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+    getObjectSource: jest.fn(async () => { calls.push('getSource'); return source; }),
+    setObjectSource: jest.fn(async (_url, value) => { calls.push('write'); source = value; }),
+    syntaxCheck: jest.fn(async () => {
+      calls.push('syntax');
+      if (options.syntaxError) return [{ severity: 'E', line: 1, text: 'bad source' }];
+      if (options.syntaxWarning) return [{ severity: 'WARNING', line: 1, text: 'warning only' }];
+      return [];
+    }),
+    lock: jest.fn(async () => { calls.push('lock'); return { LOCK_HANDLE: 'lock-1' }; }),
+    unLock: jest.fn(async () => { calls.push('unlock'); return ''; }),
+    activate: jest.fn(async () => { calls.push('activate'); return { success: true, messages: [], inactive: [] }; }),
+    validateNewObject: jest.fn(async () => ({ success: true })),
+    createObject: jest.fn(async () => {
+      calls.push('create');
+      exists = true;
+      if (options.uncertainCreate) throw new Error('connection reset after request');
+    }),
+    deleteObject: jest.fn(async () => { calls.push('delete'); exists = false; })
+  } as unknown as jest.Mocked<CreationAdtClient>;
+  const policy = new SafetyPolicy({
+    sapUrl: 'https://dev.example.com', sapClient: '100', systemRole: 'DEV',
+    allowedHosts: 'dev.example.com', allowedClients: '100', allowedNamespaces: 'Z', auditPath: './audit'
+  });
+  const auditEvents: Record<string, unknown>[] = [];
+  const workflow = new AbapObjectCreationWorkflow(
+    client,
+    resolver as unknown as AbapCreationResolver,
+    policy,
+    new CreationPlanStore(60_000, () => 1_000, () => 'creation-1'),
+    { append: async event => { auditEvents.push(event as unknown as Record<string, unknown>); } }
+  );
+  return { workflow, client, resolver, calls, auditEvents, exists: () => exists };
+}
+
+const previewInput = {
+  objects: [{
+    objectType: 'PROGRAM', objectName: 'ZNEW', description: 'New program', packageName: 'Z001', source: object.source
+  }],
+  transportRequest: 'DEVK900001'
+};
+
+describe('AbapObjectCreationWorkflow', () => {
+  it('previews without mutations and applies the immutable program plan', async () => {
+    const test = harness();
+    const preview = await test.workflow.preview(previewInput);
+
+    expect(preview).toMatchObject({
+      status: 'preview', syntaxValidation: 'deferred_until_creation', confirmationRequired: true,
+      sources: [{ objectName: 'ZNEW', source: object.source }]
+    });
+    expect(test.calls).toEqual([]);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+    expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'activate', 'getSource']);
+    expect(test.exists()).toBe(true);
+    expect(test.workflow.status('creation-1')).toMatchObject({
+      status: 'APPLIED', createdObjects: [{ objectName: 'ZNEW', ownershipProven: true, sourceMatchType: 'EXACT' }]
+    });
+  });
+
+  it('deletes a proven object when authoritative syntax validation fails', async () => {
+    const test = harness({ syntaxError: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({ code: 'SYNTAX_CHECK_FAILED', details: { plan: { status: 'COMPENSATED' } } });
+    expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'lock', 'delete']);
+    expect(test.exists()).toBe(false);
+  });
+
+  it('never deletes an object found after an uncertain create response', async () => {
+    const test = harness({ uncertainCreate: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'OBJECT_CREATION_FAILED',
+      details: { plan: { status: 'COMPENSATION_FAILED', createdObjects: [{ ownershipProven: false }] } }
+    });
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.exists()).toBe(true);
+  });
+
+  it('records an acknowledged creation as uncertain when post-create resolution fails', async () => {
+    const test = harness({ resolveCreatedFails: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'OBJECT_CREATION_FAILED',
+      details: { plan: { status: 'COMPENSATION_FAILED', createdObjects: [{ ownershipProven: false }] } }
+    });
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.exists()).toBe(true);
+  });
+
+  it('does not treat a WARNING severity label as a syntax error', async () => {
+    const test = harness({ syntaxWarning: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+  });
+
+  it('defers child validation until a new function group exists and compensates in reverse order', async () => {
+    const functionGroup: ResolvedCreationObject = {
+      objectType: 'FUNCTION_GROUP',
+      objectName: 'ZNEW_FG',
+      description: 'New function group',
+      adtType: 'FUGR/F',
+      packageName: 'Z001',
+      parentName: 'Z001',
+      parentPath: '/sap/bc/adt/packages/z001',
+      objectUrl: '/sap/bc/adt/functions/groups/znew_fg',
+      sourceUrl: '/sap/bc/adt/functions/groups/znew_fg/source/main'
+    };
+    const functionModule: ResolvedCreationObject = {
+      objectType: 'FUNCTION_MODULE',
+      objectName: 'ZNEW_FM',
+      description: 'New function module',
+      adtType: 'FUGR/FF',
+      packageName: 'Z001',
+      parentName: 'ZNEW_FG',
+      parentPath: functionGroup.objectUrl,
+      parentFunctionGroup: 'ZNEW_FG',
+      objectUrl: `${functionGroup.objectUrl}/fmodules/znew_fm`,
+      sourceUrl: `${functionGroup.objectUrl}/fmodules/znew_fm/source/main`,
+      activationParentUrl: functionGroup.objectUrl,
+      source: 'FUNCTION znew_fm.\nENDFUNCTION.',
+      sourceHash: 'function-source-hash'
+    };
+    const objects = [functionGroup, functionModule];
+    const existing = new Set<string>();
+    const calls: string[] = [];
+    const resolver = {
+      resolve: jest.fn(async () => objects.map(value => ({ ...value }))),
+      assertTargetsAbsent: jest.fn(async (targets: ResolvedCreationObject[]) => {
+        const found = targets.find(target => existing.has(target.objectName));
+        if (found) throw new Error(`${found.objectName} already exists`);
+      }),
+      resolveCreated: jest.fn(async (expected: ResolvedCreationObject) => {
+        if (!existing.has(expected.objectName)) throw new Error('not found');
+        return { ...expected };
+      })
+    };
+    const client = {
+      transportInfo: jest.fn(async () => ({
+        DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
+      })),
+      transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+      validateNewObject: jest.fn(async (options: { objname?: string }) => {
+        calls.push(`validate:${options.objname}`);
+        if (options.objname === 'ZNEW_FM' && !existing.has('ZNEW_FG')) {
+          throw new Error('parent function group is missing');
+        }
+        return { success: true };
+      }),
+      createObject: jest.fn(async (options: { name: string }) => {
+        calls.push(`create:${options.name}`);
+        existing.add(options.name);
+      }),
+      lock: jest.fn(async (url: string) => {
+        calls.push(`lock:${url}`);
+        return { LOCK_HANDLE: `lock-${url}` };
+      }),
+      setObjectSource: jest.fn(async () => { calls.push('write:ZNEW_FM'); }),
+      syntaxCheck: jest.fn(async () => {
+        calls.push('syntax:ZNEW_FM');
+        return [{ severity: 'E', line: 1, text: 'forced syntax error' }];
+      }),
+      unLock: jest.fn(async () => { calls.push('unlock:ZNEW_FM'); return ''; }),
+      activate: jest.fn(async (...args: unknown[]) => {
+        calls.push(typeof args[0] === 'string' ? 'activate:ZNEW_FG' : 'activate:ZNEW_FM');
+        return { success: true, messages: [], inactive: [] };
+      }),
+      deleteObject: jest.fn(async (url: string) => {
+        const name = url.includes('/fmodules/') ? 'ZNEW_FM' : 'ZNEW_FG';
+        calls.push(`delete:${name}`);
+        existing.delete(name);
+      })
+    } as unknown as jest.Mocked<CreationAdtClient>;
+    const policy = new SafetyPolicy({
+      sapUrl: 'https://dev.example.com', sapClient: '100', systemRole: 'DEV',
+      allowedHosts: 'dev.example.com', allowedClients: '100', allowedNamespaces: 'Z', auditPath: './audit'
+    });
+    const workflow = new AbapObjectCreationWorkflow(
+      client,
+      resolver as unknown as AbapCreationResolver,
+      policy,
+      new CreationPlanStore(60_000, () => 1_000, () => 'creation-graph'),
+      { append: async () => undefined }
+    );
+
+    await expect(workflow.preview({
+      objects: [
+        { objectType: 'FUNCTION_GROUP', objectName: 'ZNEW_FG', description: 'New group', packageName: 'Z001' },
+        { objectType: 'FUNCTION_MODULE', objectName: 'ZNEW_FM', description: 'New module', parentFunctionGroup: 'ZNEW_FG', source: functionModule.source }
+      ],
+      transportRequest: 'DEVK900001'
+    })).resolves.toMatchObject({ deferredObjectValidation: ['ZNEW_FM'] });
+    expect(calls).toEqual(['validate:ZNEW_FG']);
+
+    await expect(workflow.apply({
+      creationPlanId: 'creation-graph', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'SYNTAX_CHECK_FAILED',
+      details: { plan: { status: 'COMPENSATED', compensationSucceeded: true } }
+    });
+    expect(calls).toEqual([
+      'validate:ZNEW_FG',
+      'validate:ZNEW_FG', 'create:ZNEW_FG', 'activate:ZNEW_FG',
+      'validate:ZNEW_FM', 'create:ZNEW_FM',
+      `lock:${functionModule.objectUrl}`, 'write:ZNEW_FM', 'syntax:ZNEW_FM', 'unlock:ZNEW_FM',
+      `lock:${functionModule.objectUrl}`, 'delete:ZNEW_FM',
+      `lock:${functionGroup.objectUrl}`, 'delete:ZNEW_FG'
+    ]);
+    expect(existing.size).toBe(0);
+  });
+});

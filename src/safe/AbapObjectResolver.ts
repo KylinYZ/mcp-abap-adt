@@ -58,7 +58,8 @@ export class AbapObjectResolver {
         activationUrl: objectUrl,
         mainProgram,
         packageName: searchResult['adtcore:packageName'],
-        parentObject: objectType === 'FUNCTION_MODULE' ? functionGroupName(objectUrl) : undefined
+        parentObject: objectType === 'FUNCTION_MODULE' ? functionGroupName(objectUrl) : undefined,
+        activationParentUrl: objectType === 'FUNCTION_MODULE' ? functionGroupUrl(objectUrl) : undefined
       };
     } catch (error) {
       if (error instanceof SafeAbapError) {
@@ -165,6 +166,11 @@ function functionGroupName(objectUrl: string): string | undefined {
   const decoded = safeDecode(objectUrl);
   const match = decoded.match(/\/functions\/groups\/([^/]+)\/fmodules\//i);
   return match?.[1]?.toUpperCase();
+}
+
+function functionGroupUrl(objectUrl: string): string | undefined {
+  const match = objectUrl.match(/^(.*\/functions\/groups\/[^/]+)\/fmodules\/[^/]+$/i);
+  return match?.[1];
 }
 
 function safeDecode(value: string): string {

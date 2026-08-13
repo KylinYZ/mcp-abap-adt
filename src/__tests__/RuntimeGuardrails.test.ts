@@ -10,6 +10,7 @@ describe('RuntimeGuardrails', () => {
       queryMaxRows: 5_000,
       searchDefaultResults: 50,
       searchMaxResults: 500,
+      maxArgumentBytes: 5_242_880,
       maxResponseBytes: 10_485_760,
       sourceCacheMaxEntries: 20,
       sourceCacheMaxItemBytes: 2_097_152,

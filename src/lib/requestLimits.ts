@@ -5,6 +5,7 @@ export interface RequestLimitGuardrails {
   queryMaxRows: number;
   searchDefaultResults: number;
   searchMaxResults: number;
+  maxArgumentBytes: number;
 }
 
 type ArgumentsValue = Record<string, unknown>;
@@ -15,6 +16,10 @@ export function applyToolArgumentLimits(
   guardrails: RequestLimitGuardrails
 ): ArgumentsValue {
   const result = { ...(argumentsValue || {}) };
+  const serialized = JSON.stringify(result);
+  if (Buffer.byteLength(serialized, 'utf8') > guardrails.maxArgumentBytes) {
+    throw new McpError(413, `Tool arguments exceed the ${guardrails.maxArgumentBytes}-byte request limit.`);
+  }
   if (toolName === 'tableContents' || toolName === 'runQuery') {
     result.rowNumber = validatedLimit('rowNumber', result.rowNumber, guardrails.queryDefaultRows, guardrails.queryMaxRows);
   } else if (toolName === 'searchObject') {

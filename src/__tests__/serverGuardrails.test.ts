@@ -3,6 +3,8 @@ import { SafeAbapHandlers } from '../handlers/SafeAbapHandlers';
 import { ToolExecutionGate } from '../lib/ToolExecutionGate';
 import { adtClientOptions, executeGuardedToolCall, usesSapExecutionGate } from '../lib/serverGuardrails';
 import type { AbapChangeWorkflow, ApplyChangeInput } from '../safe/AbapChangeWorkflow';
+import type { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkflow';
+import type { ApplyCreationInput, CreationPlanView } from '../safe/creationTypes';
 import { SafeAbapError } from '../safe/errors';
 import type { ChangePlanView } from '../safe/types';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
@@ -140,12 +142,101 @@ describe('server guardrail integration helpers', () => {
     expect(order).toEqual(['apply-start', 'apply-end', 'legacy']);
   });
 
+  it('keeps creation confirmation outside the SAP gate and gates the complete creation apply', async () => {
+    const gate = new ToolExecutionGate(1, 2);
+    const plan: CreationPlanView = {
+      creationPlanId: 'creation-1',
+      createdAt: '2026-08-13T00:00:00.000Z',
+      expiresAt: '2099-08-13T00:15:00.000Z',
+      status: 'PREVIEWED',
+      systemHost: 'dev.example.com',
+      client: '100',
+      transportRequest: 'DEVK900001',
+      objects: [{
+        objectType: 'PROGRAM', objectName: 'ZNEW', description: 'New program', packageName: 'Z001',
+        objectUrl: '/sap/bc/adt/programs/programs/znew', sourceHash: 'target'
+      }],
+      stages: [],
+      createdObjects: []
+    };
+    let acceptConfirmation!: () => void;
+    const confirmation = new Promise<void>(resolve => { acceptConfirmation = resolve; });
+    let releaseApply!: () => void;
+    const applyBlocker = new Promise<void>(resolve => { releaseApply = resolve; });
+    const order: string[] = [];
+    const creationWorkflow = {
+      status: jest.fn().mockReturnValue(plan),
+      apply: jest.fn(async (_input: ApplyCreationInput) => {
+        order.push('creation-start');
+        await applyBlocker;
+        order.push('creation-end');
+        return { status: 'success' };
+      })
+    };
+    const handlers = new SafeAbapHandlers(
+      {} as AbapChangeWorkflow,
+      undefined,
+      creationWorkflow as unknown as AbapObjectCreationWorkflow,
+      {
+        allowTextConfirmation: false,
+        supportsFormElicitation: () => true,
+        elicitInput: async () => {
+          await confirmation;
+          return { action: 'accept', content: { decision: 'apply' } };
+        },
+        applyConfirmed: input => gate.run(() => creationWorkflow.apply(input))
+      }
+    );
+    const execute = (toolName: string, argumentsValue: Record<string, unknown>, dispatch: (args: Record<string, unknown>) => Promise<unknown>) =>
+      executeGuardedToolCall(
+        toolName,
+        argumentsValue,
+        guardrails,
+        gate,
+        usesSapExecutionGate(toolName),
+        dispatch,
+        value => value,
+        errorResult
+      );
+
+    const apply = execute(
+      'applyAbapObjectCreation',
+      { creationPlanId: 'creation-1' },
+      args => handlers.handle('applyAbapObjectCreation', args)
+    );
+    await Promise.resolve();
+    await expect(execute(
+      'getAbapObjectCreationStatus',
+      { creationPlanId: 'creation-1' },
+      args => handlers.handle('getAbapObjectCreationStatus', args)
+    )).resolves.toMatchObject({ status: 'success' });
+    expect(order).toEqual([]);
+
+    acceptConfirmation();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(['creation-start']);
+    const legacy = execute('searchObject', {}, async () => {
+      order.push('legacy');
+      return { content: [] };
+    });
+    await Promise.resolve();
+    expect(order).toEqual(['creation-start']);
+
+    releaseApply();
+    await Promise.all([apply, legacy]);
+    expect(order).toEqual(['creation-start', 'creation-end', 'legacy']);
+  });
+
   it.each([
     ['applyAbapChange', false],
     ['getAbapChangeStatus', false],
+    ['applyAbapObjectCreation', false],
+    ['getAbapObjectCreationStatus', false],
     ['healthcheck', false],
     ['inspectAbapObject', true],
     ['previewAbapChange', true],
+    ['previewAbapObjectCreation', true],
     ['searchObject', true]
   ] as const)('classifies %s SAP gate usage as %s', (toolName, expected) => {
     expect(usesSapExecutionGate(toolName)).toBe(expected);

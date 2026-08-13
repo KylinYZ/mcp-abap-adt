@@ -54,6 +54,7 @@ describe('AbapObjectResolver', () => {
     expect(resolved.objectName).toBe(objectName);
     if (objectType === 'FUNCTION_MODULE') {
       expect(resolved.parentObject).toBe('ZGROUP');
+      expect(resolved.activationParentUrl).toBe('/sap/bc/adt/functions/groups/zgroup');
     }
   });
 

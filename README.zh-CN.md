@@ -1,12 +1,12 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-免责声明：本服务仍处于实验阶段。默认 `safe` 模式提供受控的源码变更流程，但 SAP 权限设计、传输治理、备份和人工复核仍由使用方负责。
+免责声明：本服务仍处于实验阶段。默认 `safe` 模式提供受控的源码变更与对象创建流程，但 SAP 权限设计、传输治理、备份和人工复核仍由使用方负责。
 
 # ABAP-ADT-API MCP 服务
 
 ## 项目说明
 
-`mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。它基于 [`abap-adt-api`](https://github.com/marcellourbani/abap-adt-api/)，提供 ABAP 对象读取、安全源码修改、传输校验、语法检查、激活、失败恢复和审计能力。
+`mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。它基于 [`abap-adt-api`](https://github.com/marcellourbani/abap-adt-api/)，提供 ABAP 对象读取、安全源码修改、受控对象创建、传输校验、语法检查、激活、失败恢复和审计能力。
 
 > **分发状态（2026-08-12）：** 当前修改版**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
 
@@ -19,6 +19,7 @@
 ### 默认 `safe` 模式
 
 - **支持四类源码对象**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`。
+- **支持三类对象创建**：`PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE`，也可一次预览“新函数组 + 首个函数模块”。
 - **先审阅、后修改**：读取精确对象的完整当前源码，验证完整目标源码，执行语法检查并返回完整 diff；预览阶段不会锁定、写入或激活 SAP 对象。
 - **跨客户端确认**：客户端支持 MCP `elicitation.form` 时使用原生弹框；不支持时，可按配置启用绑定计划的一次性文字确认。
 - **策略边界**：只允许 DEV 角色、白名单主机、客户端和命名空间；拒绝 `$TMP`，并要求 SAP 为目标对象返回一个已有且未释放的传输请求。
@@ -28,13 +29,13 @@
 
 ### 兼容 `legacy-full` 模式
 
-只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。该模式会在四个安全工具之外开放原有的认证、对象 CRUD、传输、激活、DDIC、代码分析、调试和跟踪等工具。
+只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。该模式会在七个安全工具之外开放原有的认证、对象 CRUD、传输、激活、DDIC、代码分析、调试和跟踪等工具。
 
 低层写入和删除工具不会经过安全源码变更流程，因此只应作为兼容能力使用。
 
 ### 性能与资源护栏
 
-`safe` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地 `getAbapChangeStatus` 和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整应用、复核和回滚流程仍在同一个 gate 内原子执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
+`safe` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整应用、复核、回滚或创建补偿流程仍在同一个 gate 内原子执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
 
 | 环境变量 | 默认值 | 有效范围 | 用途 |
 | --- | ---: | --- | --- |
@@ -51,15 +52,16 @@
 | `SAP_MCP_SOURCE_CACHE_TTL_SECONDS` | `900` | 60–3600 | 源码缓存有效期。 |
 | `SAP_MCP_CHANGE_PLAN_MAX_ENTRIES` | `100` | 1–1000 | 内存中变更计划记录上限。 |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | 回滚失败后恢复源码保留时间。 |
+| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | 单次工具参数的 UTF-8 JSON 字节上限，包含完整源码。 |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`、`warn`、`info`、`debug` | 普通 stderr 日志最低级别。 |
 
 配置越界时服务启动失败。显式查询或搜索数量超过上限会在访问 SAP 前拒绝，不静默截断，也不改写 SQL。`getObjectSource` 分页是在首次完整读取 SAP 后使用受限的进程内会话缓存切分，不是 SAP 服务端分页。写请求超时代表远端结果未知，必须先检查对象或变更计划状态，再决定是否重试，禁止盲目重复写入。
 
 审计 JSONL 仍逐条等待并串行落盘。服务不自动轮转或删除审计日志；部署环境必须负责保留、归档、磁盘容量告警和访问控制。
 
-## 安全 ABAP 源码变更
+## 安全 ABAP 源码变更与对象创建
 
-默认 `SAP_MCP_TOOL_PROFILE=safe`，只暴露以下四个工具：
+默认 `SAP_MCP_TOOL_PROFILE=safe`，只暴露七个高层工具：
 
 - `inspectAbapObject`：读取一个精确且在白名单内的 `PROGRAM`、`INCLUDE`、`CLASS` 或 `FUNCTION_MODULE` 对象，返回完整源码、对象元数据和源码哈希。
 - `previewAbapChange`：校验目标对象、传输请求、完整目标源码和语法，返回完整 diff 和短时变更计划；不修改 SAP。
@@ -75,6 +77,9 @@
 5. 需要查看执行阶段、错误、解锁或回滚结果时，调用 `getAbapChangeStatus`。
 
 变更计划只保存在当前 MCP 进程内，具有有效期且只能消费一次。MCP 重启后计划会丢失。默认有效期为 900 秒，允许配置为 60–3600 秒。计划不存在、已过期、已消费或出现源码漂移时均不能写入 SAP，必须重新预览。
+- `previewAbapObjectCreation`：只读校验并冻结 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` 创建计划；不创建、锁定、写入或激活 SAP 对象。
+- `applyAbapObjectCreation`：用户明确确认后，按依赖顺序创建、写入、检查、激活和复读；失败时只对当前计划能证明归属的对象尝试反向删除补偿。
+- `getAbapObjectCreationStatus`：读取创建计划、已创建对象和补偿状态，不返回完整源码、确认短语或锁句柄。
 
 ### 确认交互
 
@@ -83,6 +88,10 @@
 - 原生弹框最多等待 15 分钟，同时不会超过计划剩余有效期。超时按取消处理，计划保持 `PREVIEWED`；只要计划仍有效，用户可以再次调用应用工具重新弹框。
 - 客户端不支持 form elicitation 时，只有设置 `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true` 才能应用。第一次调用会返回绑定计划的一次性短语，第二次调用必须提交完全一致的 `textConfirmation`。
 - 支持原生弹框的客户端始终使用更强的弹框确认，并忽略文字确认参数。两种确认机制都不可用时，服务返回 `CONFIRMATION_UNSUPPORTED` 并拒绝写入。
+
+创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、单个 `FUNCTION_GROUP`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#9-安全创建对象)。
+
+函数模块接口参数维护仍未接入。首期只创建函数模块及其完整实现源码；函数组源码由 SAP 生成。创建失败后的删除是尽力补偿，不是数据库事务，结果不确定时必须人工检查而不能盲目重试。
 
 ### 计划与恢复状态
 
@@ -100,7 +109,7 @@
 
 截至 2026-08-13，第一阶段安全工作流及主要只读运行护栏已在约定范围内完成实现和核心验收：
 
-- **自动化验证**：18 个 Jest 测试套件、131 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、日志和审计串行写入；TypeScript 构建与 `git diff --check` 通过。
+- **自动化验证**：22 个 Jest 测试套件、160 项测试全部通过，除安全流程外，还覆盖运行配置、FIFO 执行门控、请求/响应限制、受限源码缓存、计划保留、源码换行规范化、日志和审计串行写入；TypeScript 构建与 `git diff --check` 通过。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
@@ -166,6 +175,7 @@ SAP_MCP_LOG_LEVEL=warn
 ```
 
 不要将 `.env` 提交到版本库。`SAP_MCP_AUDIT_PATH` 必须允许 MCP 进程写入。安全源码修改要求角色、主机、客户端、命名空间白名单和审计目录全部满足策略。
+SAP_MCP_MAX_ARGUMENT_BYTES=5242880
 
 源码构建完成后，让 MCP 客户端直接运行绝对路径下的 `dist/index.js`：
 
@@ -182,12 +192,12 @@ SAP_MCP_LOG_LEVEL=warn
 }
 ```
 
-修改 `.env`、重新构建 `dist` 或调整 MCP 配置后，需要重启 MCP 客户端。Codex/Claude 配置示例、验证步骤、四工具实际操作和错误处理见 [使用指南](docs/使用指南.md)。
+修改 `.env`、重新构建 `dist` 或调整 MCP 配置后，需要重启 MCP 客户端。Codex/Claude 配置示例、验证步骤、安全源码修改、对象创建和错误处理见 [使用指南](docs/使用指南.md)。
 
 ## 推荐给模型的自定义指令
 
 ```text
-默认 safe 模式只支持受控修改 PROGRAM、INCLUDE、CLASS 和 FUNCTION_MODULE。
+默认 safe 模式支持受控修改 PROGRAM、INCLUDE、CLASS、FUNCTION_MODULE，以及受控创建 PROGRAM、FUNCTION_GROUP、FUNCTION_MODULE。
 
 1. 先调用 inspectAbapObject 读取精确对象的完整当前源码和元数据。
 2. 使用完整目标源码、精确对象和已有未释放传输调用 previewAbapChange。
@@ -203,9 +213,11 @@ legacy-full 会额外开放原有低层 ADT 工具。原始写入和删除操作
 
 ## 数据库访问建议（仅 `legacy-full`）
 
-默认四工具 `safe` 模式不开放数据库查询工具。使用 `legacy-full` 时：
+默认七工具 `safe` 模式不开放数据库查询工具。使用 `legacy-full` 时：
 
 - 始终使用明确的 `WHERE` 条件，避免无边界读取。
+创建对象时，先调用 previewAbapObjectCreation 展示完整对象图、源码、传输和补偿警告；用户明确同意后只使用 creationPlanId 调用 applyAbapObjectCreation，再用 getAbapObjectCreationStatus 检查创建与补偿状态。不要给 FUNCTION_GROUP 传 source，不要声称可以维护 FUNCTION_MODULE 接口参数。
+
 - 只查询实际需要的字段。
 - 确定提供完整主键时使用 `SELECT SINGLE`。
 - 不能保证完整主键但只需要一条记录时，使用 `UP TO 1 ROWS`。

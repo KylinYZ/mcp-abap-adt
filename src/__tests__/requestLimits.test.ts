@@ -1,6 +1,12 @@
 import { applyToolArgumentLimits, assertToolResponseSize } from '../lib/requestLimits';
 
-const guardrails = { queryDefaultRows: 200, queryMaxRows: 5000, searchDefaultResults: 50, searchMaxResults: 500 };
+const guardrails = {
+  queryDefaultRows: 200,
+  queryMaxRows: 5000,
+  searchDefaultResults: 50,
+  searchMaxResults: 500,
+  maxArgumentBytes: 1024
+};
 
 describe('request limits', () => {
   it.each([['tableContents', 'rowNumber', 200], ['runQuery', 'rowNumber', 200], ['searchObject', 'max', 50]] as const)
@@ -21,6 +27,14 @@ describe('request limits', () => {
 
   it('does not change unrelated tools', () => {
     expect(applyToolArgumentLimits('healthcheck', { value: 1 }, guardrails)).toEqual({ value: 1 });
+  });
+
+  it('rejects oversized UTF-8 arguments before dispatch', () => {
+    expect(() => applyToolArgumentLimits(
+      'previewAbapObjectCreation',
+      { objects: [{ source: '中'.repeat(400) }] },
+      guardrails
+    )).toThrow('request limit');
   });
 
   it('counts UTF-8 bytes across text items and ignores non-text items', () => {

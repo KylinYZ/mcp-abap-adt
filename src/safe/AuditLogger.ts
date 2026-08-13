@@ -6,6 +6,7 @@ export interface AuditEvent {
   timestamp?: string;
   correlationId: string;
   changePlanId?: string;
+  creationPlanId?: string;
   eventType: string;
   systemHost: string;
   client: string;
@@ -13,6 +14,7 @@ export interface AuditEvent {
   objectType?: string;
   objectName?: string;
   parentObject?: string;
+  packageName?: string;
   activationTarget?: string;
   transportRequest?: string;
   originalHash?: string;
@@ -29,6 +31,8 @@ export interface AuditEvent {
   errorSummary?: string;
   rollbackAttempted?: boolean;
   rollbackSucceeded?: boolean;
+  compensationAttempted?: boolean;
+  compensationSucceeded?: boolean;
   unlockSucceeded?: boolean;
   confirmationMode?: string;
 }
