@@ -116,6 +116,7 @@ describe('AbapChangeWorkflow', () => {
       transportRequest: 'DEVK900001'
     });
     expect(preview).toMatchObject({ status: 'preview', confirmationRequired: true });
+    expect(preview).not.toHaveProperty('confirmationInstruction');
     expect(test.calls).not.toContain('lock');
     expect(test.calls).not.toContain('writeSource');
 

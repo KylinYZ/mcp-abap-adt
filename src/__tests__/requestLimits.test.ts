@@ -44,6 +44,17 @@ describe('request limits', () => {
       .toThrow('response limit');
   });
 
+  it('counts structured content in addition to visible text', () => {
+    expect(() => assertToolResponseSize({
+      content: [{ type: 'text', text: 'a' }],
+      structuredContent: { diff: '中' }
+    }, 15)).not.toThrow();
+    expect(() => assertToolResponseSize({
+      content: [{ type: 'text', text: 'a' }],
+      structuredContent: { diff: '中' }
+    }, 14)).toThrow('response limit');
+  });
+
   it('does not include rejected response content in the error', () => {
     const secret = 'SECRET_RESPONSE';
     expect(() => assertToolResponseSize({ content: [{ type: 'text', text: secret }] }, 1)).toThrowError(

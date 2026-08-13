@@ -33,6 +33,12 @@
 
 低层写入和删除工具不会经过安全源码变更流程，因此只应作为兼容能力使用。
 
+### 可选 SM21 运行日志分析
+
+设置 `SAP_MCP_TOOL_PROFILE=legacy-full` 后，会额外开放只读的 `sm21Read` 与 `analyzeRuntimeErrors`。它们复用现有 ADT HTTP 登录会话，依赖 SAP 端部署 [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) 及其[部署说明](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md)，默认七工具 `safe` 模式不会开放这两个工具。
+
+不需要在 MCP 主机安装 `node-rfc`、SAP NW RFC SDK、JCo、NCo，也不需要 RFC destination 或额外客户端凭据。现有 ADT 用户只需 `S_ADMI_FCD=SM21`；MCP 工具参数不接受凭据。
+
 ### 性能与资源护栏
 
 `safe` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整应用、复核、回滚或创建补偿流程仍在同一个 gate 内原子执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
@@ -46,14 +52,18 @@
 | `SAP_MCP_QUERY_MAX_ROWS` | `5000` | 1–100000 | 查询行数硬上限。 |
 | `SAP_MCP_SEARCH_DEFAULT_RESULTS` | `50` | 1–搜索上限 | `searchObject` 默认数量。 |
 | `SAP_MCP_SEARCH_MAX_RESULTS` | `500` | 1–10000 | 搜索结果硬上限。 |
+| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | 单次工具参数的 UTF-8 JSON 字节上限，包含完整源码。 |
 | `SAP_MCP_MAX_RESPONSE_BYTES` | `10485760` | 1–100 MiB | 单次工具响应允许的 UTF-8 文本总字节数。 |
 | `SAP_MCP_SOURCE_CACHE_MAX_ENTRIES` | `20` | 0–1000 | 会话源码缓存条目数；`0` 表示关闭。 |
 | `SAP_MCP_SOURCE_CACHE_MAX_ITEM_BYTES` | `2097152` | 64 KiB–20 MiB | 允许缓存的单份源码上限。 |
 | `SAP_MCP_SOURCE_CACHE_TTL_SECONDS` | `900` | 60–3600 | 源码缓存有效期。 |
 | `SAP_MCP_CHANGE_PLAN_MAX_ENTRIES` | `100` | 1–1000 | 内存中变更计划记录上限。 |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | 回滚失败后恢复源码保留时间。 |
-| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | 单次工具参数的 UTF-8 JSON 字节上限，包含完整源码。 |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`、`warn`、`info`、`debug` | 普通 stderr 日志最低级别。 |
+| `SAP_MCP_SM21_TIMEZONE` | `UTC` | IANA 时区名称 | 将工具 ISO 时间转换为 SAP 时间戳。 |
+| `SAP_MCP_SM21_MAX_WINDOW_HOURS` | `24` | 1–24 | SM21 时间窗硬上限。 |
+| `SAP_MCP_SM21_DEFAULT_PAGE_SIZE` | `100` | 1–500 | SM21 默认返回行数。 |
+| `SAP_MCP_SM21_MAX_PAGE_SIZE` | `500` | 1–500 | SM21 单页行数硬上限。 |
 
 配置越界时服务启动失败。显式查询或搜索数量超过上限会在访问 SAP 前拒绝，不静默截断，也不改写 SQL。`getObjectSource` 分页是在首次完整读取 SAP 后使用受限的进程内会话缓存切分，不是 SAP 服务端分页。写请求超时代表远端结果未知，必须先检查对象或变更计划状态，再决定是否重试，禁止盲目重复写入。
 
@@ -75,8 +85,8 @@
 
 1. 调用 `inspectAbapObject`，读取精确对象的完整当前源码，并以它作为编辑基线。
 2. 调用 `previewAbapChange`，传入完整替换源码和一个已有且未释放的传输请求。
-3. 向用户展示服务器返回的完整 diff。预览不会锁定、写入或激活对象。
-4. 使用返回的 `changePlanId` 调用 `applyAbapChange`。用户确认由服务器通过 MCP 客户端获取，不能由模型自行声明。
+3. 向用户展示工具内容中服务器直接返回的完整 Markdown diff。预览不会锁定、写入或激活对象。
+4. 直接使用返回的 `changePlanId` 调用 `applyAbapChange`，不要再要求一次聊天文字确认。唯一确认由服务器通过 MCP 客户端获取，不能由模型自行声明。
 5. 需要查看执行阶段、错误、解锁或回滚结果时，调用 `getAbapChangeStatus`。
 
 创建对象时改用 `previewAbapObjectCreation`、`applyAbapObjectCreation` 和 `getAbapObjectCreationStatus`。支持单个 `PROGRAM`、已有函数组中的单个 `FUNCTION_MODULE`，以及“新函数组 + 首个函数模块”。单独空 `FUNCTION_GROUP` 会在预览阶段拒绝。完整中文 JSONC 参数和恢复说明见[使用指南](docs/使用指南.md#9-安全创建对象)。
@@ -87,7 +97,7 @@
 
 ### 确认交互
 
-- 支持 MCP form elicitation 的客户端会显示精简弹框，包含 `应用变更` 和 `取消` 两个选项。只有客户端返回接受且选择 `应用变更` 时才会开始修改。
+- 支持 MCP form elicitation 的客户端会在 diff 展示后显示唯一的精简弹框，包含 `应用变更` 和 `取消` 两个选项；不需要先在聊天中回复确认。只有客户端返回接受且选择 `应用变更` 时才会开始修改。
 - 选择 `取消`、点击跳过、关闭弹框或未返回选择，都视为取消，不消费计划，也不锁定或写入 SAP。
 - 原生弹框最多等待 15 分钟，同时不会超过计划剩余有效期。超时按取消处理，计划保持 `PREVIEWED`；只要计划仍有效，用户可以再次调用应用工具重新弹框。
 - 客户端不支持 form elicitation 时，只有设置 `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true` 才能应用。第一次调用会返回绑定计划的一次性短语，第二次调用必须提交完全一致的 `textConfirmation`。
@@ -178,7 +188,6 @@ SAP_MCP_LOG_LEVEL=warn
 ```
 
 不要将 `.env` 提交到版本库。`SAP_MCP_AUDIT_PATH` 必须允许 MCP 进程写入。安全源码修改要求角色、主机、客户端、命名空间白名单和审计目录全部满足策略。
-SAP_MCP_MAX_ARGUMENT_BYTES=5242880
 
 源码构建完成后，让 MCP 客户端直接运行绝对路径下的 `dist/index.js`：
 
@@ -204,8 +213,8 @@ SAP_MCP_MAX_ARGUMENT_BYTES=5242880
 
 1. 先调用 inspectAbapObject 读取精确对象的完整当前源码和元数据。
 2. 使用完整目标源码、精确对象和已有未释放传输调用 previewAbapChange。
-3. 向用户展示服务器返回的完整 diff。用户明确同意前不要调用应用工具。
-4. 只使用返回的 changePlanId 调用 applyAbapChange。客户端支持 form elicitation 时，必须显示服务器发起的原生确认弹框并提交用户选择。
+3. 向用户展示工具内容中服务器直接返回的完整 Markdown diff。
+4. 直接使用返回的 changePlanId 调用 applyAbapChange，不要先要求聊天文字确认。客户端支持 form elicitation 时，必须显示服务器发起的唯一原生确认弹框并提交用户选择。
 5. 客户端不支持 form 且服务器启用了文字降级时，先展示服务器返回的一次性短语，再用同一个 changePlanId 和完全一致的 textConfirmation 调用一次。
 6. 使用 getAbapChangeStatus 检查阶段、解锁和恢复结果，不暴露完整源码。
 

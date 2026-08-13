@@ -89,7 +89,7 @@ export class SafeAbapHandlers {
       },
       {
         name: 'previewAbapChange',
-        description: 'Validate and preview a complete ABAP source change. Does not lock, write, or activate SAP objects.',
+        description: 'Validate and preview a complete ABAP source change. Display the returned Markdown diff, then call applyAbapChange directly; do not request a separate chat confirmation. The apply tool obtains the single server-managed confirmation. Preview does not lock, write, or activate SAP objects.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -110,7 +110,7 @@ export class SafeAbapHandlers {
       },
       {
         name: 'applyAbapChange',
-        description: 'Apply one previously previewed change plan. Mutates SAP and requires explicit user confirmation.',
+        description: 'Open the server-managed confirmation for one previously displayed change plan, then apply only if accepted. Call this directly after showing the preview; do not ask for a separate chat confirmation. Mutates SAP after confirmation.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -226,7 +226,7 @@ export class SafeAbapHandlers {
       case 'inspectAbapObject':
         return this.workflow.inspect(String(args.objectType || ''), String(args.objectName || ''));
       case 'previewAbapChange':
-        return this.workflow.preview({
+        return this.previewChange({
           objectType: String(args.objectType || ''),
           objectName: String(args.objectName || ''),
           newSource: typeof args.newSource === 'string' ? args.newSource : '',
@@ -269,10 +269,51 @@ export class SafeAbapHandlers {
     return this.creationWorkflow;
   }
 
+  private async previewChange(input: {
+    objectType: string;
+    objectName: string;
+    newSource: string;
+    transportRequest: string;
+  }): Promise<Record<string, unknown>> {
+    const preview = await this.workflow.preview(input);
+    return {
+      content: [{ type: 'text', text: renderChangePreview(preview) }],
+      structuredContent: preview
+    };
+  }
+
   private requireCreationConfirmation(): AbapCreationConfirmation {
     if (!this.creationConfirmation) {
       throw new McpError(ErrorCode.InternalError, 'ABAP object creation confirmation is unavailable.');
     }
     return this.creationConfirmation;
   }
+}
+
+function renderChangePreview(preview: Record<string, unknown>): string {
+  const plan = preview.plan as Record<string, unknown> | undefined;
+  const object = plan?.object as Record<string, unknown> | undefined;
+  const summary = plan?.diffSummary as Record<string, unknown> | undefined;
+  const diff = String(preview.diff || '');
+  const fence = markdownFence(diff);
+  return [
+    '## ABAP 代码变更预览',
+    '',
+    `- 对象：${String(object?.objectType || '')} ${String(object?.objectName || '')}`,
+    `- 传输请求：${String(plan?.transportRequest || '')}`,
+    `- 变更统计：+${Number(summary?.addedLines || 0)} / -${Number(summary?.removedLines || 0)}`,
+    `- 变更计划：${String(plan?.changePlanId || '')}`,
+    '',
+    `${fence}diff`,
+    diff,
+    fence,
+    '',
+    '下一步直接调用 `applyAbapChange` 打开唯一的服务器确认选项；无需先在聊天中要求文字确认。'
+  ].join('\n');
+}
+
+function markdownFence(content: string): string {
+  // Keep remote source containing backticks from terminating the visible diff block.
+  const longestRun = Math.max(0, ...[...content.matchAll(/`+/g)].map(match => match[0].length));
+  return '`'.repeat(Math.max(3, longestRun + 1));
 }

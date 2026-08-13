@@ -31,6 +31,12 @@ For a complete Windows setup and operating walkthrough, see the [Chinese Usage G
 
 Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the original low-level ADT surface is explicitly required. It adds authentication, object CRUD, transport, activation, DDIC, code-analysis, debugging, tracing, and other legacy tools. Those raw mutation and deletion tools bypass the safe source-change workflow.
 
+### Optional SM21 runtime-log analysis
+
+With `SAP_MCP_TOOL_PROFILE=legacy-full`, the server also exposes read-only `sm21Read` and `analyzeRuntimeErrors`. They reuse the existing ADT HTTP login session and require the SAP-side [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) SICF handler and its [deployment instructions](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md); they are not part of the default seven-tool `safe` profile.
+
+No `node-rfc`, SAP NW RFC SDK, JCo, NCo, RFC destination, or extra client credentials are required. The existing ADT user needs `S_ADMI_FCD=SM21`; MCP tools never accept credentials as arguments.
+
 ### Performance and resource guardrails
 
 Central argument and response limits protect every tool in both `safe` and `legacy-full`. The FIFO execution gate protects operations that use the shared stateful ADT client; native confirmation waiting, local status tools, and `healthcheck` do not occupy a SAP slot. After confirmation succeeds, the complete source-change or creation workflow runs atomically inside that same gate. The default concurrency is `1` because ADT operations share cookies, CSRF token, session type, and lock lifecycle. Increase it only after controlled SAP DEV validation.
@@ -44,14 +50,18 @@ Central argument and response limits protect every tool in both `safe` and `lega
 | `SAP_MCP_QUERY_MAX_ROWS` | `5000` | 1–100000 | Hard query row limit. |
 | `SAP_MCP_SEARCH_DEFAULT_RESULTS` | `50` | 1–search maximum | Default for `searchObject`. |
 | `SAP_MCP_SEARCH_MAX_RESULTS` | `500` | 1–10000 | Hard search result limit. |
+| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | UTF-8 JSON argument limit per tool call, including complete source. |
 | `SAP_MCP_MAX_RESPONSE_BYTES` | `10485760` | 1–100 MiB | Total UTF-8 text bytes allowed in one tool response. |
 | `SAP_MCP_SOURCE_CACHE_MAX_ENTRIES` | `20` | 0–1000 | Session source-cache entries; `0` disables caching. |
 | `SAP_MCP_SOURCE_CACHE_MAX_ITEM_BYTES` | `2097152` | 64 KiB–20 MiB | Largest source retained in cache. |
 | `SAP_MCP_SOURCE_CACHE_TTL_SECONDS` | `900` | 60–3600 | Source-cache lifetime. |
 | `SAP_MCP_CHANGE_PLAN_MAX_ENTRIES` | `100` | 1–1000 | Maximum in-memory change-plan records. |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | Recovery-source retention after rollback failure. |
-| `SAP_MCP_MAX_ARGUMENT_BYTES` | `5242880` | 64 KiB–50 MiB | UTF-8 JSON argument limit per tool call, including complete source. |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`, `warn`, `info`, `debug` | Minimum ordinary stderr log level. |
+| `SAP_MCP_SM21_TIMEZONE` | `UTC` | IANA time-zone name | Converts tool ISO timestamps to SAP timestamps. |
+| `SAP_MCP_SM21_MAX_WINDOW_HOURS` | `24` | 1–24 | SM21 time-window hard limit. |
+| `SAP_MCP_SM21_DEFAULT_PAGE_SIZE` | `100` | 1–500 | Default SM21 result rows. |
+| `SAP_MCP_SM21_MAX_PAGE_SIZE` | `500` | 1–500 | SM21 result-row hard limit. |
 
 Invalid values fail startup. Explicit query or search limits above the configured maximum are rejected before SAP is called; results are never silently truncated and SQL is never rewritten. `getObjectSource` pagination uses a bounded in-process session cache after the first full SAP read, not SAP server-side pagination. A write timeout means the remote result is unknown: inspect the object or change-plan state before deciding whether to retry, and never blindly replay a mutation.
 
@@ -65,6 +75,9 @@ Audit JSONL writes remain awaited and serialized. The server does not rotate or 
 - `previewAbapChange`: validates the target, existing transport, proposed complete source, and syntax; then returns a complete diff and short-lived plan.
 - `applyAbapChange`: applies only the previously previewed plan after explicit user confirmation, with drift detection, activation, verification, rollback, and unlock handling.
 - `getAbapChangeStatus`: returns local plan status without complete source, credentials, cookies, or lock handles.
+- `previewAbapObjectCreation`: validates and freezes a non-mutating creation plan for `PROGRAM`, `FUNCTION_GROUP`, or `FUNCTION_MODULE`.
+- `applyAbapObjectCreation`: creates only a confirmed plan, verifies source and activation, and attempts bounded reverse compensation after failure.
+- `getAbapObjectCreationStatus`: returns local creation and compensation status without complete source or confirmation secrets.
 
 Set `SAP_MCP_TOOL_PROFILE=legacy-full` only for explicit compatibility needs. It additionally exposes all original low-level tools, including raw mutation and deletion operations that do not pass through the safe workflow.
 
@@ -72,18 +85,15 @@ Set `SAP_MCP_TOOL_PROFILE=legacy-full` only for explicit compatibility needs. It
 
 1. Call `inspectAbapObject` for the exact object and use the returned complete source as the edit baseline.
 2. Call `previewAbapChange` with the complete replacement source and an existing unreleased transport request.
-3. Show the complete returned diff to the user. Preview performs no lock, write, or activation.
-4. Call `applyAbapChange` with the returned `changePlanId`. The server, not the model, obtains the user's confirmation.
+3. Show the complete Markdown diff returned in the tool content. Preview performs no lock, write, or activation.
+4. Call `applyAbapChange` directly with the returned `changePlanId`; do not ask for a separate chat confirmation. The server, not the model, obtains the single confirmation through the MCP client.
 5. Call `getAbapChangeStatus` when stage, error, unlock, or rollback details are needed.
-- `previewAbapObjectCreation`: validates and freezes a non-mutating creation plan for `PROGRAM`, `FUNCTION_GROUP`, or `FUNCTION_MODULE`.
-- `applyAbapObjectCreation`: creates only a confirmed plan, verifies source and activation, and attempts bounded reverse compensation after failure.
-- `getAbapObjectCreationStatus`: returns local creation and compensation status without complete source or confirmation secrets.
 
 Change plans are in-memory, short-lived, and single-use. They are lost when the MCP process restarts. The default lifetime is 900 seconds; accepted values are 60–3600 seconds. An expired, missing, already consumed, or source-drifted plan cannot write SAP and requires a new preview.
 
 ### Confirmation behavior
 
-- Clients declaring MCP form elicitation receive a compact dialog with `应用变更` and `取消` choices. Only an accepted form with `应用变更` can start mutation; selecting `取消`, skipping, closing the dialog, or omitting the decision does not consume the plan.
+- Clients declaring MCP form elicitation receive one compact dialog with `应用变更` and `取消` choices after the diff is displayed. No prior chat confirmation is required. Only an accepted form with `应用变更` can start mutation; selecting `取消`, skipping, closing the dialog, or omitting the decision does not consume the plan.
 - The form waits for at most 15 minutes and never beyond the plan's remaining lifetime. Timeout is treated as cancellation, leaves the plan `PREVIEWED`, and allows the user to reopen confirmation while the plan remains valid.
 - Clients without form elicitation can apply only when `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true`. The first apply call returns a plan-bound one-time phrase; the exact phrase must be submitted in a second call before the plan expires.
 - Form-capable clients always use the stronger native dialog and ignore a supplied text phrase. If neither mechanism is available, apply fails closed with `CONFIRMATION_UNSUPPORTED`.
@@ -231,8 +241,8 @@ The default `safe` profile supports controlled source changes for `PROGRAM`, `IN
 
 1. Use `inspectAbapObject` to read the complete current source and metadata of the exact allow-listed object.
 2. Call `previewAbapChange` with the exact object, complete proposed source, and an existing unreleased transport request.
-3. Show the complete returned diff to the user. Do not call the apply tool until the user explicitly confirms that plan.
-4. Call `applyAbapChange` with only the returned `changePlanId`. If the client supports MCP form elicitation, present the server's native confirmation form and submit the user's decision.
+3. Show the complete Markdown diff returned in the tool content.
+4. Call `applyAbapChange` directly with only the returned `changePlanId`; do not request a separate chat confirmation. If the client supports MCP form elicitation, present the server's single native confirmation form and submit the user's decision.
 5. If form elicitation is unavailable and `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true`, show the returned one-time confirmation phrase to the user, then call `applyAbapChange` again with the same `changePlanId` and the exact phrase as `textConfirmation`.
 6. Use `getAbapChangeStatus` to inspect plan stages and recovery results without exposing complete source.
 

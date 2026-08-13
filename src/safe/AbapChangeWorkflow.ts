@@ -109,7 +109,7 @@ export class AbapChangeWorkflow {
       plan: this.plans.view(plan.changePlanId),
       diff,
       confirmationRequired: true,
-      confirmationInstruction: `Review the complete diff and explicitly confirm change plan ${plan.changePlanId} before applying.`
+      chatConfirmationRequired: false
     };
   }
 

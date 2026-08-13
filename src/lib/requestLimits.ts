@@ -39,6 +39,13 @@ export function assertToolResponseSize(toolResult: unknown, maxResponseBytes: nu
       }
     }
   }
+  if (toolResult.structuredContent !== undefined) {
+    // Structured output travels alongside visible content and must share the same response budget.
+    totalBytes += Buffer.byteLength(JSON.stringify(toolResult.structuredContent), 'utf8');
+    if (totalBytes > maxResponseBytes) {
+      throw new McpError(413, `Tool response exceeds the ${maxResponseBytes}-byte response limit. Narrow the request or retrieve fewer rows.`);
+    }
+  }
 }
 
 function validatedLimit(field: string, value: unknown, defaultValue: number, maximum: number): number {

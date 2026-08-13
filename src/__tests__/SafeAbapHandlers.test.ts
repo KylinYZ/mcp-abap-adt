@@ -130,6 +130,47 @@ describe('SafeAbapHandlers', () => {
     expect(creationWorkflow.status).toHaveBeenCalledWith('creation-1');
   });
 
+  it('returns a directly renderable complete diff and machine-readable preview data', async () => {
+    const preview = {
+      status: 'preview',
+      plan: {
+        changePlanId: 'plan-1',
+        object: { objectType: 'PROGRAM', objectName: 'ZTEST' },
+        transportRequest: 'DEVK900001',
+        diffSummary: { addedLines: 1, removedLines: 1 }
+      },
+      diff: '@@ -1,2 +1,2 @@\n REPORT ztest.\n-WRITE / old.\n+WRITE / new.',
+      confirmationRequired: true
+    };
+    const workflow = {
+      preview: jest.fn().mockResolvedValue(preview)
+    };
+    const handlers = new SafeAbapHandlers(workflow as never);
+
+    await expect(handlers.handle('previewAbapChange', {
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.\nWRITE / new.',
+      transportRequest: 'DEVK900001'
+    })).resolves.toEqual({
+      content: [{
+        type: 'text',
+        text: expect.stringContaining('```diff\n@@ -1,2 +1,2 @@\n REPORT ztest.\n-WRITE / old.\n+WRITE / new.\n```')
+      }],
+      structuredContent: preview
+    });
+
+    const result = await handlers.handle('previewAbapChange', {
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.\nWRITE / new.',
+      transportRequest: 'DEVK900001'
+    });
+    const content = result.content as Array<{ type: string; text: string }>;
+    expect(content[0].text).toContain('下一步直接调用 `applyAbapChange`');
+    expect(content[0].text).toContain('无需先在聊天中要求文字确认');
+  });
+
   it('keeps legacy tools hidden unless legacy-full is selected', () => {
     const handlers = new SafeAbapHandlers({} as never);
     const safeTools = handlers.getTools();
