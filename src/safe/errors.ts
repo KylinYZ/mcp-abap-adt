@@ -8,6 +8,7 @@ export type SafeErrorCode =
   | 'PLAN_NOT_FOUND'
   | 'PLAN_EXPIRED'
   | 'PLAN_ALREADY_CONSUMED'
+  | 'PLAN_CAPACITY_FULL'
   | 'LOCK_FAILED'
   | 'WRITE_FAILED'
   | 'ACTIVATION_FAILED'
@@ -59,6 +60,8 @@ function nextStepFor(code: SafeErrorCode): string {
     case 'PLAN_EXPIRED':
     case 'PLAN_ALREADY_CONSUMED':
       return 'Create and confirm a new change preview.';
+    case 'PLAN_CAPACITY_FULL':
+      return 'Wait for an active plan to finish or a retained recovery plan to expire before creating another preview.';
     case 'LOCK_FAILED':
       return 'Resolve the SAP object lock in ADT and retry with a new preview if the source changed.';
     case 'ROLLBACK_FAILED':

@@ -25,6 +25,8 @@ describe('AuditLogger', () => {
       client: '100',
       systemRole: 'DEV',
       success: false,
+      verifiedSourceHash: 'verified-hash',
+      sourceMatchType: 'DIFFERENT',
       confirmationMode: 'text-fallback',
       errorSummary: 'Authorization: Basic dXNlcjpzZWNyZXQ= password=secret',
       password: 'secret',
@@ -47,6 +49,8 @@ describe('AuditLogger', () => {
       success: false,
       confirmationMode: 'text-fallback'
     });
+    expect(record.verifiedSourceHash).toBe('verified-hash');
+    expect(record.sourceMatchType).toBe('DIFFERENT');
     expect(record.errorSummary).toContain('Authorization=[REDACTED]');
     expect(record.errorSummary).toContain('password=[REDACTED]');
     expect(record).not.toHaveProperty('password');
@@ -60,5 +64,68 @@ describe('AuditLogger', () => {
     expect(record).not.toHaveProperty('verificationCode');
     expect(JSON.stringify(record)).not.toContain('secret');
     expect(JSON.stringify(record)).not.toContain('123456');
+  });
+
+  it('serializes concurrent appends in call order with one directory initialization', async () => {
+    const logger = new AuditLogger(auditDirectory);
+    const mkdirSpy = jest.spyOn(fs, 'mkdir');
+    const events = [1, 2, 3].map(sequence => ({
+      correlationId: `plan-${sequence}`,
+      eventType: 'STAGE',
+      systemHost: 'dev.example.com',
+      client: '100',
+      systemRole: 'DEV',
+      success: true
+    } satisfies AuditEvent));
+
+    await Promise.all(events.map(event => logger.append(event)));
+
+    const lines = (await fs.readFile(logger.filePath, 'utf8')).trim().split('\n');
+    expect(lines.map(line => JSON.parse(line).correlationId)).toEqual(['plan-1', 'plan-2', 'plan-3']);
+    expect(mkdirSpy).toHaveBeenCalledTimes(1);
+    mkdirSpy.mockRestore();
+  });
+
+  it('recovers the append chain after a write failure', async () => {
+    const logger = new AuditLogger(auditDirectory);
+    const appendSpy = jest.spyOn(fs, 'appendFile')
+      .mockRejectedValueOnce(new Error('disk unavailable'))
+      .mockResolvedValueOnce();
+    const event: AuditEvent = {
+      correlationId: 'plan-1',
+      eventType: 'STAGE',
+      systemHost: 'dev.example.com',
+      client: '100',
+      systemRole: 'DEV',
+      success: true
+    };
+
+    await expect(logger.append(event)).rejects.toMatchObject({ code: 'AUDIT_FAILED' });
+    await expect(logger.append({ ...event, correlationId: 'plan-2' })).resolves.toBeUndefined();
+    expect(appendSpy).toHaveBeenCalledTimes(2);
+    appendSpy.mockRestore();
+  });
+
+  it('retries directory initialization after a mkdir failure', async () => {
+    const logger = new AuditLogger(auditDirectory);
+    const mkdirSpy = jest.spyOn(fs, 'mkdir')
+      .mockRejectedValueOnce(new Error('permission denied'))
+      .mockResolvedValueOnce(undefined);
+    const appendSpy = jest.spyOn(fs, 'appendFile').mockResolvedValue();
+    const event: AuditEvent = {
+      correlationId: 'plan-1',
+      eventType: 'STAGE',
+      systemHost: 'dev.example.com',
+      client: '100',
+      systemRole: 'DEV',
+      success: true
+    };
+
+    await expect(logger.append(event)).rejects.toMatchObject({ code: 'AUDIT_FAILED' });
+    await expect(logger.append(event)).resolves.toBeUndefined();
+    expect(mkdirSpy).toHaveBeenCalledTimes(2);
+    expect(appendSpy).toHaveBeenCalledTimes(1);
+    mkdirSpy.mockRestore();
+    appendSpy.mockRestore();
   });
 });

@@ -17,6 +17,10 @@ export interface AuditEvent {
   transportRequest?: string;
   originalHash?: string;
   targetHash?: string;
+  verifiedSourceHash?: string;
+  sourceMatchType?: string;
+  rollbackVerifiedSourceHash?: string;
+  rollbackSourceMatchType?: string;
   addedLines?: number;
   removedLines?: number;
   durationMs?: number;
@@ -31,18 +35,38 @@ export interface AuditEvent {
 
 export class AuditLogger {
   readonly filePath: string;
+  private directoryInitialization?: Promise<void>;
+  private writeTail: Promise<void> = Promise.resolve();
 
   constructor(auditDirectory: string) {
     this.filePath = path.join(path.resolve(auditDirectory), 'abap-change-audit.jsonl');
   }
 
-  async append(event: AuditEvent): Promise<void> {
+  append(event: AuditEvent): Promise<void> {
     const record = sanitizeRecord({ ...event, timestamp: event.timestamp || new Date().toISOString() });
+    const write = this.writeTail.then(() => this.writeRecord(record));
+    this.writeTail = write.catch(() => undefined);
+    return write;
+  }
+
+  private async writeRecord(record: Record<string, unknown>): Promise<void> {
     try {
-      await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+      await this.ensureDirectory();
       await fs.appendFile(this.filePath, `${JSON.stringify(record)}\n`, { encoding: 'utf8' });
     } catch (error) {
       throw new SafeAbapError('AUDIT_FAILED', 'audit', `Failed to write the audit log: ${errorMessage(error)}`);
+    }
+  }
+
+  private async ensureDirectory(): Promise<void> {
+    if (!this.directoryInitialization) {
+      this.directoryInitialization = fs.mkdir(path.dirname(this.filePath), { recursive: true }).then(() => undefined);
+    }
+    try {
+      await this.directoryInitialization;
+    } catch (error) {
+      this.directoryInitialization = undefined;
+      throw error;
     }
   }
 }
@@ -50,9 +74,15 @@ export class AuditLogger {
 function sanitizeRecord(record: Record<string, unknown>): Record<string, unknown> {
   // Confirmation phrases and verification codes are one-time secrets and must never reach disk.
   const forbidden = /password|passwd|pwd|cookie|authorization|lockhandle|source|diff|confirmationtext|textconfirmation|challenge|verificationcode/i;
+  const safeDiagnosticFields = new Set([
+    'verifiedSourceHash',
+    'sourceMatchType',
+    'rollbackVerifiedSourceHash',
+    'rollbackSourceMatchType'
+  ]);
   return Object.fromEntries(
     Object.entries(record)
-      .filter(([key]) => !forbidden.test(key))
+      .filter(([key]) => safeDiagnosticFields.has(key) || !forbidden.test(key))
       .map(([key, value]) => [key, typeof value === 'string' ? sanitizeValue(value) : value])
   );
 }

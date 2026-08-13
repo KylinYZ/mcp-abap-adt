@@ -3,7 +3,7 @@
 ## 状态
 
 - 日期：2026-08-11
-- 状态：跨客户端弹窗与文字降级方案已获批准并进入实现验证
+- 状态：第一阶段实现与核心验收已完成（2026-08-12）
 - 主开发仓库：`mcp-abap-abap-adt-api`
 - 配套策略仓库：`sap-skills`
 
@@ -200,9 +200,11 @@ SAP_MCP_ALLOW_TEXT_CONFIRMATION=false
 
 该工具不接受新源码、对象名或传输号，防止预览后替换内容。
 
-MCP 客户端必须先向用户展示计划中的完整 diff。调用 `applyAbapChange` 后，服务器通过 `Server.getClientCapabilities()` 检查客户端是否声明 `elicitation.form`；支持时使用 `Server.elicitInput` 发起标准 `elicitation/create` 表单，由 Codex、Claude 或其他兼容客户端显示各自的确认界面。弹窗展示对象、传输请求、计划 ID、原始与目标哈希和 diff 摘要，并提供必选布尔项“我已审阅完整 diff 并确认应用”。
+MCP 客户端必须先向用户展示计划中的完整 diff。调用 `applyAbapChange` 后，服务器通过 `Server.getClientCapabilities()` 检查客户端是否声明 `elicitation.form`；支持时使用 `Server.elicitInput` 发起标准 `elicitation/create` 表单，由 Codex、Claude 或其他兼容客户端显示各自的确认界面。考虑到客户端可能把换行折叠为空格，弹窗使用单行摘要，仅展示对象、传输请求和 diff 增删行数，不重复展示计划 ID 或源码哈希。表单提供必选单选项“应用变更”和“取消”，不设置默认值。
 
-只有客户端响应同时满足 `action === 'accept'` 和 `content.confirmApply === true` 时，handler 才能把内部 `confirmedByUser: true` 传给 workflow。`decline`、`cancel`、缺少确认字段、字段为 `false` 或 elicitation 请求失败时全部关闭失败，不调用 workflow 的写入路径。支持弹窗的客户端不再需要用户在聊天中输入固定确认文字。
+只有客户端响应同时满足 `action === 'accept'` 和 `content.decision === 'apply'` 时，handler 才能把内部 `confirmedByUser: true` 传给 workflow。用户选择“取消”、点击客户端的“跳过”或关闭按钮、缺少确认字段，或 elicitation 请求失败时全部关闭失败，不调用 workflow 的写入路径。支持弹窗的客户端不再需要用户在聊天中输入固定确认文字。
+
+原生确认请求最长等待十五分钟，同时不得超过当前计划的剩余有效时间。等待超时后 SDK 取消该 elicitation 请求，服务端按 `confirmation_declined` 和 `reason: timeout` 处理；计划保持 `PREVIEWED`，不锁定、不写入 SAP，用户稍后可再次调用 `applyAbapChange` 重新弹出确认。其他客户端或协议错误仍返回失败，不能伪装成用户取消。
 
 客户端未声明 `elicitation.form` 时检查 `SAP_MCP_ALLOW_TEXT_CONFIRMATION`。未显式设为 `true` 时返回 `CONFIRMATION_UNSUPPORTED / confirmation`；设为 `true` 时进入文字挑战降级，不按客户端名称维护白名单。
 
@@ -320,9 +322,9 @@ SAP 活动版本和版本管理是额外保障，不能替代 MCP 自己保存�
 - 预览语法失败不生成计划、不锁定、不写入。
 - 计划超时、篡改、重复消费。
 - 源码漂移在锁定前阻断。
-- 支持 `elicitation.form` 的客户端只有返回接受、`confirmApply=true` 时才调用 workflow，并忽略文字参数。
+- 支持 `elicitation.form` 的客户端只有返回接受、`decision=apply` 时才调用 workflow，并忽略文字参数。
 - 不支持客户端在文字降级关闭时返回 `CONFIRMATION_UNSUPPORTED`；开启时首次返回一次性短语，精确匹配后才调用 workflow。
-- 弹窗拒绝、取消、未勾选、elicitation 失败、文字挑战缺失或不匹配时均不写 SAP、不消费计划。
+- 弹窗拒绝、取消、未选择、elicitation 失败、文字挑战缺失或不匹配时均不写 SAP、不消费计划。
 - 文字挑战不进入审计和状态响应；审计仅记录 `confirmationMode: text-fallback`。
 - 成功调用顺序：读、锁、写、检查、解锁、激活、复读。
 - 写入、检查、解锁、激活或验证失败后的恢复；已解锁时恢复必须重新获取锁。
@@ -331,18 +333,22 @@ SAP 活动版本和版本管理是额外保障，不能替代 MCP 自己保存�
 - JSONL 审计字段和敏感信息清理。
 - MCP 工具 schema、annotations、错误结构和 TypeScript 构建。
 
+当前结果（2026-08-12）：18 个 Jest 测试套件、131 项测试全部通过；TypeScript 构建和 `git diff --check` 通过。新增性能与资源护栏、源码换行规范化已纳入自动化测试；对应真实 SAP 专项验证状态分别见同日设计说明。
+
 ## 真实 SAP 验证
 
-本地自动化通过后，按以下顺序在明确允许的开发系统执行：
+已在用户明确允许的开发系统和专用测试对象上完成：
 
-1. 验证只读连接与四种对象解析。
-2. 对指定 `Z/Y` 测试对象生成预览，不写入。
-3. 使用用户提供的已有传输请求，对专用测试对象执行一次真实修改。
-4. 验证语法检查、激活状态、源码哈希和 SAP 版本记录。
-5. 人工制造一次激活失败，验证恢复与解锁。
-6. 单独验证函数模块独立源码资源及其锁定、激活关系。
+1. `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 的真实解析、读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计。
+2. 预览语法错误在计划创建和弹窗前拒绝，未写入 SAP。
+3. 用户持锁时返回 `LOCK_FAILED`，释放锁后可按新计划成功执行。
+4. 预览后 GUI 修改触发 `SOURCE_DRIFT`，在获取锁前停止且不覆盖用户修改。
+5. MCP 重启后旧计划返回 `PLAN_NOT_FOUND`；计划自然过期后状态为 `EXPIRED`，应用返回 `PLAN_EXPIRED`。
+6. 已成功应用的计划再次调用返回 `PLAN_ALREADY_CONSUMED`，不再次弹窗或写入。
+7. Codex 原生弹窗的应用、取消、关闭和超时行为已验证；超时不消费计划。
+8. 使用一次性本地故障注入让首次激活失败，真实验证恢复锁、写回原源码、解锁、重新激活、原哈希复核和 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
 
-不连接测试或生产系统，不创建或释放传输请求。每项结果分别记录为代码验证、真实开发系统验证或未验证。
+本阶段未连接生产系统，不创建或释放传输请求。未穷举不同 SAP 版本、授权模型、网络中断和恢复过程再次失败；`ROLLBACK_FAILED`、`UNLOCK_FAILED` 仍按设计要求人工检查 ADT/SAP，避免自动反复写入。
 
 ## `sap-skills` 配套工作
 
@@ -367,7 +373,7 @@ SAP 活动版本和版本管理是额外保障，不能替代 MCP 自己保存�
 - 四类目标对象均有明确且可验证的解析路径。
 - 未预览、计划过期、计划重复使用、源码漂移或策略不匹配时无法写入。
 - `applyAbapChange` 不再信任模型传入的确认布尔值；优先接受标准 MCP elicitation 结果，只有显式开启时才接受绑定计划的一次性文字挑战。
-- 弹窗拒绝、取消、未勾选，或文字挑战缺失、不匹配时不消费计划，也不锁定或写入 SAP。
+- 弹窗拒绝、取消、未选择，或文字挑战缺失、不匹配时不消费计划，也不锁定或写入 SAP。
 - 不支持 form elicitation 的 Codex、Claude 或其他客户端在文字降级开启时可以通过短语应用变更；关闭时仍可读取和预览，但无法写入。
 - 当前开发环境启用 `SAP_MCP_ALLOW_TEXT_CONFIRMATION=true`，示例配置和 README 明确标注其安全降级性质，其他部署默认关闭。
 - 最终写入内容与用户确认的 diff 绑定，`applyAbapChange` 不能替换源码。

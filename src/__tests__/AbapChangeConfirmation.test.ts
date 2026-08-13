@@ -1,4 +1,4 @@
-import type { ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError, type ElicitResult } from '@modelcontextprotocol/sdk/types.js';
 import { AbapChangeConfirmation, type AbapChangeConfirmationOptions } from '../safe/AbapChangeConfirmation';
 import { AbapChangeWorkflow } from '../safe/AbapChangeWorkflow';
 import { SafeAbapError } from '../safe/errors';
@@ -45,7 +45,7 @@ describe('AbapChangeConfirmation', () => {
       supportsFormElicitation: () => true,
       elicitInput: jest.fn().mockResolvedValue({
         action: 'accept',
-        content: { confirmApply: true }
+        content: { decision: 'apply' }
       } satisfies ElicitResult),
       createTextCode: () => '123456',
       ...overrides
@@ -62,10 +62,24 @@ describe('AbapChangeConfirmation', () => {
     const { confirmation, workflow, options } = createSubject();
 
     await expect(confirmation.confirmAndApply('plan-1')).resolves.toEqual({ status: 'success' });
-    expect(options.elicitInput).toHaveBeenCalledWith(expect.objectContaining({
+    expect(options.elicitInput).toHaveBeenCalledWith({
       mode: 'form',
-      requestedSchema: expect.objectContaining({ required: ['confirmApply'] })
-    }));
+      message: '应用 ZTEST · 传输 DEVK900001 · +1/-0',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          decision: {
+            type: 'string',
+            title: '请选择操作',
+            oneOf: [
+              { const: 'apply', title: '应用变更' },
+              { const: 'cancel', title: '取消' }
+            ]
+          }
+        },
+        required: ['decision']
+      }
+    }, 15 * 60 * 1000);
     expect(workflow.apply).toHaveBeenCalledWith({
       changePlanId: 'plan-1',
       confirmedByUser: true,
@@ -74,12 +88,13 @@ describe('AbapChangeConfirmation', () => {
   });
 
   it.each([
-    ['decline', undefined],
-    ['cancel', undefined],
-    ['accept', { confirmApply: false }]
-  ] as const)('does not apply when the native form returns %s', async (action, content) => {
+    ['decline action', { action: 'decline' }],
+    ['cancel action', { action: 'cancel' }],
+    ['cancel option', { action: 'accept', content: { decision: 'cancel' } }],
+    ['missing decision', { action: 'accept' }]
+  ] as const)('does not apply for the native form %s', async (_caseName, result) => {
     const { confirmation, workflow } = createSubject({
-      elicitInput: jest.fn().mockResolvedValue({ action, ...(content ? { content } : {}) } as ElicitResult)
+      elicitInput: jest.fn().mockResolvedValue(result as ElicitResult)
     });
 
     await expect(confirmation.confirmAndApply('plan-1')).resolves.toMatchObject({
@@ -108,6 +123,36 @@ describe('AbapChangeConfirmation', () => {
       stage: 'confirmation'
     });
     expect(workflow.apply).not.toHaveBeenCalled();
+  });
+
+  it('treats a native confirmation timeout as a retryable cancellation', async () => {
+    const { confirmation, workflow } = createSubject({
+      elicitInput: jest.fn().mockRejectedValue(new McpError(ErrorCode.RequestTimeout, 'Request timed out'))
+    });
+
+    await expect(confirmation.confirmAndApply('plan-1')).resolves.toMatchObject({
+      status: 'confirmation_declined',
+      confirmationMode: 'elicitation',
+      reason: 'timeout'
+    });
+    expect(workflow.apply).not.toHaveBeenCalled();
+  });
+
+  it('does not wait beyond the remaining change-plan lifetime', async () => {
+    const now = Date.parse('2026-08-12T00:00:00.000Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const { confirmation, workflow, options } = createSubject();
+    workflow.status.mockReturnValue({
+      ...plan,
+      expiresAt: new Date(now + 30_000).toISOString()
+    });
+
+    try {
+      await confirmation.confirmAndApply('plan-1');
+      expect(options.elicitInput).toHaveBeenCalledWith(expect.any(Object), 30_000);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('returns a plan-bound text challenge before applying', async () => {
@@ -152,6 +197,45 @@ describe('AbapChangeConfirmation', () => {
     await expect(confirmation.confirmAndApply('plan-1', '确认应用 plan-1 验证码 654321'))
       .rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'confirmation' });
     expect(workflow.apply).not.toHaveBeenCalled();
+  });
+
+  it('lazily removes expired challenges before issuing a replacement', async () => {
+    const now = Date.parse('2026-08-12T00:00:00.000Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const { confirmation, workflow } = createSubject({
+      allowTextConfirmation: true,
+      supportsFormElicitation: () => false
+    });
+    workflow.status
+      .mockReturnValueOnce({ ...plan, expiresAt: new Date(now + 1).toISOString() })
+      .mockReturnValueOnce({ ...plan, expiresAt: new Date(now + 60_000).toISOString() });
+
+    try {
+      await confirmation.confirmAndApply('plan-1');
+      nowSpy.mockReturnValue(now + 2);
+      await expect(confirmation.confirmAndApply('plan-1', '确认应用 plan-1 验证码 123456'))
+        .resolves.toMatchObject({ status: 'confirmation_required' });
+      expect(workflow.apply).not.toHaveBeenCalled();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('replaces the previous challenge for the same plan', async () => {
+    const createTextCode = jest.fn().mockReturnValueOnce('123456').mockReturnValueOnce('654321');
+    const { confirmation, workflow } = createSubject({
+      allowTextConfirmation: true,
+      supportsFormElicitation: () => false,
+      createTextCode
+    });
+
+    await confirmation.confirmAndApply('plan-1');
+    await confirmation.confirmAndApply('plan-1');
+    await expect(confirmation.confirmAndApply('plan-1', '确认应用 plan-1 验证码 123456'))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED' });
+    await expect(confirmation.confirmAndApply('plan-1', '确认应用 plan-1 验证码 654321'))
+      .resolves.toEqual({ status: 'success' });
+    expect(workflow.apply).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed when form elicitation and text fallback are unavailable', async () => {

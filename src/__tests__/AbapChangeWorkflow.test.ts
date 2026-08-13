@@ -28,10 +28,14 @@ function policy(): SafetyPolicy {
   });
 }
 
-function harness(options: { activationResults?: boolean[] } = {}) {
+function harness(options: {
+  activationResults?: boolean[];
+  successfulActivationTransforms?: Array<(source: string) => string>;
+} = {}) {
   let source = 'REPORT ztest.';
   const calls: string[] = [];
   const activationResults = [...(options.activationResults || [true])];
+  const successfulActivationTransforms = [...(options.successfulActivationTransforms || [])];
   const client: SafeAdtClient = {
     searchObject: jest.fn(),
     objectStructure: jest.fn(),
@@ -67,6 +71,7 @@ function harness(options: { activationResults?: boolean[] } = {}) {
     activate: jest.fn(async () => {
       calls.push('activate');
       const success = activationResults.shift() ?? true;
+      if (success) source = (successfulActivationTransforms.shift() || (value => value))(source);
       return {
         success,
         messages: success ? [] : [{ shortText: 'Activation failed' }],
@@ -121,6 +126,74 @@ describe('AbapChangeWorkflow', () => {
     expect(test.workflow.status('plan-1').status).toBe('APPLIED');
     await expect(test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' }))
       .rejects.toThrow('already applied');
+  });
+
+  it('accepts SAP line-ending normalization without rolling back', async () => {
+    const test = harness({ successfulActivationTransforms: [source => source.replace(/\n+$/, '')] });
+    await test.workflow.preview({
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.\r\nWRITE / test.\r\n',
+      transportRequest: 'DEVK900001'
+    });
+
+    await expect(test.workflow.apply({
+      changePlanId: 'plan-1',
+      confirmedByUser: true,
+      confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success' });
+
+    expect(test.calls).not.toContain('restoreSource');
+    expect(test.workflow.status('plan-1')).toMatchObject({
+      status: 'APPLIED',
+      sourceMatchType: 'LINE_ENDING_NORMALIZED'
+    });
+    expect(String(test.workflow.status('plan-1').verifiedSourceHash)).toHaveLength(64);
+    expect(test.auditEvents).toContainEqual(expect.objectContaining({
+      eventType: 'SOURCE_VERIFIED',
+      sourceMatchType: 'LINE_ENDING_NORMALIZED',
+      verifiedSourceHash: expect.any(String)
+    }));
+  });
+
+  it('rolls back real content differences and exposes safe hash diagnostics', async () => {
+    const test = harness({ successfulActivationTransforms: [source => `${source}\nWRITE / unexpected.`] });
+    await test.workflow.preview({
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.\nWRITE / test.',
+      transportRequest: 'DEVK900001'
+    });
+
+    let applyError: unknown;
+    try {
+      await test.workflow.apply({
+        changePlanId: 'plan-1',
+        confirmedByUser: true,
+        confirmationMode: 'elicitation'
+      });
+    } catch (error) {
+      applyError = error;
+    }
+
+    expect(applyError).toMatchObject({
+      code: 'VERIFY_FAILED',
+      details: {
+        targetHash: expect.any(String),
+        verifiedSourceHash: expect.any(String),
+        sourceMatchType: 'DIFFERENT',
+        plan: expect.objectContaining({ status: 'ROLLED_BACK' })
+      }
+    });
+
+    expect(test.getSource()).toBe('REPORT ztest.');
+    expect(test.workflow.status('plan-1')).toMatchObject({
+      status: 'ROLLED_BACK',
+      sourceMatchType: 'DIFFERENT',
+      verifiedSourceHash: expect.any(String),
+      rollbackSourceMatchType: 'EXACT',
+      rollbackVerifiedSourceHash: expect.any(String)
+    });
   });
 
   it('blocks source drift before acquiring a lock', async () => {
@@ -183,6 +256,32 @@ describe('AbapChangeWorkflow', () => {
       rollbackAttempted: true,
       rollbackSucceeded: true,
       unlockSucceeded: true
+    });
+  });
+
+  it('accepts line-ending normalization when verifying restored source', async () => {
+    const test = harness({
+      activationResults: [false, true],
+      successfulActivationTransforms: [source => `${source}\r\n`]
+    });
+    await test.workflow.preview({
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.\nWRITE / test.',
+      transportRequest: 'DEVK900001'
+    });
+
+    await expect(test.workflow.apply({
+      changePlanId: 'plan-1',
+      confirmedByUser: true,
+      confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({ code: 'ACTIVATION_FAILED' });
+
+    expect(test.workflow.status('plan-1')).toMatchObject({
+      status: 'ROLLED_BACK',
+      rollbackSucceeded: true,
+      rollbackSourceMatchType: 'LINE_ENDING_NORMALIZED',
+      rollbackVerifiedSourceHash: expect.any(String)
     });
   });
 

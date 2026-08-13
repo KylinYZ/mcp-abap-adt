@@ -43,12 +43,21 @@ import { AuditLogger } from './safe/AuditLogger.js';
 import { ChangePlanStore } from './safe/ChangePlanStore.js';
 import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
+import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
+import { ToolExecutionGate } from './lib/ToolExecutionGate.js';
+import { adtClientOptions, executeGuardedToolCall, usesSapExecutionGate } from './lib/serverGuardrails.js';
+import type { ToolDefinition } from './types/tools.js';
+import { sourceCache } from './lib/sourceCache.js';
+import { configureLogLevel } from './lib/logger.js';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
 export class AbapAdtServer extends Server {
   private adtClient: ADTClient;
   private safetyPolicy: SafetyPolicy;
+  private readonly guardrails: RuntimeGuardrailValues;
+  private readonly executionGate: ToolExecutionGate;
+  private toolCatalog: ToolDefinition[] = [];
   private safeAbapHandlers: SafeAbapHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
@@ -89,6 +98,14 @@ export class AbapAdtServer extends Server {
       }
     );
 
+    this.guardrails = RuntimeGuardrails.fromEnvironment();
+    configureLogLevel(this.guardrails.logLevel);
+    this.executionGate = new ToolExecutionGate(this.guardrails.maxConcurrentTools, this.guardrails.maxQueuedTools);
+    sourceCache.configure({
+      maxEntries: this.guardrails.sourceCacheMaxEntries,
+      maxItemBytes: this.guardrails.sourceCacheMaxItemBytes,
+      ttlMs: this.guardrails.sourceCacheTtlMs
+    });
     const missingVars = ['SAP_URL', 'SAP_USER', 'SAP_PASSWORD'].filter(v => !process.env[v]);
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
@@ -99,7 +116,8 @@ export class AbapAdtServer extends Server {
       process.env.SAP_USER as string,
       process.env.SAP_PASSWORD as string,
       process.env.SAP_CLIENT as string,
-      process.env.SAP_LANGUAGE as string
+      process.env.SAP_LANGUAGE as string,
+      adtClientOptions(this.guardrails)
     );
     this.adtClient.stateful = session_types.stateful
     this.safetyPolicy = SafetyPolicy.fromEnvironment();
@@ -131,7 +149,13 @@ export class AbapAdtServer extends Server {
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
     const objectResolver = new AbapObjectResolver(this.adtClient);
-    const changePlans = new ChangePlanStore(this.safetyPolicy.planTtlMs);
+    const changePlans = new ChangePlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries,
+      this.guardrails.rollbackFailedRetentionMs
+    );
     const auditLogger = new AuditLogger(
       this.safetyPolicy.auditPath || path.resolve(process.cwd(), '.sap-mcp-audit-disabled')
     );
@@ -145,22 +169,24 @@ export class AbapAdtServer extends Server {
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: params => this.elicitInput(params)
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      applyConfirmed: input => this.executionGate.run(() => changeWorkflow.apply(input))
     });
 
 
         // Setup tool handlers
+    this.toolCatalog = this.createToolCatalog();
     this.setupToolHandlers();
   }
 
-  private serializeResult(result: any) {
+  private serializeResult(result: unknown) {
     try {
       // Handlers already return a well-formed MCP tool result
       // ({ content: [...] }). Re-wrapping it would double-serialize the payload
       // (every quote in the data gets escaped again), needlessly inflating large
       // responses such as object source (issue #4). Pass those through as-is and
       // only wrap raw values (e.g. the healthcheck object).
-      if (result && Array.isArray(result.content)) {
+      if (typeof result === 'object' && result !== null && 'content' in result && Array.isArray(result.content)) {
         return result;
       }
       return {
@@ -218,8 +244,26 @@ export class AbapAdtServer extends Server {
 
   private setupToolHandlers() {
     this.setRequestHandler(ListToolsRequestSchema, async () => {
-      const safeTools = this.safeAbapHandlers.getTools();
-      const legacyTools = this.safetyPolicy.toolProfile === 'legacy-full' ? [
+      return { tools: this.toolCatalog };
+    });
+
+    this.setRequestHandler(CallToolRequestSchema, async (request) => {
+      return executeGuardedToolCall(
+        request.params.name,
+        (request.params.arguments || {}) as Record<string, unknown>,
+        this.guardrails,
+        this.executionGate,
+        usesSapExecutionGate(request.params.name),
+        limitedArguments => this.dispatchTool(request.params.name, limitedArguments),
+        result => this.serializeResult(result),
+        error => this.handleError(error)
+      );
+    });
+  }
+
+  private createToolCatalog(): ToolDefinition[] {
+    const safeTools = this.safeAbapHandlers.getTools();
+    const legacyTools = this.safetyPolicy.toolProfile === 'legacy-full' ? [
         ...this.authHandlers.getTools(),
         ...this.transportHandlers.getTools(),
         ...this.objectHandlers.getTools(),
@@ -254,33 +298,30 @@ export class AbapAdtServer extends Server {
           }
         }
       ] : [];
-      return {
-        tools: selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools)
-      };
-    });
+    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools);
+  }
 
-    this.setRequestHandler(CallToolRequestSchema, async (request) => {
-      try {
-        let result: any;
-        if (this.safeAbapHandlers.supports(request.params.name)) {
+  private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
+        let result: unknown;
+        if (this.safeAbapHandlers.supports(toolName)) {
           result = await this.safeAbapHandlers.handle(
-            request.params.name,
-            (request.params.arguments || {}) as Record<string, unknown>
+            toolName,
+            limitedArguments
           );
-          return this.serializeResult(result);
+          return result;
         }
         if (this.safetyPolicy.toolProfile === 'safe') {
           throw new McpError(
             ErrorCode.MethodNotFound,
-            `Tool '${request.params.name}' is unavailable in the safe tool profile.`
+            `Tool '${toolName}' is unavailable in the safe tool profile.`
           );
         }
 
-        switch (request.params.name) {
+        switch (toolName) {
             case 'login':
             case 'logout':
             case 'dropSession':
-                result = await this.authHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.authHandlers.handle(toolName, limitedArguments);
                 break;
             case 'transportInfo':
             case 'createTransport':
@@ -297,22 +338,22 @@ export class AbapAdtServer extends Server {
             case 'transportAddUser':
             case 'systemUsers':
             case 'transportReference':
-                result = await this.transportHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.transportHandlers.handle(toolName, limitedArguments);
                 break;
             case 'lock':
             case 'unLock':
-                result = await this.objectLockHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectLockHandlers.handle(toolName, limitedArguments);
                 break;
             case 'objectStructure':
             case 'searchObject':
             case 'findObjectPath':
             case 'objectTypes':
             case 'reentranceTicket':
-                result = await this.objectHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectHandlers.handle(toolName, limitedArguments);
                 break;
             case 'classIncludes':
             case 'classComponents':
-                result = await this.classHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.classHandlers.handle(toolName, limitedArguments);
                 break;
             case 'syntaxCheckCode':
             case 'syntaxCheckCdsUrl':
@@ -328,28 +369,28 @@ export class AbapAdtServer extends Server {
             case 'fixEdits':
             case 'fragmentMappings':
             case 'abapDocumentation':
-                result = await this.codeAnalysisHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.codeAnalysisHandlers.handle(toolName, limitedArguments);
                 break;
             case 'getObjectSource':
             case 'setObjectSource':
-                result = await this.objectSourceHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectSourceHandlers.handle(toolName, limitedArguments);
                 break;
             case 'deleteObject':
-                result = await this.objectDeletionHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectDeletionHandlers.handle(toolName, limitedArguments);
                 break;
             case 'activateObjects':
             case 'activateByName':
             case 'inactiveObjects':
-                result = await this.objectManagementHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectManagementHandlers.handle(toolName, limitedArguments);
                 break;
             case 'objectRegistrationInfo':
             case 'validateNewObject':
             case 'createObject':
-                result = await this.objectRegistrationHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.objectRegistrationHandlers.handle(toolName, limitedArguments);
                 break;
             case 'nodeContents':
             case 'mainPrograms':
-                result = await this.nodeHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.nodeHandlers.handle(toolName, limitedArguments);
                 break;
             case 'featureDetails':
             case 'collectionFeatureDetails':
@@ -358,18 +399,18 @@ export class AbapAdtServer extends Server {
             case 'adtDiscovery':
             case 'adtCoreDiscovery':
             case 'adtCompatibiliyGraph':
-                result = await this.discoveryHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.discoveryHandlers.handle(toolName, limitedArguments);
                 break;
             case 'unitTestRun':
             case 'unitTestEvaluation':
             case 'unitTestOccurrenceMarkers':
             case 'createTestInclude':
-                result = await this.unitTestHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.unitTestHandlers.handle(toolName, limitedArguments);
                 break;
             case 'prettyPrinterSetting':
             case 'setPrettyPrinterSetting':
             case 'prettyPrinter':
-                result = await this.prettyPrinterHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.prettyPrinterHandlers.handle(toolName, limitedArguments);
                 break;
             case 'gitRepos':
             case 'gitExternalRepoInfo':
@@ -381,26 +422,26 @@ export class AbapAdtServer extends Server {
             case 'checkRepo':
             case 'remoteRepoInfo':
             case 'switchRepoBranch':
-                result = await this.gitHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.gitHandlers.handle(toolName, limitedArguments);
                 break;
             case 'annotationDefinitions':
             case 'ddicElement':
             case 'ddicRepositoryAccess':
             case 'packageSearchHelp':
-                result = await this.ddicHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.ddicHandlers.handle(toolName, limitedArguments);
                 break;
             case 'publishServiceBinding':
             case 'unPublishServiceBinding':
             case 'bindingDetails':
-                result = await this.serviceBindingHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.serviceBindingHandlers.handle(toolName, limitedArguments);
                 break;
             case 'tableContents':
             case 'runQuery':
-                result = await this.queryHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.queryHandlers.handle(toolName, limitedArguments);
                 break;
             case 'feeds':
             case 'dumps':
-                result = await this.feedHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.feedHandlers.handle(toolName, limitedArguments);
                 break;
             case 'debuggerListeners':
             case 'debuggerListen':
@@ -415,12 +456,12 @@ export class AbapAdtServer extends Server {
             case 'debuggerStep':
             case 'debuggerGoToStack':
             case 'debuggerSetVariableValue':
-                result = await this.debugHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.debugHandlers.handle(toolName, limitedArguments);
                 break;
             case 'renameEvaluate':
             case 'renamePreview':
             case 'renameExecute':
-                result = await this.renameHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.renameHandlers.handle(toolName, limitedArguments);
                 break;
             case 'atcCustomizing':
             case 'atcCheckVariant':
@@ -432,7 +473,7 @@ export class AbapAdtServer extends Server {
             case 'isProposalMessage':
             case 'atcContactUri':
             case 'atcChangeContact':
-                result = await this.atcHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.atcHandlers.handle(toolName, limitedArguments);
                 break;
             case 'tracesList':
             case 'tracesListRequests':
@@ -443,28 +484,24 @@ export class AbapAdtServer extends Server {
             case 'tracesCreateConfiguration':
             case 'tracesDeleteConfiguration':
             case 'tracesDelete':
-                result = await this.traceHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.traceHandlers.handle(toolName, limitedArguments);
                 break;
             case 'extractMethodEvaluate':
             case 'extractMethodPreview':
             case 'extractMethodExecute':
-                result = await this.refactorHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.refactorHandlers.handle(toolName, limitedArguments);
                 break;
             case 'revisions':
-                result = await this.revisionHandlers.handle(request.params.name, request.params.arguments);
+                result = await this.revisionHandlers.handle(toolName, limitedArguments);
                 break;
             case 'healthcheck':
                 result = { status: 'healthy', timestamp: new Date().toISOString() };
                 break;
             default:
-                throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+                throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
         }
 
-        return this.serializeResult(result);
-      } catch (error) {
-        return this.handleError(error);
-      }
-    });
+        return result;
   }
 
   async run() {
@@ -493,9 +530,14 @@ export class AbapAdtServer extends Server {
   }
 }
 
-// Create and run server instance
-const server = new AbapAdtServer();
-server.run().catch((error) => {
-  console.error('Failed to start MCP server:', error);
-  process.exit(1);
-});
+export async function main(): Promise<void> {
+  const server = new AbapAdtServer();
+  await server.run();
+}
+
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error('Failed to start MCP server:', error);
+    process.exit(1);
+  });
+}

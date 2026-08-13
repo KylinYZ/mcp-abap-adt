@@ -5,7 +5,7 @@ import type { AuditEvent } from './AuditLogger.js';
 import { ChangePlanStore } from './ChangePlanStore.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
-import { createUnifiedDiff, sourceHash } from './sourceTools.js';
+import { compareSources, createUnifiedDiff, sourceHash } from './sourceTools.js';
 import type {
   ChangePlan,
   ChangePlanView,
@@ -172,8 +172,20 @@ export class AbapChangeWorkflow {
       await this.recordStage(plan, 'OBJECT_ACTIVATED', true);
 
       const verifiedSource = await this.client.getObjectSource(plan.object.sourceUrl);
-      if (sourceHash(verifiedSource) !== plan.targetHash) {
-        throw new SafeAbapError('VERIFY_FAILED', 'verify', 'The activated SAP source hash does not match the confirmed plan.');
+      const sourceComparison = compareSources(plan.targetSource, verifiedSource);
+      plan.verifiedSourceHash = sourceComparison.actualHash;
+      plan.sourceMatchType = sourceComparison.matchType;
+      if (!sourceComparison.matches) {
+        throw new SafeAbapError(
+          'VERIFY_FAILED',
+          'verify',
+          'The activated SAP source does not match the confirmed plan.',
+          {
+            targetHash: sourceComparison.expectedHash,
+            verifiedSourceHash: sourceComparison.actualHash,
+            sourceMatchType: sourceComparison.matchType
+          }
+        );
       }
       await this.recordStage(plan, 'SOURCE_VERIFIED', true);
       this.plans.setStatus(plan.changePlanId, 'APPLIED');
@@ -223,7 +235,10 @@ export class AbapChangeWorkflow {
           await this.recordStage(plan, 'ROLLBACK_OBJECT_ACTIVATED', true, undefined, false);
 
           const restoredSource = await this.client.getObjectSource(plan.object.sourceUrl);
-          if (sourceHash(restoredSource) !== plan.originalHash) {
+          const rollbackComparison = compareSources(plan.originalSource, restoredSource);
+          plan.rollbackVerifiedSourceHash = rollbackComparison.actualHash;
+          plan.rollbackSourceMatchType = rollbackComparison.matchType;
+          if (!rollbackComparison.matches) {
             throw new Error('Restored source hash does not match the original preview source.');
           }
           await this.recordStage(plan, 'ROLLBACK_SOURCE_VERIFIED', true, undefined, false);
@@ -267,6 +282,7 @@ export class AbapChangeWorkflow {
     await this.audit.append(this.auditEvent(plan, primaryError ? 'APPLY_COMPLETED_WITH_ERROR' : 'APPLY_COMPLETED', !primaryError));
     if (primaryError) {
       throw new SafeAbapError(primaryError.code, primaryError.stage, primaryError.message, {
+        ...primaryError.details,
         plan: this.plans.view(plan.changePlanId)
       });
     }
@@ -383,6 +399,10 @@ export class AbapChangeWorkflow {
       transportRequest: plan.transportRequest,
       originalHash: plan.originalHash,
       targetHash: plan.targetHash,
+      verifiedSourceHash: plan.verifiedSourceHash,
+      sourceMatchType: plan.sourceMatchType,
+      rollbackVerifiedSourceHash: plan.rollbackVerifiedSourceHash,
+      rollbackSourceMatchType: plan.rollbackSourceMatchType,
       addedLines: plan.diffSummary.addedLines,
       removedLines: plan.diffSummary.removedLines,
       success,

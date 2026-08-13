@@ -1,8 +1,15 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler';
 import type { ToolDefinition } from '../types/tools';
-import { session_types } from "abap-adt-api";
+import { session_types, type ADTClient } from "abap-adt-api";
 import { sourceCache } from '../lib/sourceCache';
+
+interface TextToolResult {
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+}
 
 export class ObjectSourceHandlers extends BaseHandler {
   getTools(): ToolDefinition[] {
@@ -57,14 +64,24 @@ export class ObjectSourceHandlers extends BaseHandler {
     }
   }
 
-  async handleGetObjectSource(args: any): Promise<any> {
+  async handleGetObjectSource(args: {
+    objectSourceUrl: string;
+    options?: Parameters<ADTClient['getObjectSource']>[1];
+    startLine?: number;
+    maxLines?: number;
+  }): Promise<TextToolResult> {
     
     const startTime = performance.now();
     try {
-      const fullSource = await this.adtclient.getObjectSource(args.objectSourceUrl, args.options);
+      const hasPaging = args.startLine !== undefined || args.maxLines !== undefined;
+      const cachedSource = hasPaging ? sourceCache.get(args.objectSourceUrl) : undefined;
+      const sourceOrigin = cachedSource === undefined ? 'sap' : 'cache';
+      const fullSource = cachedSource === undefined
+        ? await this.adtclient.getObjectSource(args.objectSourceUrl, args.options)
+        : cachedSource;
       // Remember the source so a later syntaxCheckCode on the same URL can reuse
       // it without the caller re-sending it (issue #2).
-      sourceCache.set(args.objectSourceUrl, fullSource);
+      if (sourceOrigin === 'sap') sourceCache.set(args.objectSourceUrl, fullSource);
       this.trackRequest(startTime, true);
 
       const lines = fullSource.split('\n');
@@ -72,7 +89,6 @@ export class ObjectSourceHandlers extends BaseHandler {
 
       // Optional pagination for large sources (issue #4). When neither
       // parameter is provided, behaviour is unchanged: the whole source is returned.
-      const hasPaging = args.startLine !== undefined || args.maxLines !== undefined;
       const startLine = Math.max(1, Number(args.startLine) || 1);
       const startIndex = startLine - 1;
       const endIndex = args.maxLines !== undefined
@@ -91,7 +107,8 @@ export class ObjectSourceHandlers extends BaseHandler {
               totalLines,
               startLine: hasPaging ? startLine : 1,
               returnedLines: Math.max(0, returnedLines),
-              hasMore: hasPaging ? endIndex < totalLines : false
+              hasMore: hasPaging ? endIndex < totalLines : false,
+              sourceOrigin
             })
           }
         ]
@@ -105,7 +122,12 @@ export class ObjectSourceHandlers extends BaseHandler {
     }
   }
 
-  async handleSetObjectSource(args: any): Promise<any> {
+  async handleSetObjectSource(args: {
+    objectSourceUrl: string;
+    source: string;
+    lockHandle: string;
+    transport?: string;
+  }): Promise<TextToolResult> {
     const startTime = performance.now();
     try {
       // dropSession/logout reset the client to stateless; writing source requires a stateful session

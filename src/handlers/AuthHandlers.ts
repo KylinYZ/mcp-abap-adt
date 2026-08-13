@@ -1,6 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
+import { sourceCache } from '../lib/sourceCache.js';
 
 export class AuthHandlers extends BaseHandler {
   getTools(): ToolDefinition[] {
@@ -71,6 +72,7 @@ export class AuthHandlers extends BaseHandler {
     const startTime = performance.now();
     try {
       await this.adtclient.logout();
+      sourceCache.clear();
       this.trackRequest(startTime, true);
       return {
         content: [
@@ -93,6 +95,7 @@ export class AuthHandlers extends BaseHandler {
     const startTime = performance.now();
     try {
       await this.adtclient.dropSession();
+      sourceCache.clear();
       this.trackRequest(startTime, true);
       return {
         content: [

@@ -1,15 +1,24 @@
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ErrorCode,
+  McpError,
+  type ElicitRequestFormParams,
+  type ElicitResult
+} from '@modelcontextprotocol/sdk/types.js';
 import { AbapChangeWorkflow } from './AbapChangeWorkflow.js';
+import type { ApplyChangeInput } from './AbapChangeWorkflow.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import type { ChangePlanView, ConfirmationMode } from './types.js';
 
 export interface AbapChangeConfirmationOptions {
   allowTextConfirmation: boolean;
   supportsFormElicitation: () => boolean;
-  elicitInput: (params: ElicitRequestFormParams) => Promise<ElicitResult>;
+  elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  applyConfirmed?: (input: ApplyChangeInput) => Promise<Record<string, unknown>>;
   createTextCode?: () => string;
 }
+
+const MAX_FORM_CONFIRMATION_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface TextChallenge {
   expectedHash: string;
@@ -25,6 +34,7 @@ export class AbapChangeConfirmation {
   ) {}
 
   async confirmAndApply(changePlanId: string, textConfirmation?: string): Promise<Record<string, unknown>> {
+    this.cleanupExpiredChallenges();
     const plan = this.assertConfirmable(this.workflow.status(changePlanId));
 
     if (this.options.supportsFormElicitation()) {
@@ -46,8 +56,16 @@ export class AbapChangeConfirmation {
   private async confirmWithForm(plan: ChangePlanView): Promise<Record<string, unknown>> {
     let result: ElicitResult;
     try {
-      result = await this.options.elicitInput(this.formRequest(plan));
+      result = await this.options.elicitInput(this.formRequest(plan), confirmationTimeoutMs(plan));
     } catch (error) {
+      if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
+        return {
+          status: 'confirmation_declined',
+          changePlanId: plan.changePlanId,
+          confirmationMode: 'elicitation',
+          reason: 'timeout'
+        };
+      }
       throw new SafeAbapError(
         'POLICY_DENIED',
         'confirmation',
@@ -55,7 +73,7 @@ export class AbapChangeConfirmation {
       );
     }
 
-    if (result.action !== 'accept' || result.content?.confirmApply !== true) {
+    if (result.action !== 'accept' || result.content?.decision !== 'apply') {
       return {
         status: 'confirmation_declined',
         changePlanId: plan.changePlanId,
@@ -96,32 +114,27 @@ export class AbapChangeConfirmation {
   }
 
   private applyConfirmed(changePlanId: string, confirmationMode: ConfirmationMode): Promise<Record<string, unknown>> {
-    return this.workflow.apply({ changePlanId, confirmedByUser: true, confirmationMode });
+    const input: ApplyChangeInput = { changePlanId, confirmedByUser: true, confirmationMode };
+    return this.options.applyConfirmed ? this.options.applyConfirmed(input) : this.workflow.apply(input);
   }
 
   private formRequest(plan: ChangePlanView): ElicitRequestFormParams {
     return {
       mode: 'form',
-      message: [
-        '确认应用 SAP ABAP 变更',
-        `对象: ${plan.object.objectType} ${plan.object.objectName}`,
-        `传输请求: ${plan.transportRequest}`,
-        `计划 ID: ${plan.changePlanId}`,
-        `原始哈希: ${plan.originalHash}`,
-        `目标哈希: ${plan.targetHash}`,
-        `Diff 摘要: +${plan.diffSummary.addedLines} / -${plan.diffSummary.removedLines}`
-      ].join('\n'),
+      message: `应用 ${plan.object.objectName} · 传输 ${plan.transportRequest} · +${plan.diffSummary.addedLines}/-${plan.diffSummary.removedLines}`,
       requestedSchema: {
         type: 'object',
         properties: {
-          confirmApply: {
-            type: 'boolean',
-            title: '我已审阅完整 diff 并确认应用',
-            description: '确认后将锁定、写入并激活该 SAP 对象。',
-            default: false
+          decision: {
+            type: 'string',
+            title: '请选择操作',
+            oneOf: [
+              { const: 'apply', title: '应用变更' },
+              { const: 'cancel', title: '取消' }
+            ]
           }
         },
-        required: ['confirmApply']
+        required: ['decision']
       }
     };
   }
@@ -143,6 +156,21 @@ export class AbapChangeConfirmation {
     }
     return plan;
   }
+
+  private cleanupExpiredChallenges(): void {
+    const timestamp = Date.now();
+    for (const [changePlanId, challenge] of this.textChallenges) {
+      if (timestamp >= challenge.expiresAt) this.textChallenges.delete(changePlanId);
+    }
+  }
+}
+
+function confirmationTimeoutMs(plan: ChangePlanView): number {
+  const remainingPlanMs = Date.parse(plan.expiresAt) - Date.now();
+  if (!Number.isFinite(remainingPlanMs) || remainingPlanMs <= 0) {
+    throw new SafeAbapError('PLAN_EXPIRED', 'plan', 'Change plan has expired. Create a new preview.');
+  }
+  return Math.min(remainingPlanMs, MAX_FORM_CONFIRMATION_TIMEOUT_MS);
 }
 
 function safeHashEquals(expected: string, actual: string): boolean {

@@ -1,4 +1,17 @@
-type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+import type { LogLevel } from '../config/RuntimeGuardrails.js';
+
+const logPriorities: Record<LogLevel, number> = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3
+};
+
+let configuredLogLevel: LogLevel = 'warn';
+
+export function configureLogLevel(level: LogLevel): void {
+  configuredLogLevel = level;
+}
 
 export function createLogger(name: string) {
   return {
@@ -14,6 +27,7 @@ export function createLogger(name: string) {
 }
 
 function log(level: LogLevel, name: string, message: string, meta?: Record<string, unknown>) {
+  if (logPriorities[level] > logPriorities[configuredLogLevel]) return;
   const timestamp = new Date().toISOString();
   const logEntry = {
     timestamp,

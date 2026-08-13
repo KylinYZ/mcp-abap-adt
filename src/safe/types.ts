@@ -15,6 +15,8 @@ export type ToolProfile = 'safe' | 'legacy-full';
 
 export type ConfirmationMode = 'elicitation' | 'text-fallback';
 
+export type SourceMatchType = 'EXACT' | 'LINE_ENDING_NORMALIZED' | 'DIFFERENT';
+
 export interface SafeAdtClient {
   searchObject(query: string, objType?: string, max?: number): Promise<SearchResult[]>;
   objectStructure(objectUrl: string, version?: 'active' | 'inactive' | 'workingArea'): Promise<AbapObjectStructure>;
@@ -77,6 +79,7 @@ export interface ChangePlan {
   createdAt: number;
   expiresAt: number;
   status: ChangePlanStatus;
+  terminalAt?: number;
   systemHost: string;
   client: string;
   object: ResolvedAbapObject;
@@ -98,6 +101,10 @@ export interface ChangePlan {
   rollbackSucceeded?: boolean;
   unlockSucceeded?: boolean;
   confirmationMode?: ConfirmationMode;
+  verifiedSourceHash?: string;
+  sourceMatchType?: SourceMatchType;
+  rollbackVerifiedSourceHash?: string;
+  rollbackSourceMatchType?: SourceMatchType;
 }
 
 export interface ChangePlanView {
@@ -118,4 +125,8 @@ export interface ChangePlanView {
   rollbackAttempted?: boolean;
   rollbackSucceeded?: boolean;
   unlockSucceeded?: boolean;
+  verifiedSourceHash?: string;
+  sourceMatchType?: SourceMatchType;
+  rollbackVerifiedSourceHash?: string;
+  rollbackSourceMatchType?: SourceMatchType;
 }

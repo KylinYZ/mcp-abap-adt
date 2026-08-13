@@ -1,8 +1,27 @@
 import { createHash } from 'crypto';
-import type { DiffSummary } from './types.js';
+import type { DiffSummary, SourceMatchType } from './types.js';
+
+export interface SourceComparison {
+  matches: boolean;
+  matchType: SourceMatchType;
+  expectedHash: string;
+  actualHash: string;
+}
 
 export function sourceHash(source: string): string {
   return createHash('sha256').update(source, 'utf8').digest('hex');
+}
+
+export function compareSources(expectedSource: string, actualSource: string): SourceComparison {
+  const expectedHash = sourceHash(expectedSource);
+  const actualHash = sourceHash(actualSource);
+  if (expectedHash === actualHash) {
+    return { matches: true, matchType: 'EXACT', expectedHash, actualHash };
+  }
+  if (normalizeLineEndings(expectedSource) === normalizeLineEndings(actualSource)) {
+    return { matches: true, matchType: 'LINE_ENDING_NORMALIZED', expectedHash, actualHash };
+  }
+  return { matches: false, matchType: 'DIFFERENT', expectedHash, actualHash };
 }
 
 export function createUnifiedDiff(originalSource: string, targetSource: string): { diff: string; summary: DiffSummary } {
@@ -47,4 +66,9 @@ export function createUnifiedDiff(originalSource: string, targetSource: string):
 
 function splitLines(source: string): string[] {
   return source.replace(/\r\n/g, '\n').split('\n');
+}
+
+function normalizeLineEndings(source: string): string {
+  // SAP may normalize line separators and the final line terminator during activation.
+  return source.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
 }
