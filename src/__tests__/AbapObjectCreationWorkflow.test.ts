@@ -290,7 +290,7 @@ describe('AbapObjectCreationWorkflow', () => {
       objectUrl: `${functionGroup.objectUrl}/fmodules/znew_fm`,
       sourceUrl: `${functionGroup.objectUrl}/fmodules/znew_fm/source/main`,
       activationParentUrl: functionGroup.objectUrl,
-      source: 'FUNCTION znew_fm.\nENDFUNCTION.',
+      source: 'FUNCTION znew_fm\n  IMPORTING\n    VALUE(iv_input) TYPE string.\n\n  DATA(result) = iv_input.\nENDFUNCTION.',
       sourceHash: 'function-source-hash'
     };
     const objects = [functionGroup, functionModule];
@@ -338,7 +338,9 @@ describe('AbapObjectCreationWorkflow', () => {
       unLock: jest.fn(async () => { calls.push('unlock:ZNEW_FM'); return ''; }),
       getObjectSource: jest.fn(async () => {
         calls.push('getSource:ZNEW_FM');
-        return functionModule.source as string;
+        return (functionModule.source as string)
+          .replace(/(TYPE string\.)\n+/, '$1\n\n\n\n')
+          .replace(/\n/g, '\r\n');
       }),
       activate: jest.fn(async (...args: unknown[]) => {
         activationArguments.push(args);
@@ -423,7 +425,18 @@ describe('AbapObjectCreationWorkflow', () => {
 
     await expect(successWorkflow.apply({
       creationPlanId: 'creation-success', confirmedByUser: true, confirmationMode: 'elicitation'
-    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+    })).resolves.toMatchObject({
+      status: 'success',
+      plan: {
+        status: 'APPLIED',
+        compensationAttempted: undefined,
+        createdObjects: expect.arrayContaining([expect.objectContaining({
+          objectName: 'ZNEW_FM',
+          sourceMatchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED',
+          compensationAttempted: undefined
+        })])
+      }
+    });
     expect(existing).toEqual(new Set(['ZNEW_FG', 'ZNEW_FM']));
     expect(activationArguments).toEqual([[
       'ZNEW_FM', functionModule.objectUrl, undefined, true

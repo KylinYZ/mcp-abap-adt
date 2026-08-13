@@ -33,8 +33,9 @@ function harness(options: {
   activationResults?: boolean[];
   successfulActivationTransforms?: Array<(source: string) => string>;
   syntaxMessages?: SyntaxCheckResult[];
+  initialSource?: string;
 } = {}) {
-  let source = 'REPORT ztest.';
+  let source = options.initialSource ?? 'REPORT ztest.';
   const calls: string[] = [];
   const activationResults = [...(options.activationResults || [true])];
   const successfulActivationTransforms = [...(options.successfulActivationTransforms || [])];
@@ -145,7 +146,10 @@ describe('AbapChangeWorkflow', () => {
   });
 
   it('activates function modules with the Eclipse ADT name-and-URI request', async () => {
-    const test = harness();
+    const targetSource = 'FUNCTION z_mcp_test\n  IMPORTING\n    VALUE(iv_input) TYPE string.\n\n  DATA(result) = iv_input.\nENDFUNCTION.';
+    const test = harness({
+      successfulActivationTransforms: [source => formatFunctionModuleLikeSap(source)]
+    });
     const functionModule = {
       ...object,
       objectType: 'FUNCTION_MODULE' as const,
@@ -161,7 +165,7 @@ describe('AbapChangeWorkflow', () => {
     jest.mocked(test.client.searchObject).mockResolvedValue([]);
     (test.workflow as any).resolver.resolve.mockResolvedValue(functionModule);
     await test.workflow.preview({
-      objectType: 'FUNCTION_MODULE', objectName: 'Z_MCP_TEST', newSource: 'FUNCTION z_mcp_test.', transportRequest: 'DEVK900001'
+      objectType: 'FUNCTION_MODULE', objectName: 'Z_MCP_TEST', newSource: targetSource, transportRequest: 'DEVK900001'
     });
     await test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' });
     expect(test.client.activate).toHaveBeenCalledWith(
@@ -171,10 +175,19 @@ describe('AbapChangeWorkflow', () => {
       true
     );
     expect(test.client.syntaxCheck).toHaveBeenCalledTimes(1);
+    expect(test.workflow.status('plan-1')).toMatchObject({
+      status: 'APPLIED',
+      sourceMatchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED'
+    });
   });
 
   it('uses the same Eclipse request when restoring a function module', async () => {
-    const test = harness({ activationResults: [false, true] });
+    const originalSource = 'FUNCTION z_mcp_test\n  IMPORTING\n    VALUE(iv_input) TYPE string.\n\n  DATA(result) = iv_input.\nENDFUNCTION.';
+    const test = harness({
+      activationResults: [false, true],
+      initialSource: originalSource,
+      successfulActivationTransforms: [source => formatFunctionModuleLikeSap(source)]
+    });
     const functionModule = {
       ...object,
       objectType: 'FUNCTION_MODULE' as const,
@@ -202,6 +215,10 @@ describe('AbapChangeWorkflow', () => {
     expect(test.client.activate).toHaveBeenNthCalledWith(
       2, 'Z_MCP_TEST', functionModule.objectUrl, undefined, true
     );
+    expect(test.workflow.status('plan-1')).toMatchObject({
+      status: 'ROLLED_BACK',
+      rollbackSourceMatchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED'
+    });
   });
 
   it('accepts SAP line-ending normalization without rolling back', async () => {
@@ -411,3 +428,10 @@ describe('AbapChangeWorkflow', () => {
     });
   });
 });
+
+function formatFunctionModuleLikeSap(source: string): string {
+  return source
+    .replace(/\r\n?/g, '\n')
+    .replace(/(TYPE string\.)\n+/, '$1\n\n\n\n')
+    .replace(/\n/g, '\r\n');
+}

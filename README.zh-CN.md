@@ -115,7 +115,7 @@
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
 - **真实 SAP DEV 运行护栏**：已验证查询/搜索超限在访问 SAP 前拒绝、搜索默认数量、查询数量参数透传、1 MiB 响应替换为 `413`、源码分页缓存命中、LRU 淘汰、60 秒 TTL 过期，以及同一 MCP 进程内单并发 FIFO 和队列满 `429`。当前 SAP ADT 表预览会稳定返回请求数量外加一条 lookahead 行，例如请求 `5` 行返回 `6` 条。
 - **换行规范化**：`ZCODEX_MCP_TEST` 已真实得到 `LINE_ENDING_NORMALIZED`，计划进入 `APPLIED`，且激活、解锁和复读哈希均成功。
-- **对象创建与抓包实测**：`PROGRAM ZMCP_CREATE_TEST` 已在客户端 `300`、开发包 `Z001`、传输 `S4HK900011` 中完成创建、写入、语法检查、解锁、激活和复读验证并保留。历史 `ZMCP_IF_TEST` 计划在函数组独立激活失败后安全补偿，终态为 `COMPENSATED`。随后 Eclipse ADT 3.60.2 对 `ZMCP_ADT_TRACE + Z_MCP_ADT_TRACE` 的真实会话证明：组合创建不单独激活函数组，函数参数直接写入 `source/main`，函数模块使用仅含 `uri + name` 且 `preauditRequested=true` 的激活请求。MCP 已按此协议完成代码与定向测试修正，仍需重启后使用新对象做真实 DEV 复测。
+- **对象创建与抓包实测**：`PROGRAM ZMCP_CREATE_TEST` 已完成真实创建并保留。Eclipse ADT 3.60.2 对 `ZMCP_ADT_TRACE + Z_MCP_ADT_TRACE` 的会话证明：组合创建不单独激活函数组，参数直接写入 `source/main`，函数模块使用仅含 `uri + name` 且 `preauditRequested=true` 的激活请求。MCP 使用该协议创建 `ZMCP_IF_TEST + Z_MCP_IF_TEST` 时，创建、写入、语法检查、解锁和激活均成功；SAP 随后把换行改为 CRLF，并将签名后分隔区补为三个空行，旧复核规则误判后安全补偿成功，两个对象只读搜索确认无残留。现已增加函数模块专用受限格式比较，仍需重启后做最终真实 DEV 成功复测。
 - **激活未知结果保护**：激活请求抛出超时或连接异常时，先只读核对 active/inactive 版本；无法确定远端结果时撤销自动删除资格并进入人工检查状态，禁止盲目重试。
 - **HTTP 超时**：已使用本机停滞 HTTP 端点端到端确认底层 ADT 客户端在配置 `5000 ms` 时约 5 秒取消请求；没有通过故意运行慢查询压测 SAP。
 - **待专项验证**：调试、ATC、trace 等长任务的专用超时，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。

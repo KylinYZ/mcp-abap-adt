@@ -13,7 +13,7 @@ import type {
 } from './creationTypes.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
-import { compareSources } from './sourceTools.js';
+import { compareFunctionModuleSources, compareSources } from './sourceTools.js';
 
 export interface CreationAuditSink {
   append(event: AuditEvent): Promise<void>;
@@ -176,7 +176,9 @@ export class AbapObjectCreationWorkflow {
 
         await this.resolver.resolveCreated(created, 'active');
         const actualSource = await this.client.getObjectSource(created.actualSourceUrl as string);
-        const comparison = compareSources(created.source as string, actualSource);
+        const comparison = created.objectType === 'FUNCTION_MODULE'
+          ? compareFunctionModuleSources(created.source as string, actualSource)
+          : compareSources(created.source as string, actualSource);
         created.verifiedSourceHash = comparison.actualHash;
         created.sourceMatchType = comparison.matchType;
         if (!comparison.matches) {

@@ -5,7 +5,12 @@ import type { AuditEvent } from './AuditLogger.js';
 import { ChangePlanStore } from './ChangePlanStore.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
-import { compareSources, createUnifiedDiff, sourceHash } from './sourceTools.js';
+import {
+  compareFunctionModuleSources,
+  compareSources,
+  createUnifiedDiff,
+  sourceHash
+} from './sourceTools.js';
 import type {
   ChangePlan,
   ChangePlanView,
@@ -177,7 +182,7 @@ export class AbapChangeWorkflow {
       await this.recordStage(plan, 'OBJECT_ACTIVATED', true);
 
       const verifiedSource = await this.client.getObjectSource(plan.object.sourceUrl);
-      const sourceComparison = compareSources(plan.targetSource, verifiedSource);
+      const sourceComparison = compareObjectSources(plan.object, plan.targetSource, verifiedSource);
       plan.verifiedSourceHash = sourceComparison.actualHash;
       plan.sourceMatchType = sourceComparison.matchType;
       if (!sourceComparison.matches) {
@@ -240,7 +245,7 @@ export class AbapChangeWorkflow {
           await this.recordStage(plan, 'ROLLBACK_OBJECT_ACTIVATED', true, undefined, false);
 
           const restoredSource = await this.client.getObjectSource(plan.object.sourceUrl);
-          const rollbackComparison = compareSources(plan.originalSource, restoredSource);
+          const rollbackComparison = compareObjectSources(plan.object, plan.originalSource, restoredSource);
           plan.rollbackVerifiedSourceHash = rollbackComparison.actualHash;
           plan.rollbackSourceMatchType = rollbackComparison.matchType;
           if (!rollbackComparison.matches) {
@@ -421,6 +426,12 @@ export class AbapChangeWorkflow {
       confirmationMode: plan.confirmationMode
     };
   }
+}
+
+function compareObjectSources(object: ResolvedAbapObject, expectedSource: string, actualSource: string) {
+  return object.objectType === 'FUNCTION_MODULE'
+    ? compareFunctionModuleSources(expectedSource, actualSource)
+    : compareSources(expectedSource, actualSource);
 }
 
 function assertSyntaxSuccess(messages: SyntaxCheckResult[], stage: string): void {

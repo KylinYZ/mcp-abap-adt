@@ -15,7 +15,11 @@ export type ToolProfile = 'safe' | 'legacy-full';
 
 export type ConfirmationMode = 'elicitation' | 'text-fallback';
 
-export type SourceMatchType = 'EXACT' | 'LINE_ENDING_NORMALIZED' | 'DIFFERENT';
+export type SourceMatchType =
+  | 'EXACT'
+  | 'LINE_ENDING_NORMALIZED'
+  | 'FUNCTION_MODULE_FORMAT_NORMALIZED'
+  | 'DIFFERENT';
 
 export interface SafeAdtClient {
   searchObject(query: string, objType?: string, max?: number): Promise<SearchResult[]>;
