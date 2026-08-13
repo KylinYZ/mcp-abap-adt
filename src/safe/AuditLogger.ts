@@ -35,6 +35,8 @@ export interface AuditEvent {
   compensationSucceeded?: boolean;
   unlockSucceeded?: boolean;
   confirmationMode?: string;
+  activationOutcome?: string;
+  activationInactiveCount?: number;
 }
 
 export class AuditLogger {

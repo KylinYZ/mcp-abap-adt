@@ -84,6 +84,7 @@ export interface CreationPlan {
     code: string;
     stage: string;
     message: string;
+    details?: Record<string, unknown>;
   };
   confirmationMode?: ConfirmationMode;
   compensationAttempted?: boolean;

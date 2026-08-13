@@ -3,6 +3,7 @@ import { CreationPlanStore } from '../safe/CreationPlanStore';
 import { SafetyPolicy } from '../safe/SafetyPolicy';
 import type { AbapCreationResolver } from '../safe/AbapCreationResolver';
 import type { CreationAdtClient, ResolvedCreationObject } from '../safe/creationTypes';
+import { SafeAbapError } from '../safe/errors';
 
 const object: ResolvedCreationObject = {
   objectType: 'PROGRAM',
@@ -18,18 +19,36 @@ const object: ResolvedCreationObject = {
   sourceHash: 'target-hash'
 };
 
-function harness(options: { syntaxError?: boolean; syntaxWarning?: boolean; uncertainCreate?: boolean; resolveCreatedFails?: boolean } = {}) {
+function harness(options: {
+  syntaxError?: boolean;
+  syntaxWarning?: boolean;
+  uncertainCreate?: boolean;
+  resolveCreatedFails?: boolean;
+  activationThrows?: boolean;
+  activeAfterActivationError?: boolean;
+  inactiveAfterActivationError?: boolean;
+  activationReturnsInactive?: boolean;
+} = {}) {
   const calls: string[] = [];
   let exists = false;
   let source = '';
+  let activationAttempted = false;
   const resolver = {
     resolve: jest.fn(async () => [{ ...object }]),
     assertTargetsAbsent: jest.fn(async () => {
       if (exists) throw new Error('already exists');
     }),
-    resolveCreated: jest.fn(async () => {
+    resolveCreated: jest.fn(async (_expected: ResolvedCreationObject, version = 'inactive') => {
       if (!exists) throw new Error('not found');
       if (options.resolveCreatedFails) throw new Error('object structure unavailable');
+      if (options.activationThrows && activationAttempted) {
+        if (version === 'active' && !options.activeAfterActivationError) {
+          throw new SafeAbapError('OBJECT_CREATION_FAILED', 'resolve-created', 'active version unavailable');
+        }
+        if (version === 'inactive' && !options.inactiveAfterActivationError) {
+          throw new SafeAbapError('OBJECT_CREATION_FAILED', 'resolve-created', 'inactive version unavailable');
+        }
+      }
       return { ...object };
     })
   };
@@ -51,7 +70,36 @@ function harness(options: { syntaxError?: boolean; syntaxWarning?: boolean; unce
     }),
     lock: jest.fn(async () => { calls.push('lock'); return { LOCK_HANDLE: 'lock-1' }; }),
     unLock: jest.fn(async () => { calls.push('unlock'); return ''; }),
-    activate: jest.fn(async () => { calls.push('activate'); return { success: true, messages: [], inactive: [] }; }),
+    activate: jest.fn(async () => {
+      calls.push('activate');
+      activationAttempted = true;
+      if (options.activationThrows) throw new Error('connection reset after activation request');
+      if (options.activationReturnsInactive) {
+        return {
+          success: false,
+          messages: [],
+          inactive: [{
+            object: {
+              'adtcore:uri': object.objectUrl,
+              'adtcore:type': object.adtType,
+              'adtcore:name': object.objectName,
+              'adtcore:parentUri': object.parentPath,
+              user: 'SECRET_USER',
+              deleted: false
+            },
+            transport: {
+              'adtcore:uri': '/sap/bc/adt/cts/transportrequests/DEVK900001',
+              'adtcore:type': 'TR/REQUEST',
+              'adtcore:name': 'DEVK900001',
+              'adtcore:parentUri': '',
+              user: 'SECRET_USER',
+              deleted: false
+            }
+          }]
+        };
+      }
+      return { success: true, messages: [], inactive: [] };
+    }),
     validateNewObject: jest.fn(async () => ({ success: true })),
     createObject: jest.fn(async () => {
       calls.push('create');
@@ -97,6 +145,7 @@ describe('AbapObjectCreationWorkflow', () => {
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
     expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'activate', 'getSource']);
+    expect(test.client.activate).toHaveBeenCalledWith(object.objectName, object.objectUrl, undefined, true);
     expect(test.exists()).toBe(true);
     expect(test.workflow.status('creation-1')).toMatchObject({
       status: 'APPLIED', createdObjects: [{ objectName: 'ZNEW', ownershipProven: true, sourceMatchType: 'EXACT' }]
@@ -151,7 +200,73 @@ describe('AbapObjectCreationWorkflow', () => {
     })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
   });
 
-  it('defers child validation until a new function group exists and compensates in reverse order', async () => {
+  it('returns sanitized inactive diagnostics for an explicit activation failure', async () => {
+    const test = harness({ activationReturnsInactive: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'ACTIVATION_FAILED',
+      details: {
+        inactiveCount: 1,
+        inactiveObjects: [{
+          uri: object.objectUrl,
+          type: object.adtType,
+          name: object.objectName,
+          parentUri: object.parentPath
+        }],
+        plan: { status: 'COMPENSATED' }
+      }
+    });
+    const serialized = JSON.stringify(test.workflow.status('creation-1'));
+    expect(serialized).not.toContain('SECRET_USER');
+    expect(serialized).not.toContain('REPORT znew');
+    expect(serialized).not.toContain('lock-1');
+    expect(test.auditEvents.at(-1)).toMatchObject({ activationInactiveCount: 1 });
+  });
+
+  it('continues without retrying when an activation exception is followed by an active version', async () => {
+    const test = harness({ activationThrows: true, activeAfterActivationError: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+    expect(test.client.activate).toHaveBeenCalledTimes(1);
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('compensates when an activation exception is followed by a proven inactive version', async () => {
+    const test = harness({ activationThrows: true, inactiveAfterActivationError: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'ACTIVATION_FAILED',
+      details: { activationOutcome: 'INACTIVE_CONFIRMED', plan: { status: 'COMPENSATED' } }
+    });
+    expect(test.client.activate).toHaveBeenCalledTimes(1);
+    expect(test.client.deleteObject).toHaveBeenCalledTimes(1);
+  });
+
+  it('forbids compensation when activation outcome cannot be determined', async () => {
+    const test = harness({ activationThrows: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'ACTIVATION_FAILED',
+      details: { activationOutcome: 'UNKNOWN', plan: { status: 'COMPENSATION_FAILED' } }
+    });
+    expect(test.client.activate).toHaveBeenCalledTimes(1);
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.auditEvents.at(-1)).toMatchObject({ activationOutcome: 'UNKNOWN' });
+  });
+
+  it('uses typed activation for the object graph and compensates in reverse order', async () => {
     const functionGroup: ResolvedCreationObject = {
       objectType: 'FUNCTION_GROUP',
       objectName: 'ZNEW_FG',
@@ -181,6 +296,7 @@ describe('AbapObjectCreationWorkflow', () => {
     const objects = [functionGroup, functionModule];
     const existing = new Set<string>();
     const calls: string[] = [];
+    const activationArguments: unknown[][] = [];
     const resolver = {
       resolve: jest.fn(async () => objects.map(value => ({ ...value }))),
       assertTargetsAbsent: jest.fn(async (targets: ResolvedCreationObject[]) => {
@@ -215,11 +331,19 @@ describe('AbapObjectCreationWorkflow', () => {
       setObjectSource: jest.fn(async () => { calls.push('write:ZNEW_FM'); }),
       syntaxCheck: jest.fn(async () => {
         calls.push('syntax:ZNEW_FM');
-        return [{ severity: 'E', line: 1, text: 'forced syntax error' }];
+        return [];
       }),
       unLock: jest.fn(async () => { calls.push('unlock:ZNEW_FM'); return ''; }),
+      getObjectSource: jest.fn(async () => {
+        calls.push('getSource:ZNEW_FM');
+        return 'FUNCTION znew_fm.\nWRITE / different.\nENDFUNCTION.';
+      }),
       activate: jest.fn(async (...args: unknown[]) => {
-        calls.push(typeof args[0] === 'string' ? 'activate:ZNEW_FG' : 'activate:ZNEW_FM');
+        activationArguments.push(args);
+        const type = typeof args[0] === 'string'
+          ? 'PROGRAM'
+          : String((args[0] as Record<string, unknown>)['adtcore:type']);
+        calls.push(type === 'FUGR/F' ? 'activate:ZNEW_FG' : 'activate:ZNEW_FM');
         return { success: true, messages: [], inactive: [] };
       }),
       deleteObject: jest.fn(async (url: string) => {
@@ -252,7 +376,7 @@ describe('AbapObjectCreationWorkflow', () => {
     await expect(workflow.apply({
       creationPlanId: 'creation-graph', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
-      code: 'SYNTAX_CHECK_FAILED',
+      code: 'SOURCE_VERIFY_FAILED',
       details: { plan: { status: 'COMPENSATED', compensationSucceeded: true } }
     });
     expect(calls).toEqual([
@@ -260,9 +384,22 @@ describe('AbapObjectCreationWorkflow', () => {
       'validate:ZNEW_FG', 'create:ZNEW_FG', 'activate:ZNEW_FG',
       'validate:ZNEW_FM', 'create:ZNEW_FM',
       `lock:${functionModule.objectUrl}`, 'write:ZNEW_FM', 'syntax:ZNEW_FM', 'unlock:ZNEW_FM',
+      'activate:ZNEW_FM', 'getSource:ZNEW_FM',
       `lock:${functionModule.objectUrl}`, 'delete:ZNEW_FM',
       `lock:${functionGroup.objectUrl}`, 'delete:ZNEW_FG'
     ]);
     expect(existing.size).toBe(0);
+    expect(activationArguments[0]).toEqual([{
+      'adtcore:uri': functionGroup.objectUrl,
+      'adtcore:type': 'FUGR/F',
+      'adtcore:name': 'ZNEW_FG',
+      'adtcore:parentUri': functionGroup.parentPath
+    }, true]);
+    expect(activationArguments[1]).toEqual([{
+      'adtcore:uri': functionModule.objectUrl,
+      'adtcore:type': 'FUGR/FF',
+      'adtcore:name': 'ZNEW_FM',
+      'adtcore:parentUri': functionGroup.objectUrl
+    }, false]);
   });
 });

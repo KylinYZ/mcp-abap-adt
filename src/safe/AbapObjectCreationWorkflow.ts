@@ -193,7 +193,12 @@ export class AbapObjectCreationWorkflow {
       return { status: 'success', plan: this.plans.view(plan.creationPlanId) };
     } catch (error) {
       const primary = asCreationError(error);
-      plan.primaryError = { code: primary.code, stage: primary.stage, message: primary.message };
+      plan.primaryError = {
+        code: primary.code,
+        stage: primary.stage,
+        message: primary.message,
+        details: primary.details
+      };
 
       if (heldLock) {
         try {
@@ -210,6 +215,7 @@ export class AbapObjectCreationWorkflow {
       if (compensation === 'failed') this.plans.setStatus(plan.creationPlanId, 'COMPENSATION_FAILED');
       await this.recordStage(plan, 'CREATION_COMPLETED_WITH_ERROR', false, primary.message, false);
       throw new SafeAbapError(primary.code, primary.stage, primary.message, {
+        ...primary.details,
         plan: this.plans.view(plan.creationPlanId)
       });
     }
@@ -281,27 +287,49 @@ export class AbapObjectCreationWorkflow {
 
   private async activate(object: CreatedObjectRecord): Promise<void> {
     try {
-      const result = object.objectType === 'FUNCTION_MODULE'
-        ? await this.client.activate({
-          'adtcore:uri': object.actualObjectUrl,
-          'adtcore:type': object.adtType,
-          'adtcore:name': object.objectName,
-          'adtcore:parentUri': object.activationParentUrl as string
-        }, false)
-        : await this.client.activate(object.objectName, object.actualObjectUrl, undefined, true);
+      const result = object.objectType === 'PROGRAM'
+        ? await this.client.activate(object.objectName, object.actualObjectUrl, undefined, true)
+        : await this.client.activate(activationReference(object), object.objectType === 'FUNCTION_GROUP');
       if (!result.success) {
+        const details = activationFailureDetails(result, object);
         throw new SafeAbapError(
           'ACTIVATION_FAILED',
           'activate',
-          result.messages.map(message => message.shortText).filter(Boolean).join('; ') || `Activation failed for ${object.objectName}.`
+          details.messages.join('; ') || `Activation failed for ${object.objectName}.`,
+          details
         );
       }
     } catch (error) {
       if (error instanceof SafeAbapError) throw error;
+
+      // A transport error after POST leaves the remote activation outcome unknown.
+      // Prove the object state through read-only resolution before allowing recovery.
+      try {
+        await this.resolver.resolveCreated(object, 'active');
+        return;
+      } catch {
+        // Continue with an explicit inactive-version check.
+      }
+
+      try {
+        await this.resolver.resolveCreated(object, 'inactive');
+      } catch {
+        // Without an authoritative active or inactive version, deletion could remove
+        // an object whose activation actually succeeded after the client disconnected.
+        object.ownershipProven = false;
+        throw new SafeAbapError(
+          'ACTIVATION_FAILED',
+          'activate',
+          `Activation outcome is unknown for ${object.objectName}: ${errorMessage(error)}`,
+          { activationOutcome: 'UNKNOWN' }
+        );
+      }
+
       throw new SafeAbapError(
         'ACTIVATION_FAILED',
         'activate',
-        `Failed to activate ${object.objectName}: ${errorMessage(error)}`
+        `Activation did not complete for ${object.objectName}.`,
+        { activationOutcome: 'INACTIVE_CONFIRMED' }
       );
     }
   }
@@ -418,7 +446,9 @@ export class AbapObjectCreationWorkflow {
         errorSummary: message,
         compensationAttempted: plan.compensationAttempted,
         compensationSucceeded: plan.compensationSucceeded,
-        confirmationMode: plan.confirmationMode
+        confirmationMode: plan.confirmationMode,
+        activationOutcome: stringDetail(plan.primaryError?.details, 'activationOutcome'),
+        activationInactiveCount: numberDetail(plan.primaryError?.details, 'inactiveCount')
       });
     } catch (error) {
       if (auditFailureIsFatal) throw error;
@@ -447,6 +477,45 @@ function newObjectOptions(object: ResolvedCreationObject, transport: string): Ne
   };
 }
 
+function activationReference(object: CreatedObjectRecord): {
+  'adtcore:uri': string;
+  'adtcore:type': string;
+  'adtcore:name': string;
+  'adtcore:parentUri': string;
+} {
+  return {
+    'adtcore:uri': object.actualObjectUrl,
+    'adtcore:type': object.adtType,
+    'adtcore:name': object.objectName,
+    'adtcore:parentUri': object.objectType === 'FUNCTION_GROUP'
+      ? object.parentPath
+      : object.activationParentUrl as string
+  };
+}
+
+function activationFailureDetails(
+  result: Awaited<ReturnType<CreationAdtClient['activate']>>,
+  object: CreatedObjectRecord
+): Record<string, unknown> & { messages: string[] } {
+  const messages = result.messages.map(message => message.shortText).filter(Boolean);
+  const inactiveObjects = result.inactive
+    .map(record => record.object)
+    .filter((inactive): inactive is NonNullable<typeof inactive> => Boolean(inactive))
+    .filter(inactive => {
+      const nameMatches = String(inactive['adtcore:name'] || '').toUpperCase() === object.objectName;
+      const typeMatches = String(inactive['adtcore:type'] || '').toUpperCase() === object.adtType;
+      const uriMatches = String(inactive['adtcore:uri'] || '').toLowerCase() === object.actualObjectUrl.toLowerCase();
+      return nameMatches || typeMatches && uriMatches;
+    })
+    .map(inactive => ({
+      uri: inactive['adtcore:uri'],
+      type: inactive['adtcore:type'],
+      name: inactive['adtcore:name'],
+      parentUri: inactive['adtcore:parentUri']
+    }));
+  return { inactiveCount: result.inactive.length, inactiveObjects, messages };
+}
+
 function assertSyntaxSuccess(messages: SyntaxCheckResult[], objectName: string): void {
   const errors = messages.filter(message => isErrorSeverity(message.severity));
   if (errors.length > 0) {
@@ -470,6 +539,16 @@ function transportNumbers(info: TransportInfo): Set<string> {
     ...(info.LOCKS?.TASKS || []).map(task => task.TRKORR)
   ];
   return new Set(values.filter((value): value is string => Boolean(value)).map(value => value.toUpperCase()));
+}
+
+function stringDetail(details: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = details?.[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function numberDetail(details: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = details?.[key];
+  return typeof value === 'number' ? value : undefined;
 }
 
 function asCreationError(error: unknown): SafeAbapError {

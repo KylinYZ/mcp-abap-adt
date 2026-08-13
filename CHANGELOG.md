@@ -3,6 +3,7 @@
 ## [Unreleased]
 - This modified version is source-only and has not been published to npm or the MCP Registry.
 - Default to seven high-level safe tools for ABAP source changes and controlled `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE` creation with explicit preview and confirmation.
+- Use typed ADT activation for function groups and preserve unknown activation outcomes for read-only inspection instead of deleting automatically.
 - Return complete allow-listed ABAP source from `inspectAbapObject` so clients can prepare full-source previews.
 - Add DEV host/client/namespace allowlists, transport and `$TMP` checks, source-drift detection, rollback, unlock handling, and sanitized JSONL audit logs.
 - Prefer native MCP form elicitation for apply confirmation, with an opt-in one-time text challenge fallback for incompatible clients.
