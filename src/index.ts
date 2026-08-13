@@ -36,15 +36,16 @@ import { AtcHandlers } from './handlers/AtcHandlers.js';
 import { TraceHandlers } from './handlers/TraceHandlers.js';
 import { RefactorHandlers } from './handlers/RefactorHandlers.js';
 import { RevisionHandlers } from './handlers/RevisionHandlers.js';
+import { Sm21Handlers } from './handlers/Sm21Handlers.js';
 import { SafeAbapHandlers, selectProfileTools } from './handlers/SafeAbapHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
-import { AbapObjectResolver } from './safe/AbapObjectResolver.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
 import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
+import { AbapObjectResolver } from './safe/AbapObjectResolver.js';
 import { AuditLogger } from './safe/AuditLogger.js';
 import { ChangePlanStore } from './safe/ChangePlanStore.js';
-import { SafeAbapError } from './safe/errors.js';
 import { CreationPlanStore } from './safe/CreationPlanStore.js';
+import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
 import { ToolExecutionGate } from './lib/ToolExecutionGate.js';
@@ -52,6 +53,8 @@ import { adtClientOptions, executeGuardedToolCall, usesSapExecutionGate } from '
 import type { ToolDefinition } from './types/tools.js';
 import { sourceCache } from './lib/sourceCache.js';
 import { configureLogLevel } from './lib/logger.js';
+import { AdtHttpSm21Client } from './sm21/AdtHttpSm21Client.js';
+import { sm21ConfigFromEnvironment } from './sm21/config.js';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
@@ -87,6 +90,7 @@ export class AbapAdtServer extends Server {
     private traceHandlers: TraceHandlers;
     private refactorHandlers: RefactorHandlers;
     private revisionHandlers: RevisionHandlers;
+    private sm21Handlers?: Sm21Handlers;
 
     constructor() {
     super(
@@ -124,6 +128,7 @@ export class AbapAdtServer extends Server {
     );
     this.adtClient.stateful = session_types.stateful
     this.safetyPolicy = SafetyPolicy.fromEnvironment();
+    const sm21Config = sm21ConfigFromEnvironment();
     
     // Initialize handlers
     this.authHandlers = new AuthHandlers(this.adtClient);
@@ -151,6 +156,8 @@ export class AbapAdtServer extends Server {
     this.traceHandlers = new TraceHandlers(this.adtClient);
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
+    // SM21 reuses the authenticated ADT HTTP client; the custom SICF service remains read-only.
+    this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(this.adtClient.httpClient), sm21Config, this.adtClient);
     const objectResolver = new AbapObjectResolver(this.adtClient);
     const changePlans = new ChangePlanStore(
       this.safetyPolicy.planTtlMs,
@@ -194,10 +201,12 @@ export class AbapAdtServer extends Server {
       applyConfirmed: input => this.executionGate.run(() => creationWorkflow.apply(input))
     });
 
-    // Setup tool handlers
+
+        // Setup tool handlers
     this.toolCatalog = this.createToolCatalog();
     this.setupToolHandlers();
   }
+
   private serializeResult(result: unknown) {
     try {
       // Handlers already return a well-formed MCP tool result
@@ -282,6 +291,7 @@ export class AbapAdtServer extends Server {
 
   private createToolCatalog(): ToolDefinition[] {
     const safeTools = this.safeAbapHandlers.getTools();
+    const sm21Tools = this.sm21Handlers?.getTools() || [];
     const legacyTools = this.safetyPolicy.toolProfile === 'legacy-full' ? [
         ...this.authHandlers.getTools(),
         ...this.transportHandlers.getTools(),
@@ -317,11 +327,15 @@ export class AbapAdtServer extends Server {
           }
         }
       ] : [];
-    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools);
+    // Safe mode exposes only audited high-level source-change and object-creation workflows.
+    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, [...sm21Tools, ...legacyTools]);
   }
 
   private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
         let result: unknown;
+        if (this.safetyPolicy.toolProfile === 'legacy-full' && this.sm21Handlers?.supports(toolName)) {
+          return this.sm21Handlers.handle(toolName, limitedArguments);
+        }
         if (this.safeAbapHandlers.supports(toolName)) {
           result = await this.safeAbapHandlers.handle(
             toolName,
