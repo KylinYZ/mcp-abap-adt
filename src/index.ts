@@ -37,7 +37,8 @@ import { TraceHandlers } from './handlers/TraceHandlers.js';
 import { RefactorHandlers } from './handlers/RefactorHandlers.js';
 import { RevisionHandlers } from './handlers/RevisionHandlers.js';
 import { Sm21Handlers } from './handlers/Sm21Handlers.js';
-import { SafeAbapHandlers, selectProfileTools } from './handlers/SafeAbapHandlers.js';
+import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
+import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
 import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
@@ -45,6 +46,9 @@ import { AbapObjectResolver } from './safe/AbapObjectResolver.js';
 import { AuditLogger } from './safe/AuditLogger.js';
 import { ChangePlanStore } from './safe/ChangePlanStore.js';
 import { CreationPlanStore } from './safe/CreationPlanStore.js';
+import { DebugControlWorkflow } from './safe/DebugControlWorkflow.js';
+import { DebugOperationPlanStore } from './safe/DebugOperationPlanStore.js';
+import { DebugSessionAuthorizationStore } from './safe/DebugSessionAuthorizationStore.js';
 import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
@@ -55,8 +59,18 @@ import { sourceCache } from './lib/sourceCache.js';
 import { configureLogLevel } from './lib/logger.js';
 import { AdtHttpSm21Client } from './sm21/AdtHttpSm21Client.js';
 import { sm21ConfigFromEnvironment } from './sm21/config.js';
+import { selectProfileTools, isReadOnlyLegacyTool } from './config/ToolProfiles.js';
+import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 
-config({ path: path.resolve(__dirname, '../.env') });
+const environmentFile = selectEnvironmentFile(
+  process.env.SAP_MCP_ENV_FILE,
+  process.cwd(),
+  path.resolve(__dirname, '../.env')
+);
+const environmentLoad = config({ path: environmentFile.path });
+if (environmentFile.explicit && environmentLoad.error) {
+  throw new Error(`Failed to load SAP_MCP_ENV_FILE: ${environmentLoad.error.message}`);
+}
 
 export class AbapAdtServer extends Server {
   private adtClient: ADTClient;
@@ -65,6 +79,7 @@ export class AbapAdtServer extends Server {
   private readonly executionGate: ToolExecutionGate;
   private toolCatalog: ToolDefinition[] = [];
   private safeAbapHandlers: SafeAbapHandlers;
+  private safeDebugHandlers: SafeDebugHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
   private objectHandlers: ObjectHandlers;
@@ -200,6 +215,31 @@ export class AbapAdtServer extends Server {
       elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
       applyConfirmed: input => this.executionGate.run(() => creationWorkflow.apply(input))
     });
+    const debugWorkflow = new DebugControlWorkflow(
+      this.adtClient,
+      this.safetyPolicy,
+      new DebugOperationPlanStore(
+        this.safetyPolicy.planTtlMs,
+        () => Date.now(),
+        undefined,
+        this.guardrails.changePlanMaxEntries
+      ),
+      new DebugSessionAuthorizationStore(
+        this.safetyPolicy.debugAuthTtlMs,
+        () => Date.now(),
+        undefined,
+        this.guardrails.changePlanMaxEntries
+      ),
+      auditLogger
+    );
+    this.safeDebugHandlers = new SafeDebugHandlers(debugWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      applyConfirmed: input => this.executionGate.run(() => debugWorkflow.applyOperation(input)),
+      authorizeConfirmed: (targetUser, debuggeeId) => this.executionGate.run(
+        () => debugWorkflow.authorizeConfirmed(targetUser, debuggeeId)
+      )
+    });
 
 
         // Setup tool handlers
@@ -291,8 +331,9 @@ export class AbapAdtServer extends Server {
 
   private createToolCatalog(): ToolDefinition[] {
     const safeTools = this.safeAbapHandlers.getTools();
+    const safeDebugTools = this.safeDebugHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
-    const legacyTools = this.safetyPolicy.toolProfile === 'legacy-full' ? [
+    const legacyTools = [
         ...this.authHandlers.getTools(),
         ...this.transportHandlers.getTools(),
         ...this.objectHandlers.getTools(),
@@ -320,21 +361,28 @@ export class AbapAdtServer extends Server {
         ...this.revisionHandlers.getTools(),
         {
           name: 'healthcheck',
-          description: 'Check server health and connectivity',
+          description: 'Check local MCP process health and configured target identity without contacting SAP',
           inputSchema: {
             type: 'object',
             properties: {}
           }
         }
-      ] : [];
-    // Safe mode exposes only audited high-level source-change and object-creation workflows.
-    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, [...sm21Tools, ...legacyTools]);
+      ];
+    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools, sm21Tools, safeDebugTools);
   }
 
   private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
         let result: unknown;
-        if (this.safetyPolicy.toolProfile === 'legacy-full' && this.sm21Handlers?.supports(toolName)) {
+        if ((this.safetyPolicy.toolProfile === 'legacy-full'
+          || this.safetyPolicy.toolProfile === 'development'
+          || this.safetyPolicy.toolProfile === 'diagnostic-readonly')
+          && this.sm21Handlers?.supports(toolName)) {
           return this.sm21Handlers.handle(toolName, limitedArguments);
+        }
+        if (this.safetyPolicy.toolProfile === 'diagnostic-readonly'
+          && toolName !== 'inspectAbapObject'
+          && !isReadOnlyLegacyTool(toolName)) {
+          throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the diagnostic-readonly tool profile.`);
         }
         if (this.safeAbapHandlers.supports(toolName)) {
           result = await this.safeAbapHandlers.handle(
@@ -343,11 +391,19 @@ export class AbapAdtServer extends Server {
           );
           return result;
         }
+        if (this.safetyPolicy.toolProfile === 'development' && this.safeDebugHandlers.supports(toolName)) {
+          return this.safeDebugHandlers.handle(toolName, limitedArguments);
+        }
         if (this.safetyPolicy.toolProfile === 'safe') {
           throw new McpError(
             ErrorCode.MethodNotFound,
             `Tool '${toolName}' is unavailable in the safe tool profile.`
           );
+        }
+
+        if (this.safetyPolicy.toolProfile === 'development'
+          && !isReadOnlyLegacyTool(toolName)) {
+          throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the ${this.safetyPolicy.toolProfile} tool profile.`);
         }
 
         switch (toolName) {
@@ -528,7 +584,18 @@ export class AbapAdtServer extends Server {
                 result = await this.revisionHandlers.handle(toolName, limitedArguments);
                 break;
             case 'healthcheck':
-                result = { status: 'healthy', timestamp: new Date().toISOString() };
+                result = {
+                  status: 'healthy',
+                  scope: 'mcp-process',
+                  sapConnectionVerified: false,
+                  configuredTarget: {
+                    host: this.safetyPolicy.systemHost,
+                    client: this.safetyPolicy.client,
+                    toolProfile: this.safetyPolicy.toolProfile,
+                    systemRole: this.safetyPolicy.systemRole
+                  },
+                  timestamp: new Date().toISOString()
+                };
                 break;
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
