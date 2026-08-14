@@ -11,6 +11,12 @@ export interface RequestLimitGuardrails {
 type ArgumentsValue = Record<string, unknown>;
 
 const ADVANCED_TOOL_FIELDS: Record<string, readonly string[]> = {
+  previewDdicPropertyChange: ['operation'],
+  applyDdicPropertyChange: ['operationPlanId'],
+  previewPackageChange: ['objectType', 'objectName', 'oldPackage', 'newPackage', 'transportRequest'],
+  applyPackageChange: ['operationPlanId'],
+  previewRapOperation: ['operation'],
+  applyRapOperation: ['operationPlanId'],
   objectStructureElements: ['objectUrl', 'version'],
   typeHierarchy: ['url', 'body', 'line', 'offset', 'superTypes'],
   objectEnhancements: ['sourceMainPath', 'contextUri', 'includeSource'],

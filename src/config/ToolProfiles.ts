@@ -1,6 +1,6 @@
 import type { ToolDefinition } from '../types/tools.js';
 import type { ToolProfile } from '../safe/types.js';
-import { isRawAdvancedMutationTool } from './ToolOperationPolicy.js';
+import { isRawAdvancedMutationTool, isToolAllowedForSystemRole } from './ToolOperationPolicy.js';
 
 export const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
   'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
@@ -33,21 +33,27 @@ export function selectProfileTools(
   legacyTools: ToolDefinition[],
   runtimeTools: ToolDefinition[] = [],
   safeDebugTools: ToolDefinition[] = [],
-  systemRole = 'DEV'
+  systemRole = 'DEV',
+  controlledAdvancedTools: ToolDefinition[] = []
 ): ToolDefinition[] {
-  if (profile === 'safe') return safeTools;
-  if (profile === 'development') return [...safeTools, ...safeDebugTools, ...runtimeTools, ...readOnlyLegacyTools(legacyTools)];
-  if (profile === 'diagnostic-readonly') {
-    return [
+  let selected: ToolDefinition[];
+  if (profile === 'safe') selected = safeTools;
+  else if (profile === 'development') selected = [...safeTools, ...safeDebugTools, ...runtimeTools, ...controlledAdvancedTools, ...readOnlyLegacyTools(legacyTools)];
+  else if (profile === 'diagnostic-readonly') {
+    selected = [
       ...safeTools.filter(tool => tool.name === 'inspectAbapObject'),
       ...runtimeTools,
       ...readOnlyLegacyTools(legacyTools)
     ];
+  } else {
+    const completeTools = [...safeTools, ...runtimeTools, ...legacyTools];
+    selected = systemRole === 'DEV'
+      ? completeTools
+      : completeTools.filter(tool => !isRawAdvancedMutationTool(tool.name));
   }
-  const completeTools = [...safeTools, ...runtimeTools, ...legacyTools];
   return systemRole === 'DEV'
-    ? completeTools
-    : completeTools.filter(tool => !isRawAdvancedMutationTool(tool.name));
+    ? selected
+    : selected.filter(tool => isToolAllowedForSystemRole(tool.name, systemRole));
 }
 
 export function readOnlyLegacyTools(tools: ToolDefinition[]): ToolDefinition[] {

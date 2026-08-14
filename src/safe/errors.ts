@@ -16,7 +16,15 @@ export type SafeErrorCode =
   | 'PLAN_NOT_FOUND'
   | 'PLAN_EXPIRED'
   | 'PLAN_ALREADY_CONSUMED'
+  | 'PLAN_NOT_EXECUTABLE'
   | 'PLAN_CAPACITY_FULL'
+  | 'STATE_DRIFT'
+  | 'VALIDATION_FAILED'
+  | 'CONFIRMATION_REQUIRED'
+  | 'CONFIRMATION_CANCELLED'
+  | 'REMOTE_WRITE_FAILED'
+  | 'VERIFICATION_FAILED'
+  | 'UNKNOWN_OUTCOME'
   | 'AUTHORIZATION_NOT_FOUND'
   | 'AUTHORIZATION_EXPIRED'
   | 'DEBUG_CONTEXT_MISSING'
@@ -85,7 +93,17 @@ function nextStepFor(code: SafeErrorCode): string {
     case 'PLAN_NOT_FOUND':
     case 'PLAN_EXPIRED':
     case 'PLAN_ALREADY_CONSUMED':
+    case 'PLAN_NOT_EXECUTABLE':
       return 'Create and confirm a new change preview.';
+    case 'STATE_DRIFT':
+      return 'Read the current SAP state and create a new preview before attempting the operation again.';
+    case 'VALIDATION_FAILED':
+      return 'Correct the bounded operation input or SAP validation messages, then create a new preview.';
+    case 'CONFIRMATION_REQUIRED':
+    case 'CONFIRMATION_CANCELLED':
+      return 'Use the native MCP confirmation dialog and explicitly approve a fresh preview when ready.';
+    case 'UNKNOWN_OUTCOME':
+      return 'Use only read-only tools to inspect the target state before deciding whether a new operation is safe.';
     case 'PLAN_CAPACITY_FULL':
       return 'Wait for an active plan to finish or a retained recovery plan to expire before creating another preview.';
     case 'AUTHORIZATION_NOT_FOUND':
@@ -105,8 +123,10 @@ function nextStepFor(code: SafeErrorCode): string {
     case 'AUDIT_FAILED':
       return 'Restore write access to SAP_MCP_AUDIT_PATH before attempting another source change.';
     case 'WRITE_FAILED':
+    case 'REMOTE_WRITE_FAILED':
     case 'ACTIVATION_FAILED':
     case 'VERIFY_FAILED':
+    case 'VERIFICATION_FAILED':
       return 'Check the returned plan recovery status and inspect the object in ADT before retrying.';
   }
 }

@@ -1,5 +1,9 @@
 import { AbapAdtServer } from '../index';
-import { RAW_ADVANCED_MUTATION_TOOL_NAMES } from '../config/ToolOperationPolicy';
+import {
+  CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES,
+  RAW_ADVANCED_MUTATION_TOOL_NAMES,
+  toolOperationClass
+} from '../config/ToolOperationPolicy';
 
 const originalEnvironment = { ...process.env };
 
@@ -26,7 +30,7 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 108],
+    ['development', 114],
     ['diagnostic-readonly', 94],
     ['legacy-full', 157]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
@@ -47,5 +51,37 @@ describe('tool catalog integrity and raw advanced role policy', () => {
       domainUrl: '/domain', properties: {}, metaData: {}, lockHandle: 'lock'
     })).rejects.toMatchObject({ code: 'POLICY_DENIED' });
     expect(client.setDomainProperties).not.toHaveBeenCalled();
+  });
+
+  it.each(['QAS', 'PRD', '', 'UNKNOWN'])('limits every profile to local/read-only tools for role %p', role => {
+    for (const profile of ['safe', 'development', 'diagnostic-readonly', 'legacy-full']) {
+      const server = configureServer(role, profile);
+      const catalog = (server as any).toolCatalog as Array<{ name: string }>;
+      expect(catalog.every(tool => ['local', 'read-only'].includes(String(toolOperationClass(tool.name))))).toBe(true);
+      expect(catalog.map(tool => tool.name)).toEqual(expect.not.arrayContaining([
+        ...RAW_ADVANCED_MUTATION_TOOL_NAMES,
+        ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES
+      ]));
+    }
+  });
+
+  it.each(['QAS', 'PRD', '', 'UNKNOWN'])('rejects hidden controlled apply before confirmation for role %p', async role => {
+    const server = configureServer(role, 'development');
+    const advancedHandlers = (server as any).safeAdvancedHandlers;
+    const handle = jest.spyOn(advancedHandlers, 'handle');
+
+    await expect((server as any).dispatchTool('applyRapOperation', { operationPlanId: 'forged-plan' }))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED' });
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('rejects controlled advanced operations in DEV diagnostic-readonly', async () => {
+    const server = configureServer('DEV', 'diagnostic-readonly');
+    const advancedHandlers = (server as any).safeAdvancedHandlers;
+    const handle = jest.spyOn(advancedHandlers, 'handle');
+
+    await expect((server as any).dispatchTool('applyDdicPropertyChange', { operationPlanId: 'forged-plan' }))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED' });
+    expect(handle).not.toHaveBeenCalled();
   });
 });

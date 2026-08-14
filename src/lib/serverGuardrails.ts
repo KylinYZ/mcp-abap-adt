@@ -16,6 +16,9 @@ export function usesSapExecutionGate(toolName: string): boolean {
     && toolName !== 'authorizeDebugSession'
     && toolName !== 'getDebugOperationStatus'
     && toolName !== 'revokeDebugSession'
+    && toolName !== 'applyDdicPropertyChange'
+    && toolName !== 'applyPackageChange'
+    && toolName !== 'applyRapOperation'
     && toolName !== 'healthcheck';
 }
 

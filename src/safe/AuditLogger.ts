@@ -46,6 +46,14 @@ export interface AuditEvent {
   oldValueHash?: string;
   newValueHash?: string;
   resultSummary?: string;
+  operationPlanId?: string;
+  advancedOperationKind?: string;
+  inputHash?: string;
+  driftHash?: string;
+  recoveryHash?: string;
+  verificationHash?: string;
+  partialSuccess?: boolean;
+  unknownOutcome?: boolean;
 }
 
 export class AuditLogger {

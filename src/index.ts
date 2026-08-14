@@ -40,6 +40,7 @@ import { RapGeneratorHandlers } from './handlers/RapGeneratorHandlers.js';
 import { Sm21Handlers } from './handlers/Sm21Handlers.js';
 import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
 import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
+import { SafeAdvancedHandlers } from './handlers/SafeAdvancedHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
 import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
@@ -50,6 +51,10 @@ import { CreationPlanStore } from './safe/CreationPlanStore.js';
 import { DebugControlWorkflow } from './safe/DebugControlWorkflow.js';
 import { DebugOperationPlanStore } from './safe/DebugOperationPlanStore.js';
 import { DebugSessionAuthorizationStore } from './safe/DebugSessionAuthorizationStore.js';
+import { AdvancedOperationPlanStore } from './safe/AdvancedOperationPlanStore.js';
+import { DdicPropertyChangeWorkflow } from './safe/DdicPropertyChangeWorkflow.js';
+import { PackageChangeWorkflow } from './safe/PackageChangeWorkflow.js';
+import { RapOperationWorkflow } from './safe/RapOperationWorkflow.js';
 import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
@@ -82,6 +87,7 @@ export class AbapAdtServer extends Server {
   private toolCatalog: ToolDefinition[] = [];
   private safeAbapHandlers: SafeAbapHandlers;
   private safeDebugHandlers: SafeDebugHandlers;
+  private safeAdvancedHandlers: SafeAdvancedHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
   private objectHandlers: ObjectHandlers;
@@ -245,6 +251,36 @@ export class AbapAdtServer extends Server {
       )
     });
 
+    const advancedPlans = new AdvancedOperationPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
+    const ddicWorkflow = new DdicPropertyChangeWorkflow(this.adtClient, this.safetyPolicy, advancedPlans, auditLogger);
+    const packageWorkflow = new PackageChangeWorkflow(this.adtClient, objectResolver, this.safetyPolicy, advancedPlans, auditLogger);
+    const rapWorkflow = new RapOperationWorkflow(this.adtClient, this.safetyPolicy, advancedPlans, auditLogger);
+    this.safeAdvancedHandlers = new SafeAdvancedHandlers({
+      status: operationPlanId => advancedPlans.view(operationPlanId, {
+        systemHost: this.safetyPolicy.systemHost,
+        client: this.safetyPolicy.client,
+        systemRole: this.safetyPolicy.systemRole,
+        toolProfile: this.safetyPolicy.toolProfile
+      }),
+      previewDdicPropertyChange: args => ddicWorkflow.preview(args),
+      previewPackageChange: args => packageWorkflow.preview(args),
+      previewRapOperation: args => rapWorkflow.preview(args)
+    }, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      applyConfirmed: operationPlanId => this.executionGate.run(async () => {
+        const plan = advancedPlans.get(operationPlanId);
+        if (plan.operationKind === 'CHANGE_PACKAGE') return packageWorkflow.apply(operationPlanId);
+        if (plan.operationKind === 'RAP_GENERATE' || plan.operationKind === 'RAP_PUBLISH_SERVICE') return rapWorkflow.apply(operationPlanId);
+        return ddicWorkflow.apply(operationPlanId);
+      })
+    });
+
 
         // Setup tool handlers
     this.toolCatalog = this.createToolCatalog();
@@ -336,6 +372,7 @@ export class AbapAdtServer extends Server {
   private createToolCatalog(): ToolDefinition[] {
     const safeTools = this.safeAbapHandlers.getTools();
     const safeDebugTools = this.safeDebugHandlers.getTools();
+    const controlledAdvancedTools = this.safeAdvancedHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
     const legacyTools = [
         ...this.authHandlers.getTools(),
@@ -373,7 +410,7 @@ export class AbapAdtServer extends Server {
           }
         }
       ];
-    const completeCatalog = [...safeTools, ...safeDebugTools, ...sm21Tools, ...legacyTools];
+    const completeCatalog = [...safeTools, ...safeDebugTools, ...controlledAdvancedTools, ...sm21Tools, ...legacyTools];
     assertToolCatalogClassified(completeCatalog.map(tool => tool.name));
     return selectProfileTools(
       this.safetyPolicy.toolProfile,
@@ -381,7 +418,8 @@ export class AbapAdtServer extends Server {
       legacyTools,
       sm21Tools,
       safeDebugTools,
-      this.safetyPolicy.systemRole
+      this.safetyPolicy.systemRole,
+      controlledAdvancedTools
     );
   }
 
@@ -406,6 +444,9 @@ export class AbapAdtServer extends Server {
             limitedArguments
           );
           return result;
+        }
+        if (this.safetyPolicy.toolProfile === 'development' && this.safeAdvancedHandlers.supports(toolName)) {
+          return this.safeAdvancedHandlers.handle(toolName, limitedArguments);
         }
         if (this.safetyPolicy.toolProfile === 'development' && this.safeDebugHandlers.supports(toolName)) {
           return this.safeDebugHandlers.handle(toolName, limitedArguments);

@@ -18,6 +18,12 @@ export const RAW_ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'rapGenPublishService'
 ]);
 
+export const CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES = new Set([
+  'previewDdicPropertyChange', 'applyDdicPropertyChange',
+  'previewPackageChange', 'applyPackageChange',
+  'previewRapOperation', 'applyRapOperation'
+]);
+
 const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
   'getDebugOperationStatus', 'revokeDebugSession'
@@ -71,12 +77,17 @@ const OTHER_MUTATION_TOOL_NAMES = new Set([
   'tracesSetParameters', 'tracesCreateConfiguration', 'tracesDeleteConfiguration', 'tracesDelete'
 ]);
 
+const ADVANCED_MUTATION_TOOL_NAMES = new Set([
+  ...RAW_ADVANCED_MUTATION_TOOL_NAMES,
+  ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES
+]);
+
 const CLASS_SETS: ReadonlyArray<readonly [ToolOperationClass, Set<string>]> = [
   ['local', LOCAL_TOOL_NAMES],
   ['read-only', READ_ONLY_TOOL_NAMES],
   ['source-mutation', SOURCE_MUTATION_TOOL_NAMES],
   ['debug-control', DEBUG_CONTROL_TOOL_NAMES],
-  ['advanced-mutation', RAW_ADVANCED_MUTATION_TOOL_NAMES],
+  ['advanced-mutation', ADVANCED_MUTATION_TOOL_NAMES],
   ['other-mutation', OTHER_MUTATION_TOOL_NAMES]
 ];
 
@@ -88,6 +99,11 @@ export function toolOperationClass(toolName: string): ToolOperationClass | undef
 
 export function isRawAdvancedMutationTool(toolName: string): boolean {
   return RAW_ADVANCED_MUTATION_TOOL_NAMES.has(toolName);
+}
+
+export function isToolAllowedForSystemRole(toolName: string, systemRole: string): boolean {
+  const operationClass = toolOperationClass(toolName);
+  return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
 export function assertToolCatalogClassified(toolNames: string[]): void {
@@ -106,11 +122,25 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
   if (!operationClass) {
     throw new SafeAbapError('POLICY_DENIED', 'policy', `Tool ${toolName} has no approved operation classification.`);
   }
-  if (operationClass === 'advanced-mutation' && (profile !== 'legacy-full' || systemRole !== 'DEV')) {
+  if (systemRole !== 'DEV' && operationClass !== 'local' && operationClass !== 'read-only') {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'QAS, PRD, missing, and unknown system roles permit only local and read-only operations.'
+    );
+  }
+  if (RAW_ADVANCED_MUTATION_TOOL_NAMES.has(toolName) && (profile !== 'legacy-full' || systemRole !== 'DEV')) {
     throw new SafeAbapError(
       'POLICY_DENIED',
       'policy',
       'Raw DDIC, package, RAP generation, and publication operations require DEV legacy-full.'
+    );
+  }
+  if (CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES.has(toolName) && (profile !== 'development' || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled DDIC, package, and RAP operations require DEV development profile.'
     );
   }
 }
