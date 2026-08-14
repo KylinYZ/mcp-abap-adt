@@ -1,4 +1,4 @@
-import { applyToolArgumentLimits, assertToolResponseSize } from '../lib/requestLimits';
+import { applyToolArgumentLimits, assertReadOnlyQuery, assertToolResponseSize } from '../lib/requestLimits';
 
 const guardrails = {
   queryDefaultRows: 200,
@@ -11,7 +11,8 @@ const guardrails = {
 describe('request limits', () => {
   it.each([['tableContents', 'rowNumber', 200], ['runQuery', 'rowNumber', 200], ['searchObject', 'max', 50]] as const)
   ('adds the configured default for %s', (toolName, field, expected) => {
-    expect(applyToolArgumentLimits(toolName, {}, guardrails)).toMatchObject({ [field]: expected });
+    const argumentsValue = toolName === 'runQuery' ? { sqlQuery: 'SELECT * FROM z_demo' } : {};
+    expect(applyToolArgumentLimits(toolName, argumentsValue, guardrails)).toMatchObject({ [field]: expected });
   });
 
   it('keeps valid values and does not mutate the original arguments', () => {
@@ -29,12 +30,28 @@ describe('request limits', () => {
     expect(applyToolArgumentLimits('healthcheck', { value: 1 }, guardrails)).toEqual({ value: 1 });
   });
 
+  it('rejects mutating and multi-statement queries', () => {
+    expect(() => assertReadOnlyQuery('runQuery', 'UPDATE z_demo SET value = 1')).toThrow('read-only');
+    expect(() => assertReadOnlyQuery('runQuery', 'SELECT * FROM z_demo; DELETE FROM z_demo')).toThrow('one read-only SQL statement');
+    expect(() => assertReadOnlyQuery('runQuery', 'SELECT * FROM z_demo')).not.toThrow();
+    expect(() => assertReadOnlyQuery('tableContents', undefined)).not.toThrow();
+  });
+
   it('rejects oversized UTF-8 arguments before dispatch', () => {
     expect(() => applyToolArgumentLimits(
       'previewAbapObjectCreation',
       { objects: [{ source: '中'.repeat(400) }] },
       guardrails
     )).toThrow('request limit');
+  });
+
+  it('rejects batch-shaped or oversized safe debug arguments', () => {
+    expect(() => applyToolArgumentLimits('executeDebugCommand', { command: [] }, guardrails)).toThrow('one command object');
+    expect(() => applyToolArgumentLimits('previewDebugVariableChange', { parents: Array(21).fill('@ROOT') }, guardrails))
+      .toThrow('20 scopes');
+    expect(() => applyToolArgumentLimits('previewDebugOperation', {
+      operation: { kind: 'SET_BREAKPOINTS', breakpoints: Array(51).fill({}) }
+    }, guardrails)).toThrow('50 breakpoints');
   });
 
   it('counts UTF-8 bytes across text items and ignores non-text items', () => {
