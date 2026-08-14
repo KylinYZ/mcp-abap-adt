@@ -37,6 +37,15 @@ export interface AuditEvent {
   confirmationMode?: string;
   activationOutcome?: string;
   activationInactiveCount?: number;
+  debugOperationPlanId?: string;
+  debugOperationKind?: string;
+  targetUser?: string;
+  debuggeeId?: string;
+  debugAuthHash?: string;
+  operationHash?: string;
+  oldValueHash?: string;
+  newValueHash?: string;
+  resultSummary?: string;
 }
 
 export class AuditLogger {
@@ -79,12 +88,14 @@ export class AuditLogger {
 
 function sanitizeRecord(record: Record<string, unknown>): Record<string, unknown> {
   // Confirmation phrases and verification codes are one-time secrets and must never reach disk.
-  const forbidden = /password|passwd|pwd|cookie|authorization|lockhandle|source|diff|confirmationtext|textconfirmation|challenge|verificationcode/i;
+  const forbidden = /password|passwd|pwd|cookie|authorization|lockhandle|source|diff|confirmationtext|textconfirmation|challenge|verificationcode|oldvalue|newvalue|variablevalue|debugvalue/i;
   const safeDiagnosticFields = new Set([
     'verifiedSourceHash',
     'sourceMatchType',
     'rollbackVerifiedSourceHash',
-    'rollbackSourceMatchType'
+    'rollbackSourceMatchType',
+    'oldValueHash',
+    'newValueHash'
   ]);
   return Object.fromEntries(
     Object.entries(record)

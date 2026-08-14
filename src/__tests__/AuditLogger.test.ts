@@ -66,6 +66,31 @@ describe('AuditLogger', () => {
     expect(JSON.stringify(record)).not.toContain('123456');
   });
 
+  it('retains variable hashes but drops accidentally supplied runtime values', async () => {
+    const logger = new AuditLogger(auditDirectory);
+    await logger.append({
+      correlationId: 'debug-plan-1',
+      eventType: 'DEBUG_VARIABLE_APPLIED',
+      systemHost: 'dev.example.com',
+      client: '100',
+      systemRole: 'DEV',
+      targetUser: 'DEVUSER',
+      oldValueHash: 'old-hash',
+      newValueHash: 'new-hash',
+      success: true,
+      oldValue: 'old-secret',
+      newValue: 'new-secret',
+      variableValue: 'variable-secret'
+    } as AuditEvent & Record<string, unknown>);
+
+    const record = JSON.parse((await fs.readFile(logger.filePath, 'utf8')).trim());
+    expect(record).toMatchObject({ oldValueHash: 'old-hash', newValueHash: 'new-hash' });
+    expect(record).not.toHaveProperty('oldValue');
+    expect(record).not.toHaveProperty('newValue');
+    expect(record).not.toHaveProperty('variableValue');
+    expect(JSON.stringify(record)).not.toContain('secret');
+  });
+
   it('serializes concurrent appends in call order with one directory initialization', async () => {
     const logger = new AuditLogger(auditDirectory);
     const mkdirSpy = jest.spyOn(fs, 'mkdir');

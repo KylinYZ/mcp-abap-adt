@@ -17,6 +17,11 @@ export type SafeErrorCode =
   | 'PLAN_EXPIRED'
   | 'PLAN_ALREADY_CONSUMED'
   | 'PLAN_CAPACITY_FULL'
+  | 'AUTHORIZATION_NOT_FOUND'
+  | 'AUTHORIZATION_EXPIRED'
+  | 'DEBUG_CONTEXT_MISSING'
+  | 'DEBUG_STATE_DRIFT'
+  | 'REMOTE_RESULT_UNKNOWN'
   | 'LOCK_FAILED'
   | 'WRITE_FAILED'
   | 'ACTIVATION_FAILED'
@@ -83,6 +88,15 @@ function nextStepFor(code: SafeErrorCode): string {
       return 'Create and confirm a new change preview.';
     case 'PLAN_CAPACITY_FULL':
       return 'Wait for an active plan to finish or a retained recovery plan to expire before creating another preview.';
+    case 'AUTHORIZATION_NOT_FOUND':
+    case 'AUTHORIZATION_EXPIRED':
+      return 'Attach to the intended DEV debuggee and request a new debug session authorization.';
+    case 'DEBUG_CONTEXT_MISSING':
+      return 'Attach to the intended DEV debuggee before requesting session authorization or control.';
+    case 'DEBUG_STATE_DRIFT':
+      return 'Read the current debug stack and variables, then create a new operation preview.';
+    case 'REMOTE_RESULT_UNKNOWN':
+      return 'Inspect the returned read-only recovery state before deciding whether a new operation is safe.';
     case 'LOCK_FAILED':
       return 'Resolve the SAP object lock in ADT and retry with a new preview if the source changed.';
     case 'ROLLBACK_FAILED':

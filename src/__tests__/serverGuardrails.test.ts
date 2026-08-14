@@ -233,10 +233,18 @@ describe('server guardrail integration helpers', () => {
     ['getAbapChangeStatus', false],
     ['applyAbapObjectCreation', false],
     ['getAbapObjectCreationStatus', false],
+    ['applyDebugOperation', false],
+    ['applyDebugVariableChange', false],
+    ['authorizeDebugSession', false],
+    ['getDebugOperationStatus', false],
+    ['revokeDebugSession', false],
     ['healthcheck', false],
     ['inspectAbapObject', true],
     ['previewAbapChange', true],
     ['previewAbapObjectCreation', true],
+    ['previewDebugOperation', true],
+    ['previewDebugVariableChange', true],
+    ['executeDebugCommand', true],
     ['searchObject', true]
   ] as const)('classifies %s SAP gate usage as %s', (toolName, expected) => {
     expect(usesSapExecutionGate(toolName)).toBe(expected);

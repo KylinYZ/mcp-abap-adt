@@ -11,6 +11,11 @@ export function usesSapExecutionGate(toolName: string): boolean {
     && toolName !== 'getAbapChangeStatus'
     && toolName !== 'applyAbapObjectCreation'
     && toolName !== 'getAbapObjectCreationStatus'
+    && toolName !== 'applyDebugOperation'
+    && toolName !== 'applyDebugVariableChange'
+    && toolName !== 'authorizeDebugSession'
+    && toolName !== 'getDebugOperationStatus'
+    && toolName !== 'revokeDebugSession'
     && toolName !== 'healthcheck';
 }
 
