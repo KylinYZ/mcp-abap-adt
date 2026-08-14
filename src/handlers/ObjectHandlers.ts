@@ -2,6 +2,7 @@ import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { ADTClient } from "../adt/index.js";
+import { readOnlyRawTool } from './rawToolMetadata.js';
 
 export class ObjectHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {
@@ -78,7 +79,19 @@ export class ObjectHandlers extends BaseHandler {
                     type: 'object',
                     properties: {}
                 }
-            }
+            },
+            readOnlyRawTool(
+                'objectStructureElements',
+                'Read the class or interface structure element tree for an ADT object URL.',
+                {
+                    type: 'object',
+                    properties: {
+                        objectUrl: { type: 'string', description: 'Class or interface ADT object URL', maxLength: 2048 },
+                        version: { type: 'string', description: 'active, inactive, or workingArea', enum: ['active', 'inactive', 'workingArea'], optional: true }
+                    },
+                    required: ['objectUrl']
+                }
+            )
         ];
     }
 
@@ -94,6 +107,11 @@ export class ObjectHandlers extends BaseHandler {
                 return this.handleObjectTypes(args);
             case 'reentranceTicket':
                 return this.handleReentranceTicket(args);
+            case 'objectStructureElements':
+                return this.executeClientCall(
+                    'Object structure element read',
+                    () => this.adtclient.objectStructureElements(args.objectUrl, args.version)
+                );
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown object tool: ${toolName}`);
         }

@@ -2,6 +2,7 @@ import { ADTClient } from '../adt/index.js';
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { AtcProposal } from '../adt/index.js';
+import { readOnlyRawTool } from './rawToolMetadata.js';
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
 export class AtcHandlers extends BaseHandler {
@@ -162,7 +163,16 @@ export class AtcHandlers extends BaseHandler {
                     },
                     required: ['itemUri', 'userId']
                 }
-            }
+            },
+            readOnlyRawTool(
+                'atcDocumentation',
+                'Read ATC documentation from an exact documentation URI.',
+                {
+                    type: 'object',
+                    properties: { docUri: { type: 'string', description: 'Exact ATC documentation URI', maxLength: 2048 } },
+                    required: ['docUri']
+                }
+            )
         ];
     }
 
@@ -188,6 +198,8 @@ export class AtcHandlers extends BaseHandler {
                 return this.handleAtcContactUri(args);
             case 'atcChangeContact':
                 return this.handleAtcChangeContact(args);
+            case 'atcDocumentation':
+                return this.executeClientCall('ATC documentation read', () => this.adtclient.atcDocumentation(args.docUri));
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown ATC tool: ${toolName}`);
         }

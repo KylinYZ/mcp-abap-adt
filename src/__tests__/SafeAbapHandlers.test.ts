@@ -204,7 +204,7 @@ describe('SafeAbapHandlers', () => {
   });
 
   it('locks the documented development and diagnostic-readonly tool counts', () => {
-    expect(READ_ONLY_LEGACY_TOOL_COUNT).toBe(76);
+    expect(READ_ONLY_LEGACY_TOOL_COUNT).toBe(91);
     const safeTools = Array.from({ length: 7 }, (_, index) => ({
       name: index === 0 ? 'inspectAbapObject' : `safe-${index}`,
       description: 'safe',
@@ -236,6 +236,10 @@ describe('SafeAbapHandlers', () => {
       'atcWorklists', 'atcUsers', 'isProposalMessage', 'atcContactUri', 'tracesList', 'tracesListRequests',
       'tracesHitList', 'tracesDbAccess', 'tracesStatements', 'renameEvaluate', 'renamePreview',
       'extractMethodEvaluate', 'extractMethodPreview', 'revisions', 'healthcheck'
+      , 'objectStructureElements', 'typeHierarchy', 'objectEnhancements', 'getDomainProperties',
+      'getDataElementProperties', 'getTextElements', 'atcDocumentation', 'changePackagePreview',
+      'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent', 'rapGenGetUiConfig',
+      'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable'
     ];
     const legacyTools = readOnlyNames.map(name => ({
       name,
@@ -243,7 +247,7 @@ describe('SafeAbapHandlers', () => {
       inputSchema: { type: 'object', properties: {} }
     }));
 
-    expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(93);
-    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(79);
+    expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(108);
+    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(94);
   });
 });

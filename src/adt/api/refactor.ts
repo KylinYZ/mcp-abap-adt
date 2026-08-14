@@ -610,7 +610,6 @@ const parseExtractMethodEval = (body: string): ExtractMethodProposal => {
 }
 
 export async function changePackagePreview(h: AdtHTTP, changePackageRefactoring: ChangePackageRefactoring, transport: string): Promise<ChangePackageRefactoring> {
-    console.log("changePackageRefactoring here", changePackageRefactoring);
     const qs = {
         step: `preview`,
         rel: `http://www.sap.com/adt/relations/refactoring/changepackage`

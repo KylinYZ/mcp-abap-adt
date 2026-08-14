@@ -1,4 +1,4 @@
-import type { ADTClient } from 'abap-adt-api';
+import type { ADTClient } from '../adt/index.js';
 import { ObjectSourceHandlers } from '../handlers/ObjectSourceHandlers';
 import { sourceCache } from '../lib/sourceCache';
 

@@ -1,4 +1,4 @@
-import type { Dump } from 'abap-adt-api';
+import type { Dump } from '../adt/index.js';
 import { Sm21Handlers } from '../handlers/Sm21Handlers';
 import type { Sm21Client, Sm21ReadRequest } from '../sm21/types';
 

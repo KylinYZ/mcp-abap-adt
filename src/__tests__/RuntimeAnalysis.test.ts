@@ -1,4 +1,4 @@
-import type { Dump } from 'abap-adt-api';
+import type { Dump } from '../adt/index.js';
 import { analyzeRuntimeErrors } from '../sm21/runtimeAnalysis';
 import type { Sm21LogEntry } from '../sm21/types';
 

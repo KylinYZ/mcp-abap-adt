@@ -1,5 +1,6 @@
 import { SafeAbapError } from './errors.js';
 import type { ToolProfile } from './types.js';
+import { assertToolOperationAllowed as assertOperationAllowed } from '../config/ToolOperationPolicy.js';
 
 export interface SafetyPolicyOptions {
   sapUrl?: string;
@@ -147,6 +148,10 @@ export class SafetyPolicy {
       );
     }
     return normalized;
+  }
+
+  assertToolOperationAllowed(toolName: string): void {
+    assertOperationAllowed(toolName, this.toolProfile, this.systemRole);
   }
 }
 

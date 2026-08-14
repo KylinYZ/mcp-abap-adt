@@ -1,4 +1,4 @@
-import type { SyntaxCheckResult } from 'abap-adt-api';
+import type { SyntaxCheckResult } from '../adt/index.js';
 import { AbapChangeWorkflow, type AuditSink } from '../safe/AbapChangeWorkflow';
 import { ChangePlanStore } from '../safe/ChangePlanStore';
 import { SafetyPolicy } from '../safe/SafetyPolicy';

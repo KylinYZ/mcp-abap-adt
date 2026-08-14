@@ -3,6 +3,7 @@ import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { ADTClient } from '../adt/index.js';
 import { sourceCache } from '../lib/sourceCache.js';
+import { readOnlyRawTool } from './rawToolMetadata.js';
 
 export class CodeAnalysisHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {
@@ -193,7 +194,35 @@ export class CodeAnalysisHandlers extends BaseHandler {
                     },
                     required: ['objectUri', 'body', 'line', 'column']
                 }
-            }
+            },
+            readOnlyRawTool(
+                'typeHierarchy',
+                'Read the ABAP type hierarchy at one source position.',
+                {
+                    type: 'object',
+                    properties: {
+                        url: { type: 'string', description: 'ADT source URL', maxLength: 2048 },
+                        body: { type: 'string', description: 'Complete source body' },
+                        line: { type: 'number', description: 'Zero-based source line', minimum: 0 },
+                        offset: { type: 'number', description: 'Zero-based source offset', minimum: 0 },
+                        superTypes: { type: 'boolean', description: 'Return supertypes instead of subtypes', optional: true }
+                    },
+                    required: ['url', 'body', 'line', 'offset']
+                }
+            ),
+            readOnlyRawTool(
+                'objectEnhancements',
+                'Read enhancement implementations for one ABAP source object.',
+                {
+                    type: 'object',
+                    properties: {
+                        sourceMainPath: { type: 'string', description: 'ADT source main path', maxLength: 2048 },
+                        contextUri: { type: 'string', description: 'Optional containing program ADT URI', maxLength: 2048, optional: true },
+                        includeSource: { type: 'boolean', description: 'Include decoded enhancement source in the bounded response', optional: true }
+                    },
+                    required: ['sourceMainPath']
+                }
+            )
         ];
     }
 
@@ -227,6 +256,16 @@ export class CodeAnalysisHandlers extends BaseHandler {
                 return this.handleFragmentMappings(args);
             case 'abapDocumentation':
                 return this.handleAbapDocumentation(args);
+            case 'typeHierarchy':
+                return this.executeClientCall(
+                    'Type hierarchy read',
+                    () => this.adtclient.typeHierarchy(args.url, args.body, args.line, args.offset, args.superTypes)
+                );
+            case 'objectEnhancements':
+                return this.executeClientCall(
+                    'Object enhancement read',
+                    () => this.adtclient.objectEnhancements(args.sourceMainPath, args.contextUri, args.includeSource)
+                );
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown code analysis tool: ${toolName}`);
         }

@@ -2,6 +2,7 @@ import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { ADTClient, Range, ExtractMethodProposal, GenericRefactoring } from '../adt/index.js';
+import { mutatingRawTool, readOnlyRawTool } from './rawToolMetadata.js';
 
 export class RefactorHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {
@@ -51,7 +52,17 @@ export class RefactorHandlers extends BaseHandler {
                     },
                     required: ['refactoring']
                 }
-            }
+            },
+            readOnlyRawTool(
+                'changePackagePreview',
+                'Preview a bounded package-change refactoring without executing it.',
+                changePackageSchema(true)
+            ),
+            mutatingRawTool(
+                'changePackageExecute',
+                'High risk raw package migration. Executes one complete preview result without automatic reversal or retry.',
+                changePackageSchema(false)
+            )
         ];
     }
 
@@ -63,6 +74,16 @@ export class RefactorHandlers extends BaseHandler {
                 return this.handleExtractMethodPreview(args);
             case 'extractMethodExecute':
                 return this.handleExtractMethodExecute(args);
+            case 'changePackagePreview':
+                return this.executeClientCall(
+                    'Package change preview',
+                    () => this.adtclient.changePackagePreview(args.refactoring, args.transport)
+                );
+            case 'changePackageExecute':
+                return this.executeClientCall(
+                    'Package change execution',
+                    () => this.adtclient.changePackageExecute(args.refactoring)
+                );
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown refactor tool: ${toolName}`);
         }
@@ -156,4 +177,41 @@ export class RefactorHandlers extends BaseHandler {
             );
         }
     }
+}
+
+function changePackageSchema(preview: boolean): ToolDefinition['inputSchema'] {
+    const refactoring = {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+            oldPackage: { type: 'string', maxLength: 255 },
+            newPackage: { type: 'string', maxLength: 255 },
+            transport: { type: 'string', maxLength: 64, optional: true },
+            title: { type: 'string', maxLength: 255, optional: true },
+            rootUserContent: { type: 'string', maxLength: 8192, optional: true },
+            ignoreSyntaxErrorsAllowed: { type: 'boolean' },
+            ignoreSyntaxErrors: { type: 'boolean' },
+            adtObjectUri: { type: 'string', maxLength: 2048 },
+            affectedObjects: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    uri: { type: 'string', maxLength: 2048 }, type: { type: 'string', maxLength: 64 },
+                    name: { type: 'string', maxLength: 255 }, oldPackage: { type: 'string', maxLength: 255 },
+                    newPackage: { type: 'string', maxLength: 255 }, parentUri: { type: 'string', maxLength: 2048 }
+                },
+                required: ['uri', 'type', 'name', 'oldPackage', 'newPackage', 'parentUri']
+            },
+            userContent: { type: 'string', maxLength: 8192 }
+        },
+        required: ['oldPackage', 'newPackage', 'ignoreSyntaxErrorsAllowed', 'ignoreSyntaxErrors', 'adtObjectUri', 'affectedObjects', 'userContent']
+    };
+    return {
+        type: 'object',
+        properties: {
+            refactoring,
+            ...(preview ? { transport: { type: 'string', description: 'Existing transport or empty for local package', maxLength: 64 } } : {})
+        },
+        required: preview ? ['refactoring', 'transport'] : ['refactoring']
+    };
 }

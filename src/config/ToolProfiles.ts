@@ -1,7 +1,8 @@
 import type { ToolDefinition } from '../types/tools.js';
 import type { ToolProfile } from '../safe/types.js';
+import { isRawAdvancedMutationTool } from './ToolOperationPolicy.js';
 
-const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
+export const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
   'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
   'userTransports', 'transportsByConfig', 'systemUsers', 'transportReference',
   'objectStructure', 'searchObject', 'findObjectPath', 'objectTypes', 'classIncludes', 'classComponents',
@@ -17,7 +18,11 @@ const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
   'debuggerVariables', 'debuggerChildVariables', 'atcCustomizing', 'atcCheckVariant',
   'atcWorklists', 'atcUsers', 'isProposalMessage', 'atcContactUri', 'tracesList', 'tracesListRequests',
   'tracesHitList', 'tracesDbAccess', 'tracesStatements', 'renameEvaluate', 'renamePreview',
-  'extractMethodEvaluate', 'extractMethodPreview', 'revisions', 'healthcheck'
+  'extractMethodEvaluate', 'extractMethodPreview', 'revisions', 'healthcheck',
+  'objectStructureElements', 'typeHierarchy', 'objectEnhancements',
+  'getDomainProperties', 'getDataElementProperties', 'getTextElements', 'atcDocumentation',
+  'changePackagePreview', 'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent',
+  'rapGenGetUiConfig', 'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable'
 ]);
 
 export const READ_ONLY_LEGACY_TOOL_COUNT = READ_ONLY_LEGACY_TOOL_NAMES.size;
@@ -27,7 +32,8 @@ export function selectProfileTools(
   safeTools: ToolDefinition[],
   legacyTools: ToolDefinition[],
   runtimeTools: ToolDefinition[] = [],
-  safeDebugTools: ToolDefinition[] = []
+  safeDebugTools: ToolDefinition[] = [],
+  systemRole = 'DEV'
 ): ToolDefinition[] {
   if (profile === 'safe') return safeTools;
   if (profile === 'development') return [...safeTools, ...safeDebugTools, ...runtimeTools, ...readOnlyLegacyTools(legacyTools)];
@@ -38,7 +44,10 @@ export function selectProfileTools(
       ...readOnlyLegacyTools(legacyTools)
     ];
   }
-  return [...safeTools, ...runtimeTools, ...legacyTools];
+  const completeTools = [...safeTools, ...runtimeTools, ...legacyTools];
+  return systemRole === 'DEV'
+    ? completeTools
+    : completeTools.filter(tool => !isRawAdvancedMutationTool(tool.name));
 }
 
 export function readOnlyLegacyTools(tools: ToolDefinition[]): ToolDefinition[] {

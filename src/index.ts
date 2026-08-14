@@ -36,6 +36,7 @@ import { AtcHandlers } from './handlers/AtcHandlers.js';
 import { TraceHandlers } from './handlers/TraceHandlers.js';
 import { RefactorHandlers } from './handlers/RefactorHandlers.js';
 import { RevisionHandlers } from './handlers/RevisionHandlers.js';
+import { RapGeneratorHandlers } from './handlers/RapGeneratorHandlers.js';
 import { Sm21Handlers } from './handlers/Sm21Handlers.js';
 import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
 import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
@@ -60,6 +61,7 @@ import { configureLogLevel } from './lib/logger.js';
 import { AdtHttpSm21Client } from './sm21/AdtHttpSm21Client.js';
 import { sm21ConfigFromEnvironment } from './sm21/config.js';
 import { selectProfileTools, isReadOnlyLegacyTool } from './config/ToolProfiles.js';
+import { assertToolCatalogClassified } from './config/ToolOperationPolicy.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 
 const environmentFile = selectEnvironmentFile(
@@ -105,6 +107,7 @@ export class AbapAdtServer extends Server {
     private traceHandlers: TraceHandlers;
     private refactorHandlers: RefactorHandlers;
     private revisionHandlers: RevisionHandlers;
+    private rapGeneratorHandlers: RapGeneratorHandlers;
     private sm21Handlers?: Sm21Handlers;
 
     constructor() {
@@ -171,6 +174,7 @@ export class AbapAdtServer extends Server {
     this.traceHandlers = new TraceHandlers(this.adtClient);
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
+    this.rapGeneratorHandlers = new RapGeneratorHandlers(this.adtClient);
     // SM21 reuses the authenticated ADT HTTP client; the custom SICF service remains read-only.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(this.adtClient.httpClient), sm21Config, this.adtClient);
     const objectResolver = new AbapObjectResolver(this.adtClient);
@@ -359,6 +363,7 @@ export class AbapAdtServer extends Server {
         ...this.traceHandlers.getTools(),
         ...this.refactorHandlers.getTools(),
         ...this.revisionHandlers.getTools(),
+        ...this.rapGeneratorHandlers.getTools(),
         {
           name: 'healthcheck',
           description: 'Check local MCP process health and configured target identity without contacting SAP',
@@ -368,11 +373,22 @@ export class AbapAdtServer extends Server {
           }
         }
       ];
-    return selectProfileTools(this.safetyPolicy.toolProfile, safeTools, legacyTools, sm21Tools, safeDebugTools);
+    const completeCatalog = [...safeTools, ...safeDebugTools, ...sm21Tools, ...legacyTools];
+    assertToolCatalogClassified(completeCatalog.map(tool => tool.name));
+    return selectProfileTools(
+      this.safetyPolicy.toolProfile,
+      safeTools,
+      legacyTools,
+      sm21Tools,
+      safeDebugTools,
+      this.safetyPolicy.systemRole
+    );
   }
 
   private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
         let result: unknown;
+        // Catalog filtering is advisory; this policy check also protects direct calls.
+        this.safetyPolicy.assertToolOperationAllowed(toolName);
         if ((this.safetyPolicy.toolProfile === 'legacy-full'
           || this.safetyPolicy.toolProfile === 'development'
           || this.safetyPolicy.toolProfile === 'diagnostic-readonly')
@@ -434,6 +450,7 @@ export class AbapAdtServer extends Server {
                 result = await this.objectLockHandlers.handle(toolName, limitedArguments);
                 break;
             case 'objectStructure':
+            case 'objectStructureElements':
             case 'searchObject':
             case 'findObjectPath':
             case 'objectTypes':
@@ -458,6 +475,8 @@ export class AbapAdtServer extends Server {
             case 'fixEdits':
             case 'fragmentMappings':
             case 'abapDocumentation':
+            case 'typeHierarchy':
+            case 'objectEnhancements':
                 result = await this.codeAnalysisHandlers.handle(toolName, limitedArguments);
                 break;
             case 'getObjectSource':
@@ -517,6 +536,12 @@ export class AbapAdtServer extends Server {
             case 'ddicElement':
             case 'ddicRepositoryAccess':
             case 'packageSearchHelp':
+            case 'getDomainProperties':
+            case 'setDomainProperties':
+            case 'getDataElementProperties':
+            case 'setDataElementProperties':
+            case 'getTextElements':
+            case 'setTextElements':
                 result = await this.ddicHandlers.handle(toolName, limitedArguments);
                 break;
             case 'publishServiceBinding':
@@ -562,6 +587,7 @@ export class AbapAdtServer extends Server {
             case 'isProposalMessage':
             case 'atcContactUri':
             case 'atcChangeContact':
+            case 'atcDocumentation':
                 result = await this.atcHandlers.handle(toolName, limitedArguments);
                 break;
             case 'tracesList':
@@ -578,7 +604,20 @@ export class AbapAdtServer extends Server {
             case 'extractMethodEvaluate':
             case 'extractMethodPreview':
             case 'extractMethodExecute':
+            case 'changePackagePreview':
+            case 'changePackageExecute':
                 result = await this.refactorHandlers.handle(toolName, limitedArguments);
+                break;
+            case 'rapGenValidateInitial':
+            case 'rapGenGetSchema':
+            case 'rapGenGetContent':
+            case 'rapGenGetUiConfig':
+            case 'rapGenValidateContent':
+            case 'rapGenPreview':
+            case 'rapGenGenerate':
+            case 'rapGenIsAvailable':
+            case 'rapGenPublishService':
+                result = await this.rapGeneratorHandlers.handle(toolName, limitedArguments);
                 break;
             case 'revisions':
                 result = await this.revisionHandlers.handle(toolName, limitedArguments);
