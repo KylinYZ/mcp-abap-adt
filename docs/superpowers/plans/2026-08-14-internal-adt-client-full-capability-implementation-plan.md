@@ -3,7 +3,7 @@
 ## 状态与范围
 
 - 日期：2026-08-14
-- 状态：待实施
+- 状态：已完成（2026-08-14）
 - 设计依据：`docs/superpowers/specs/2026-08-14-internal-adt-client-full-capability-design.md`
 - MCP 计划前基线：提交 `a5b0623`
 - MCP 发布基线：`v0.2.0`
@@ -16,6 +16,15 @@
 本计划把完整 ADT 客户端纳入 MCP 仓库，删除运行时 npm 依赖 `abap-adt-api`，注册当前缺失的 21 个原始工具，并为 DEV 增加三组共 6 个受控 preview/apply 工具。随后同步 MCP 文档、插件共享参考和三个 Skill，完成离线评测与分级真实 SAP 验证。
 
 本计划不改变已冻结的调试 detach 结论，也不放宽现有源码、对象创建、调试、ST22 或 SM21 的安全边界。之前调试生命周期计划中的“先发布独立 `abap-adt-api` 新版本”依赖，在本计划实施后改为“在 MCP 内置客户端阶段保留并验证 `3cd8c17` 的 AbortSignal 和取消语义”；不再为了 MCP 构建或发布单独的客户端 npm 包。
+
+### 完成与验证记录
+
+- MCP `0.3.0` 实现提交为 `f7717fa7ec4dcf25610bedf87926ebdad3b98dd4`。
+- `node scripts/check-adt-imports.mjs`、TypeScript build、49 个 Jest 套件和 353 项测试通过。
+- `npm ls abap-adt-api --depth=0` 为空；MCP 运行时不再依赖外部 `abap-adt-api` 包。
+- 内置客户端、21 个新增 raw 工具、6 个 raw 高级写工具、6 个受控高级工具和 `7/114/94/157` profile 目录契约已由自动化验证。
+- 使用当前源码直接启动的 MCP `0.3.0` 子进程完成 DEV、QAS、PRD 只读验收；QAS/PRD 未暴露 mutation 工具，RAP availability 在测试系统返回 `false`。
+- 未执行 DDIC、包迁移或 RAP 等真实 SAP 高级写入；Codex 当前会话对新插件和新 MCP 目录的重新加载仍需安装或重启后的新任务验证。
 
 ## 最终目标
 
