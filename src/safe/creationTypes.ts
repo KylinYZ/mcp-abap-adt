@@ -2,7 +2,7 @@ import type {
   NewObjectOptions,
   ValidateOptions,
   ValidationResult
-} from 'abap-adt-api';
+} from '../adt/index.js';
 import type {
   ChangeStageResult,
   ConfirmationMode,

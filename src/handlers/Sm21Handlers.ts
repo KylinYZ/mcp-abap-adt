@@ -1,5 +1,5 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import type { ADTClient } from 'abap-adt-api';
+import type { ADTClient } from '../adt/index.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { analyzeRuntimeErrors } from '../sm21/runtimeAnalysis.js';
 import { parseSm21Request } from '../sm21/request.js';

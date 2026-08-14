@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, PackageValueHelpType } from 'abap-adt-api';
+import { ADTClient, PackageValueHelpType } from '../adt/index.js';
 
 export class DdicHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

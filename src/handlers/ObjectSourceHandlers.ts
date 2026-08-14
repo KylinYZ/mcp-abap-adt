@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler';
 import type { ToolDefinition } from '../types/tools';
-import { session_types, type ADTClient } from "abap-adt-api";
+import { session_types, type ADTClient } from "../adt/index.js";
 import { sourceCache } from '../lib/sourceCache';
 
 interface TextToolResult {

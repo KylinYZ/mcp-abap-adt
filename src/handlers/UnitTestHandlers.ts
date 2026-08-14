@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, UnitTestRunFlags } from 'abap-adt-api';
+import { ADTClient, UnitTestRunFlags } from '../adt/index.js';
 
 export class UnitTestHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

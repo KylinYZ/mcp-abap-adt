@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, session_types } from "abap-adt-api";
+import { ADTClient, session_types } from "../adt/index.js";
 
 export class ObjectLockHandlers extends BaseHandler {
   getTools(): ToolDefinition[] {

@@ -7,7 +7,7 @@ import type {
   SyntaxCheckResult,
   TransportInfo,
   TransportRequest
-} from 'abap-adt-api';
+} from '../adt/index.js';
 
 export type SupportedObjectType = 'PROGRAM' | 'INCLUDE' | 'CLASS' | 'FUNCTION_MODULE';
 

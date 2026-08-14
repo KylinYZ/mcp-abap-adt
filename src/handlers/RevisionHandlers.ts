@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { AbapObjectStructure, classIncludes } from 'abap-adt-api';
+import { AbapObjectStructure, classIncludes } from '../adt/index.js';
 
 export class RevisionHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

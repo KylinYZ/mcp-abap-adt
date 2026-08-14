@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, RenameRefactoringProposal, RenameRefactoring } from 'abap-adt-api';
+import { ADTClient, RenameRefactoringProposal, RenameRefactoring } from '../adt/index.js';
 
 export class RenameHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

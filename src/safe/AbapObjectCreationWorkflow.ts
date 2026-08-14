@@ -1,4 +1,4 @@
-import type { NewObjectOptions, SyntaxCheckResult, TransportInfo, ValidateOptions } from 'abap-adt-api';
+import type { NewObjectOptions, SyntaxCheckResult, TransportInfo, ValidateOptions } from '../adt/index.js';
 import { AbapCreationResolver } from './AbapCreationResolver.js';
 import type { AuditEvent } from './AuditLogger.js';
 import { CreationPlanStore } from './CreationPlanStore.js';

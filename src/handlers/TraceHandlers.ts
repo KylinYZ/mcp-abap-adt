@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, TraceStatementOptions, TraceParameters, TracesCreationConfig } from 'abap-adt-api';
+import { ADTClient, TraceStatementOptions, TraceParameters, TracesCreationConfig } from '../adt/index.js';
 
 export class TraceHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

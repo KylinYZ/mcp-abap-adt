@@ -1,7 +1,7 @@
-import { ADTClient } from 'abap-adt-api';
+import { ADTClient } from '../adt/index.js';
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { AtcProposal } from 'abap-adt-api';
+import { AtcProposal } from '../adt/index.js';
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
 export class AtcHandlers extends BaseHandler {

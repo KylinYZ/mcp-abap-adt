@@ -8,7 +8,7 @@ import type {
   DebugVariable,
   DebuggingMode,
   DebuggerScope
-} from 'abap-adt-api';
+} from '../adt/index.js';
 
 export type DebugOperationKind =
   | 'CREATE_LISTENER'

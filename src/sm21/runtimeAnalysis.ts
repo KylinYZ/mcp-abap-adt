@@ -1,4 +1,4 @@
-import type { Dump } from 'abap-adt-api';
+import type { Dump } from '../adt/index.js';
 import type { Sm21LogEntry } from './types.js';
 
 export type EvidenceLevel = 'strong' | 'candidate' | 'none';

@@ -1,4 +1,4 @@
-import type { SearchResult } from 'abap-adt-api';
+import type { SearchResult } from '../adt/index.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import { normalizeObjectName, SafetyPolicy } from './SafetyPolicy.js';
 import { sourceHash } from './sourceTools.js';

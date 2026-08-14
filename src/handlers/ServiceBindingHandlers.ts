@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient, ServiceBinding } from "abap-adt-api";
+import { ADTClient, ServiceBinding } from "../adt/index.js";
 
 export class ServiceBindingHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

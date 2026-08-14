@@ -1,5 +1,5 @@
 import { performance } from 'perf_hooks';
-import type { SyntaxCheckResult, TransportInfo } from 'abap-adt-api';
+import type { SyntaxCheckResult, TransportInfo } from '../adt/index.js';
 import { AbapObjectResolver } from './AbapObjectResolver.js';
 import type { AuditEvent } from './AuditLogger.js';
 import { ChangePlanStore } from './ChangePlanStore.js';

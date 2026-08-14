@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "../types/tools";
-import type { ADTClient } from "abap-adt-api";
+import type { ADTClient } from "../adt/index.js";
 import { performance } from 'perf_hooks';
 import { createLogger } from '../lib/logger';
 

@@ -9,7 +9,7 @@ import {
   McpError,
   ErrorCode
 } from "@modelcontextprotocol/sdk/types.js";
-import { ADTClient, session_types } from "abap-adt-api";
+import { ADTClient, session_types } from "./adt/index.js";
 import path from 'path';
 import { AuthHandlers } from './handlers/AuthHandlers.js';
 import { TransportHandlers } from './handlers/TransportHandlers.js';

@@ -1,4 +1,4 @@
-import type { DebugAttach, DebugBreakpoint, DebugStack, DebugStep, DebugVariable } from 'abap-adt-api';
+import type { DebugAttach, DebugBreakpoint, DebugStack, DebugStep, DebugVariable } from '../adt/index.js';
 import { createHash, randomBytes } from 'crypto';
 import type { AuditEvent } from './AuditLogger.js';
 import { DebugOperationPlanStore } from './DebugOperationPlanStore.js';
