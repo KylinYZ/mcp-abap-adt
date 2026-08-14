@@ -6,9 +6,9 @@
 
 ## 项目说明
 
-`mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。它基于 [`abap-adt-api`](https://github.com/marcellourbani/abap-adt-api/)，提供 ABAP 对象读取、安全源码修改、受控对象创建、传输校验、语法检查、激活、失败恢复和审计能力。
+`mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
 
-> **分发状态（2026-08-14）：** 当前修改版**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
+> **分发状态（2026-08-14）：** 当前源码版本为 `0.3.0`，**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
 
 完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
 
@@ -21,11 +21,11 @@
 | Profile | 工具数 | 功能范围 | 建议用途 |
 | --- | ---: | --- | --- |
 | `safe`（默认） | 7 | 受控读取/修改 `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`，以及受控创建 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` | 日常 AI 辅助 ABAP 开发 |
-| `development` | 93 | 7 个安全源码工具 + 8 个安全调试工具 + 2 个运行日志工具 + 76 个审核过的只读 ADT 工具 | 开发与 DEV 故障定位 |
-| `diagnostic-readonly` | 79 | 1 个受控源码读取工具 + 2 个运行日志工具 + 76 个审核过的只读 ADT 工具 | DEV/QAS/PRD 业务排查与系统运维诊断 |
-| `legacy-full` | 136 | 7 个安全工具 + 2 个 SM21/ST22 工具 + 127 个原始低层 ADT 工具 | 兼容已有低层 ADT 工作流和专项诊断 |
+| `development` | 114 | 7 个安全源码工具 + 8 个安全调试工具 + 2 个运行日志工具 + 6 个受控高级工具 + 91 个审核过的只读 ADT 工具 | 开发与 DEV 故障定位 |
+| `diagnostic-readonly` | 94 | 1 个受控源码读取工具 + 2 个运行日志工具 + 91 个审核过的只读 ADT 工具 | DEV/QAS/PRD 业务排查与系统运维诊断 |
+| `legacy-full` | 157 | 7 个安全工具 + 2 个 SM21/ST22 工具 + 148 个原始低层 ADT 工具 | 仅 DEV 的兼容与专家直接控制 |
 
-`legacy-full` 的低层能力覆盖认证与会话、对象发现/结构/源码/锁/创建/删除/激活、传输、语法和代码分析、DDIC、查询、单元测试、格式化、Git、服务绑定、dump/feed、调试、ATC、trace、重命名、重构和版本历史。完整的逐工具名称、功能分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
+内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 
 ### 默认 `safe` 模式
 
@@ -40,7 +40,11 @@
 
 ### 兼容 `legacy-full` 模式
 
-源码读取与源码修改现在分开门控：`development` 仅允许 DEV 进行安全修改；`diagnostic-readonly` 允许 DEV、QAS、PRD 读取白名单源码，但不开放任何源码写入。只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。该模式共注册 136 个工具：七个安全工具、两个 SM21/ST22 工具，以及 127 个原始低层 ADT 工具。
+系统角色优先于 Profile：只有 DEV 能按 `development` 或 `legacy-full` 使用写入和调试控制；QAS、PRD、缺失角色或非法角色无论配置哪个 Profile，都只允许本地与只读操作，隐藏工具直调也会在进入 ADT 客户端前拒绝。只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。DEV 下该模式共注册 157 个工具，其中新增的 6 个原始 DDIC/包迁移/RAP 写工具不会经过受控预览、确认、漂移检查和复查流程。
+
+### DEV 受控高级操作
+
+`development` 提供 `previewDdicPropertyChange`/`applyDdicPropertyChange`、`previewPackageChange`/`applyPackageChange` 和 `previewRapOperation`/`applyRapOperation`。preview 不执行远端写入，只返回服务器管理的 `operationPlanId`；apply 只接受该计划 ID，并由 MCP 打开唯一一次原生 form 确认，不再叠加聊天文字确认。确认后重新检查策略和漂移，写入、迁移、生成或发布最多调用一次，再进行只读复查。超时或断线可能返回 `UNKNOWN_OUTCOME`，此时必须先只读核验 SAP 当前状态，不能直接重放。
 
 低层写入和删除工具不会经过安全源码变更流程，因此只应作为兼容能力使用。
 
@@ -58,7 +62,7 @@
 
 ### 性能与资源护栏
 
-`safe`、`development`、`diagnostic-readonly` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整应用、复核、回滚或创建补偿流程仍在同一个 gate 内原子执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
+`safe`、`development`、`diagnostic-readonly` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整源码变更、对象创建、调试控制或高级操作流程在同一个 gate 内执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
 
 | 环境变量 | 默认值 | 有效范围 | 用途 |
 | --- | ---: | --- | --- |
@@ -139,9 +143,9 @@
 
 ### 当前验证状态
 
-截至 2026-08-14，第一阶段安全工作流及主要只读运行护栏已在约定范围内完成实现和核心验收：
+截至 2026-08-14，当前自动化基线已经覆盖内置 ADT 客户端、全部注册工具、Profile/角色策略和受控工作流：
 
-- **自动化验证**：32 个 Jest 测试套件、246 项测试全部通过，覆盖安全源码与安全调试流程、显式环境文件选择、运行配置、FIFO 执行门控、请求/响应限制、有界状态、源码换行规范化、SM21 请求与分析、日志和审计串行写入。
+- **自动化验证**：49 个 Jest 测试套件、353 项测试全部通过，覆盖内置客户端表面、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
@@ -150,7 +154,7 @@
 - **对象创建与抓包实测**：`PROGRAM ZMCP_CREATE_TEST` 已完成真实创建并保留。Eclipse ADT 3.60.2 对 `ZMCP_ADT_TRACE + Z_MCP_ADT_TRACE` 的会话证明：组合创建不单独激活函数组，参数直接写入 `source/main`，函数模块使用仅含 `uri + name` 且 `preauditRequested=true` 的激活请求。MCP 使用该协议创建 `ZMCP_IF_TEST + Z_MCP_IF_TEST` 时，创建、写入、语法检查、解锁和激活均成功；SAP 随后把换行改为 CRLF，并将签名后分隔区补为三个空行，旧复核规则误判后安全补偿成功，两个对象只读搜索确认无残留。现已增加函数模块专用受限格式比较，仍需重启后做最终真实 DEV 成功复测。
 - **激活未知结果保护**：激活请求抛出超时或连接异常时，先只读核对 active/inactive 版本；无法确定远端结果时撤销自动删除资格并进入人工检查状态，禁止盲目重试。
 - **HTTP 超时**：已使用本机停滞 HTTP 端点端到端确认底层 ADT 客户端在配置 `5000 ms` 时约 5 秒取消请求；没有通过故意运行慢查询压测 SAP。
-- **待专项验证**：安全调试的真实 SAP DEV 控制动作、调试/ATC/trace 长任务行为，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。fake ADT 自动化测试不等于真实 SAP 调试成功。
+- **待专项验证**：15 个新增只读/校验/预览操作在当前真实 SAP 系统的端点兼容性，全部新增 DDIC/包迁移/RAP 写入，安全调试的真实 SAP DEV 控制动作，调试/ATC/trace 长任务行为，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。fake client 自动化测试不能建立真实 SAP 端点或写入成功结论。
 
 以上结论不代表已经穷举所有 SAP 版本、权限模型、网络故障或恢复过程再次失败的场景。出现 `ROLLBACK_FAILED` 或 `UNLOCK_FAILED` 时应停止自动重试并人工检查 ADT/SAP，避免反复写入扩大风险。
 
@@ -253,6 +257,8 @@ SAP_MCP_SM21_MAX_PAGE_SIZE=500
 不要传入或信任模型生成的 confirmedByUser。只有应用结果明确表示语法检查、激活、源码哈希复核和解锁均成功时，才能声明修改成功。出现源码漂移时重新读取和预览。回滚或解锁失败时，要求用户在 ADT/SAP 中人工检查非活动对象、锁和传输。
 
 legacy-full 会额外开放原有低层 ADT 工具。原始写入和删除操作绕过安全流程，只能作为兼容能力使用。
+
+DDIC、包迁移或 RAP 写入必须使用 development 的受控 preview/apply 工具。展示 preview 后，只把 operationPlanId 传给 apply，由服务器打开唯一原生确认；不要回退到 legacy-full 原始 setter、execute、generate 或 publish。QAS/PRD 无论 Profile 都只读。出现 UNKNOWN_OUTCOME 后停止写入，先核对 SAP 当前状态。
 ```
 
 ## 数据库访问建议（`development`、`diagnostic-readonly` 和 `legacy-full`）
@@ -267,7 +273,7 @@ legacy-full 会额外开放原有低层 ADT 工具。原始写入和删除操作
 - `runQuery` 只接受单条 `SELECT` 或 `WITH` 查询；DML、DDL、动态执行和多语句会在访问 SAP 前拒绝。
 - `tableContents.sqlQuery` 为空时使用表预览默认行为；提供查询时同样必须是只读语句。
 
-## DDIC 定义检查（仅 `legacy-full`）
+## DDIC 定义检查（诊断 Profile）
 
 - 先用 `searchObject` 将对象名解析为 URI，再调用 `objectStructure` 查看对象或 DDIC 结构。
 - `ddicElement` 用于读取数据元素或域等 DDIC 元素。

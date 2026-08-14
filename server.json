@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mario-andreschak/mcp-abap-abap-adt-api",
-  "description": "MCP server wrapping abap-adt-api for ABAP ADT development workflows against SAP systems",
-  "version": "0.1.1",
+  "description": "MCP server with an embedded ABAP ADT client, guarded development workflows, and read-only diagnostics for SAP systems",
+  "version": "0.3.0",
   "repository": {
     "url": "https://github.com/mario-andreschak/mcp-abap-abap-adt-api",
     "source": "github"
@@ -12,7 +12,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "mcp-abap-abap-adt-api",
-      "version": "0.1.1",
+      "version": "0.3.0",
       "transport": {
         "type": "stdio"
       },

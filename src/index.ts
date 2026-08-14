@@ -120,7 +120,7 @@ export class AbapAdtServer extends Server {
     super(
       {
         name: "mcp-abap-abap-adt-api",
-        version: "0.1.1",
+        version: "0.3.0",
       },
       {
         capabilities: {

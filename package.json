@@ -1,6 +1,6 @@
 {
   "name": "mcp-abap-abap-adt-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "mcpName": "io.github.mario-andreschak/mcp-abap-abap-adt-api",
   "main": "dist/index.js",
   "bin": {
@@ -31,7 +31,7 @@
     "model-context-protocol"
   ],
   "author": "mario-andreschak",
-  "description": "MCP server wrapping abap-adt-api for full ABAP ADT development workflows (object CRUD, transports, locking, syntax check, activation) against SAP systems",
+  "description": "MCP server with an embedded ABAP ADT client, guarded development workflows, and read-only diagnostics for SAP systems",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

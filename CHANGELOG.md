@@ -1,6 +1,13 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-08-14
+- Embed the complete `abap-adt-api` 8.4.2 client source with preserved MIT attribution, a stable local import boundary, and cancellable debugger-listener behavior.
+- Add 21 explicit raw MCP tools for structure, hierarchy, enhancements, DDIC/text, ATC documentation, package migration, and RAP generation/publication.
+- Add six guarded DEV `development` tools for DDIC, package, and RAP preview/apply workflows with native confirmation, drift checks, single-write semantics, read-only verification, and explicit unknown outcomes.
+- Enforce local/read-only operation policy for QAS, PRD, missing, and unknown roles across every profile and direct dispatch.
+- Update DEV profile baselines to `safe=7`, `development=114`, `diagnostic-readonly=94`, and `legacy-full=157`.
 - Add deployable read-only ADT HTTP SM21 service and optional `legacy-full` SM21/ST22 runtime analysis tools.
 - This modified version is source-only and has not been published to npm or the MCP Registry.
 - Default to seven high-level safe tools for ABAP source changes and controlled `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE` creation with explicit preview and confirmation.
