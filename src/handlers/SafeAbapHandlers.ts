@@ -5,7 +5,7 @@ import { AbapChangeConfirmation, type AbapChangeConfirmationOptions } from '../s
 import { AbapCreationConfirmation, type AbapCreationConfirmationOptions } from '../safe/AbapCreationConfirmation.js';
 import { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkflow.js';
 import type { CreationObjectInput } from '../safe/creationTypes.js';
-import type { ToolProfile } from '../safe/types.js';
+export { selectProfileTools } from '../config/ToolProfiles.js';
 
 type SafeToolDefinition = ToolDefinition & {
   annotations: {
@@ -29,14 +29,6 @@ const SAFE_TOOL_NAMES = new Set([
   'applyAbapObjectCreation',
   'getAbapObjectCreationStatus'
 ]);
-
-export function selectProfileTools(
-  profile: ToolProfile,
-  safeTools: ToolDefinition[],
-  legacyTools: ToolDefinition[]
-): ToolDefinition[] {
-  return profile === 'safe' ? safeTools : [...safeTools, ...legacyTools];
-}
 
 export class SafeAbapHandlers {
   private readonly confirmation: AbapChangeConfirmation;

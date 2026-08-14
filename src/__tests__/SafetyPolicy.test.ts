@@ -5,6 +5,7 @@ describe('SafetyPolicy', () => {
   const validOptions = {
     sapUrl: 'https://dev.example.com:44300',
     sapClient: '100',
+    sapUser: 'DEVUSER',
     systemRole: 'DEV',
     allowedHosts: 'dev.example.com',
     allowedClients: '100',
@@ -39,6 +40,20 @@ describe('SafetyPolicy', () => {
     expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).toThrow(SafeAbapError);
   });
 
+  it('allows diagnostic source reads in QAS and PRD but never mutations', () => {
+    for (const systemRole of ['QAS', 'PRD']) {
+      const policy = new SafetyPolicy({ ...validOptions, systemRole, toolProfile: 'diagnostic-readonly', auditPath: undefined });
+      expect(() => policy.assertReadAllowed('Z_TEST_PROGRAM')).not.toThrow();
+      expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).toThrow('Source mutations require');
+    }
+  });
+
+  it('allows development-profile source reads outside DEV but keeps mutations DEV-only', () => {
+    const policy = new SafetyPolicy({ ...validOptions, systemRole: 'QAS', toolProfile: 'development', auditPath: undefined });
+    expect(() => policy.assertReadAllowed('Z_TEST_PROGRAM')).not.toThrow();
+    expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).toThrow('Source mutations require');
+  });
+
   it('rejects objects outside configured namespaces', () => {
     const policy = new SafetyPolicy(validOptions);
     expect(() => policy.assertMutationAllowed('SAPMZ_STANDARD')).toThrow('outside the allowed namespaces');
@@ -60,6 +75,57 @@ describe('SafetyPolicy', () => {
   it('rejects unknown tool profiles', () => {
     expect(parseToolProfile()).toBe('safe');
     expect(parseToolProfile('legacy-full')).toBe('legacy-full');
+    expect(parseToolProfile('development')).toBe('development');
+    expect(parseToolProfile('diagnostic-readonly')).toBe('diagnostic-readonly');
     expect(() => parseToolProfile('unsafe')).toThrow('Unsupported SAP_MCP_TOOL_PROFILE');
+  });
+
+  it('allows DEV debug control for the current SAP user by default', () => {
+    const policy = new SafetyPolicy({ ...validOptions, toolProfile: 'development' });
+    expect(policy.assertDebugControlAllowed('devuser')).toBe('DEVUSER');
+    expect(policy.debugAuthTtlMs).toBe(900_000);
+    expect(policy.allowedDebugUsers).toEqual(new Set(['DEVUSER']));
+  });
+
+  it('supports multiple explicitly allow-listed debug users', () => {
+    const policy = new SafetyPolicy({
+      ...validOptions,
+      toolProfile: 'development',
+      allowedDebugUsers: 'devuser, tester, SUPPORT'
+    });
+    expect(policy.assertDebugControlAllowed('tester')).toBe('TESTER');
+    expect(policy.allowedDebugUsers).toEqual(new Set(['DEVUSER', 'TESTER', 'SUPPORT']));
+  });
+
+  it('rejects debug users outside the default or explicit allow-list', () => {
+    const policy = new SafetyPolicy({ ...validOptions, toolProfile: 'development' });
+    expect(() => policy.assertDebugControlAllowed('OTHER')).toThrow('SAP_MCP_ALLOWED_DEBUG_USERS');
+  });
+
+  it.each([
+    ['QAS', 'development'],
+    ['PRD', 'development'],
+    ['DEV', 'safe'],
+    ['DEV', 'diagnostic-readonly']
+  ])('rejects debug control for role %s and profile %s', (systemRole, toolProfile) => {
+    const policy = new SafetyPolicy({ ...validOptions, systemRole, toolProfile });
+    expect(() => policy.assertDebugControlAllowed('DEVUSER')).toThrow(SafeAbapError);
+  });
+
+  it('requires the audit path and allowed SAP target for debug control', () => {
+    const withoutAudit = new SafetyPolicy({ ...validOptions, toolProfile: 'development', auditPath: undefined });
+    expect(() => withoutAudit.assertDebugControlAllowed('DEVUSER')).toThrow('SAP_MCP_AUDIT_PATH');
+
+    const wrongHost = new SafetyPolicy({ ...validOptions, toolProfile: 'development', allowedHosts: 'other.example.com' });
+    expect(() => wrongHost.assertDebugControlAllowed('DEVUSER')).toThrow('SAP_MCP_ALLOWED_HOSTS');
+
+    const wrongClient = new SafetyPolicy({ ...validOptions, toolProfile: 'development', allowedClients: '200' });
+    expect(() => wrongClient.assertDebugControlAllowed('DEVUSER')).toThrow('SAP_MCP_ALLOWED_CLIENTS');
+  });
+
+  it('validates the debug authorization TTL', () => {
+    expect(new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '60' }).debugAuthTtlMs).toBe(60_000);
+    expect(() => new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '59' })).toThrow('SAP_MCP_DEBUG_AUTH_TTL_SECONDS');
+    expect(() => new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '3601' })).toThrow('SAP_MCP_DEBUG_AUTH_TTL_SECONDS');
   });
 });

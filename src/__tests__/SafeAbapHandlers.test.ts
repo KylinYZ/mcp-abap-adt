@@ -1,4 +1,5 @@
 import { SafeAbapHandlers, selectProfileTools } from '../handlers/SafeAbapHandlers';
+import { READ_ONLY_LEGACY_TOOL_COUNT } from '../config/ToolProfiles';
 
 describe('SafeAbapHandlers', () => {
   it('exposes only the seven approved high-level tools', () => {
@@ -183,5 +184,66 @@ describe('SafeAbapHandlers', () => {
     expect(selectProfileTools('safe', safeTools, legacyTools)).toEqual(safeTools);
     expect(selectProfileTools('legacy-full', safeTools, legacyTools).map(tool => tool.name))
       .toEqual([...safeTools.map(tool => tool.name), 'deleteObject']);
+  });
+
+  it('keeps development and diagnostic profiles limited to approved read-only tools', () => {
+    const safeTools = new SafeAbapHandlers({} as never).getTools();
+    const legacyTools = [
+      { name: 'dumps', description: 'read', inputSchema: { type: 'object', properties: {} } },
+      { name: 'setObjectSource', description: 'write', inputSchema: { type: 'object', properties: {} } }
+    ];
+    const safeDebugTools = [{ name: 'applyDebugOperation', description: 'safe debug', inputSchema: { type: 'object', properties: {} } }];
+    expect(selectProfileTools('development', [], legacyTools, [], safeDebugTools).map(tool => tool.name))
+      .toEqual(['applyDebugOperation', 'dumps']);
+    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools).map(tool => tool.name))
+      .toEqual(['inspectAbapObject', 'dumps']);
+    expect(selectProfileTools('safe', safeTools, legacyTools, [], safeDebugTools).map(tool => tool.name))
+      .not.toContain('applyDebugOperation');
+    expect(selectProfileTools('legacy-full', safeTools, legacyTools, [], safeDebugTools).map(tool => tool.name))
+      .not.toContain('applyDebugOperation');
+  });
+
+  it('locks the documented development and diagnostic-readonly tool counts', () => {
+    expect(READ_ONLY_LEGACY_TOOL_COUNT).toBe(76);
+    const safeTools = Array.from({ length: 7 }, (_, index) => ({
+      name: index === 0 ? 'inspectAbapObject' : `safe-${index}`,
+      description: 'safe',
+      inputSchema: { type: 'object', properties: {} }
+    }));
+    const safeDebugTools = Array.from({ length: 8 }, (_, index) => ({
+      name: `debug-${index}`,
+      description: 'debug',
+      inputSchema: { type: 'object', properties: {} }
+    }));
+    const runtimeTools = Array.from({ length: 2 }, (_, index) => ({
+      name: `runtime-${index}`,
+      description: 'runtime',
+      inputSchema: { type: 'object', properties: {} }
+    }));
+    const readOnlyNames = [
+      'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
+      'userTransports', 'transportsByConfig', 'systemUsers', 'transportReference', 'objectStructure',
+      'searchObject', 'findObjectPath', 'objectTypes', 'classIncludes', 'classComponents', 'syntaxCheckCode',
+      'syntaxCheckCdsUrl', 'codeCompletion', 'findDefinition', 'usageReferences', 'syntaxCheckTypes',
+      'codeCompletionFull', 'codeCompletionElement', 'usageReferenceSnippets', 'fixProposals', 'fragmentMappings',
+      'abapDocumentation', 'inactiveObjects', 'objectRegistrationInfo', 'validateNewObject', 'nodeContents',
+      'mainPrograms', 'featureDetails', 'collectionFeatureDetails', 'findCollectionByUrl', 'loadTypes',
+      'adtDiscovery', 'adtCoreDiscovery', 'adtCompatibiliyGraph', 'unitTestEvaluation',
+      'unitTestOccurrenceMarkers', 'prettyPrinterSetting', 'prettyPrinter', 'gitRepos', 'gitExternalRepoInfo',
+      'checkRepo', 'remoteRepoInfo', 'ddicElement', 'ddicRepositoryAccess', 'annotationDefinitions',
+      'packageSearchHelp', 'bindingDetails', 'tableContents', 'runQuery', 'feeds', 'dumps', 'debuggerListeners',
+      'debuggerStackTrace', 'debuggerVariables', 'debuggerChildVariables', 'atcCustomizing', 'atcCheckVariant',
+      'atcWorklists', 'atcUsers', 'isProposalMessage', 'atcContactUri', 'tracesList', 'tracesListRequests',
+      'tracesHitList', 'tracesDbAccess', 'tracesStatements', 'renameEvaluate', 'renamePreview',
+      'extractMethodEvaluate', 'extractMethodPreview', 'revisions', 'healthcheck'
+    ];
+    const legacyTools = readOnlyNames.map(name => ({
+      name,
+      description: 'read-only',
+      inputSchema: { type: 'object', properties: {} }
+    }));
+
+    expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(93);
+    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(79);
   });
 });

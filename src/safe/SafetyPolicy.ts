@@ -4,6 +4,7 @@ import type { ToolProfile } from './types.js';
 export interface SafetyPolicyOptions {
   sapUrl?: string;
   sapClient?: string;
+  sapUser?: string;
   systemRole?: string;
   allowedHosts?: string;
   allowedClients?: string;
@@ -12,11 +13,14 @@ export interface SafetyPolicyOptions {
   auditPath?: string;
   toolProfile?: string;
   allowTextConfirmation?: string;
+  allowedDebugUsers?: string;
+  debugAuthTtlSeconds?: string;
 }
 
 export class SafetyPolicy {
   readonly systemHost: string;
   readonly client: string;
+  readonly sapUser: string;
   readonly systemRole: string;
   readonly allowedHosts: Set<string>;
   readonly allowedClients: Set<string>;
@@ -25,10 +29,13 @@ export class SafetyPolicy {
   readonly auditPath?: string;
   readonly toolProfile: ToolProfile;
   readonly allowTextConfirmation: boolean;
+  readonly allowedDebugUsers: Set<string>;
+  readonly debugAuthTtlMs: number;
 
   constructor(options: SafetyPolicyOptions) {
     this.systemHost = parseHost(options.sapUrl);
     this.client = String(options.sapClient || '').trim();
+    this.sapUser = normalizeSapUser(options.sapUser);
     this.systemRole = String(options.systemRole || '').trim().toUpperCase();
     this.allowedHosts = csvSet(options.allowedHosts, value => value.toLowerCase());
     this.allowedClients = csvSet(options.allowedClients);
@@ -38,12 +45,18 @@ export class SafetyPolicy {
     this.auditPath = options.auditPath?.trim() || undefined;
     this.toolProfile = parseToolProfile(options.toolProfile);
     this.allowTextConfirmation = parseBooleanFlag(options.allowTextConfirmation);
+    const configuredDebugUsers = csvSet(options.allowedDebugUsers, normalizeSapUser);
+    this.allowedDebugUsers = configuredDebugUsers.size > 0
+      ? configuredDebugUsers
+      : new Set(this.sapUser ? [this.sapUser] : []);
+    this.debugAuthTtlMs = parseDebugAuthTtl(options.debugAuthTtlSeconds);
   }
 
   static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): SafetyPolicy {
     return new SafetyPolicy({
       sapUrl: environment.SAP_URL,
       sapClient: environment.SAP_CLIENT,
+      sapUser: environment.SAP_USER,
       systemRole: environment.SAP_MCP_SYSTEM_ROLE,
       allowedHosts: environment.SAP_MCP_ALLOWED_HOSTS,
       allowedClients: environment.SAP_MCP_ALLOWED_CLIENTS,
@@ -51,13 +64,18 @@ export class SafetyPolicy {
       planTtlSeconds: environment.SAP_MCP_CHANGE_PLAN_TTL_SECONDS,
       auditPath: environment.SAP_MCP_AUDIT_PATH,
       toolProfile: environment.SAP_MCP_TOOL_PROFILE,
-      allowTextConfirmation: environment.SAP_MCP_ALLOW_TEXT_CONFIRMATION
+      allowTextConfirmation: environment.SAP_MCP_ALLOW_TEXT_CONFIRMATION,
+      allowedDebugUsers: environment.SAP_MCP_ALLOWED_DEBUG_USERS,
+      debugAuthTtlSeconds: environment.SAP_MCP_DEBUG_AUTH_TTL_SECONDS
     });
   }
 
   assertReadAllowed(objectName: string): void {
-    if (this.systemRole !== 'DEV') {
-      throw new SafeAbapError('POLICY_DENIED', 'policy', 'SAP_MCP_SYSTEM_ROLE must be DEV for source access.');
+    const sourceReadAllowed = this.toolProfile === 'development' || this.toolProfile === 'diagnostic-readonly'
+      ? new Set(['DEV', 'QAS', 'PRD']).has(this.systemRole)
+      : this.systemRole === 'DEV';
+    if (!sourceReadAllowed) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'The configured system role is not allowed for source access in this tool profile.');
     }
     if (!this.systemHost || !this.allowedHosts.has(this.systemHost)) {
       throw new SafeAbapError('POLICY_DENIED', 'policy', 'The SAP host is not in SAP_MCP_ALLOWED_HOSTS.');
@@ -75,10 +93,40 @@ export class SafetyPolicy {
   }
 
   assertMutationAllowed(objectName: string): void {
+    if (this.toolProfile !== 'safe' && this.toolProfile !== 'development') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Source mutations require the safe or development tool profile.');
+    }
+    if (this.systemRole !== 'DEV') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Source mutations require SAP_MCP_SYSTEM_ROLE=DEV.');
+    }
     this.assertReadAllowed(objectName);
     if (!this.auditPath) {
       throw new SafeAbapError('POLICY_DENIED', 'policy', 'SAP_MCP_AUDIT_PATH is required for source changes.');
     }
+  }
+
+  assertDebugControlAllowed(targetUser: string): string {
+    if (this.toolProfile !== 'development') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Debug control requires the development tool profile.');
+    }
+    if (this.systemRole !== 'DEV') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Debug control requires SAP_MCP_SYSTEM_ROLE=DEV.');
+    }
+    if (!this.systemHost || !this.allowedHosts.has(this.systemHost)) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'The SAP host is not in SAP_MCP_ALLOWED_HOSTS.');
+    }
+    if (!/^\d{3}$/.test(this.client) || !this.allowedClients.has(this.client)) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'The SAP client is not in SAP_MCP_ALLOWED_CLIENTS.');
+    }
+    if (!this.auditPath) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'SAP_MCP_AUDIT_PATH is required for debug control.');
+    }
+
+    const normalizedUser = normalizeSapUser(targetUser);
+    if (!normalizedUser || !this.allowedDebugUsers.has(normalizedUser)) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', `SAP user ${normalizedUser || '(empty)'} is not in SAP_MCP_ALLOWED_DEBUG_USERS.`);
+    }
+    return normalizedUser;
   }
 
   assertTransportFormat(transportRequest: string): string {
@@ -104,10 +152,10 @@ export class SafetyPolicy {
 
 export function parseToolProfile(value?: string): ToolProfile {
   const normalized = String(value || 'safe').trim().toLowerCase();
-  if (normalized === 'safe' || normalized === 'legacy-full') {
+  if (normalized === 'safe' || normalized === 'development' || normalized === 'diagnostic-readonly' || normalized === 'legacy-full') {
     return normalized;
   }
-  throw new Error(`Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use 'safe' or 'legacy-full'.`);
+  throw new Error(`Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use 'safe', 'development', 'diagnostic-readonly', or 'legacy-full'.`);
 }
 
 export function normalizeObjectName(value: string): string {
@@ -144,6 +192,18 @@ function parseTtl(value?: string): number {
     throw new Error('SAP_MCP_CHANGE_PLAN_TTL_SECONDS must be between 60 and 3600.');
   }
   return parsed * 1000;
+}
+
+function parseDebugAuthTtl(value?: string): number {
+  const parsed = Number.parseInt(String(value || '900'), 10);
+  if (!Number.isFinite(parsed) || parsed < 60 || parsed > 3600) {
+    throw new Error('SAP_MCP_DEBUG_AUTH_TTL_SECONDS must be between 60 and 3600.');
+  }
+  return parsed * 1000;
+}
+
+function normalizeSapUser(value?: string): string {
+  return String(value || '').trim().toUpperCase();
 }
 
 function parseBooleanFlag(value?: string): boolean {

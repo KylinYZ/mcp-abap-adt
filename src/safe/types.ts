@@ -11,7 +11,7 @@ import type {
 
 export type SupportedObjectType = 'PROGRAM' | 'INCLUDE' | 'CLASS' | 'FUNCTION_MODULE';
 
-export type ToolProfile = 'safe' | 'legacy-full';
+export type ToolProfile = 'safe' | 'development' | 'diagnostic-readonly' | 'legacy-full';
 
 export type ConfirmationMode = 'elicitation' | 'text-fallback';
 
