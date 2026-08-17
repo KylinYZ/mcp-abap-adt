@@ -128,6 +128,7 @@ export {
   NonGroupTypeIds,
   ObjectSourceOptions,
   objectStructureElements,
+  StructureElement,
 
   // (ObjectStructureElement and AbapDetailedStructure removed — use runtime narrowing)
   ObjectType,
@@ -242,10 +243,13 @@ export {
 // Deterministic protocol helpers are exposed through the same stable entry point
 // so MCP tests and future handlers never couple to embedded implementation paths.
 export {
+  createAtcRun,
   debuggerListen,
+  dumps,
   parseRapGenObjectRefs,
   parseRapGenValidation,
-  rapGenBuildQs
+  rapGenBuildQs,
+  runUnitTest
 } from "./api"
 export {
   parseTraceDbAccess,

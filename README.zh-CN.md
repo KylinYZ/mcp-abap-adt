@@ -8,7 +8,7 @@
 
 `mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
 
-> **分发状态（2026-08-14）：** 当前源码版本为 `0.3.0`，**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
+> **分发状态（2026-08-17）：** 当前源码版本为 `0.4.0`，**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
 
 完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
 
@@ -21,9 +21,14 @@
 | Profile | 工具数 | 功能范围 | 建议用途 |
 | --- | ---: | --- | --- |
 | `safe`（默认） | 7 | 受控读取/修改 `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`，以及受控创建 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` | 日常 AI 辅助 ABAP 开发 |
-| `development` | 114 | 7 个安全源码工具 + 8 个安全调试工具 + 2 个运行日志工具 + 6 个受控高级工具 + 91 个审核过的只读 ADT 工具 | 开发与 DEV 故障定位 |
-| `diagnostic-readonly` | 94 | 1 个受控源码读取工具 + 2 个运行日志工具 + 91 个审核过的只读 ADT 工具 | DEV/QAS/PRD 业务排查与系统运维诊断 |
-| `legacy-full` | 157 | 7 个安全工具 + 2 个 SM21/ST22 工具 + 148 个原始低层 ADT 工具 | 仅 DEV 的兼容与专家直接控制 |
+| `development` | 118 | 向后兼容的宽开发与诊断工具面 | 现有开发客户端 |
+| `diagnostic-readonly` | 98 | 向后兼容的宽只读诊断工具面 | 现有诊断客户端 |
+| `legacy-full` | 161 | 7 个安全工具 + 6 个高层运行工具 + 148 个原始低层 ADT 工具 | 仅 DEV 的兼容与专家直接控制 |
+| `development-workbench` | 81 | 聚焦开发、安全调试、受控高级操作和质量检查 | ABAP 开发 Skill |
+| `business-readonly` | 17 | 先取 schema、再做有界业务数据读取 | 业务数据 Skill |
+| `operations-readonly` | 40 | 运行、版本、trace 和已有调试现场证据 | 运维 Skill |
+
+`0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。成员级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。
 
 内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 
@@ -40,7 +45,7 @@
 
 ### 兼容 `legacy-full` 模式
 
-系统角色优先于 Profile：只有 DEV 能按 `development` 或 `legacy-full` 使用写入和调试控制；QAS、PRD、缺失角色或非法角色无论配置哪个 Profile，都只允许本地与只读操作，隐藏工具直调也会在进入 ADT 客户端前拒绝。只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。DEV 下该模式共注册 157 个工具，其中新增的 6 个原始 DDIC/包迁移/RAP 写工具不会经过受控预览、确认、漂移检查和复查流程。
+系统角色优先于 Profile：只有 DEV 能按开发 Profile 使用写入和调试控制；QAS、PRD、缺失角色或非法角色无论配置哪个 Profile，都只允许本地与只读操作，隐藏工具直调也会在进入 ADT 客户端前拒绝。只有明确需要原始低层 ADT 能力时才设置 `SAP_MCP_TOOL_PROFILE=legacy-full`。DEV 下该模式共注册 161 个工具，其中新增的 6 个原始 DDIC/包迁移/RAP 写工具不会经过受控预览、确认、漂移检查和复查流程。
 
 ### DEV 受控高级操作
 
@@ -54,15 +59,19 @@
 
 会话授权默认 15 分钟并绑定 SAP 用户、client 和当前 Attach 上下文。Step、Continue、运行到行和栈导航每次只接受一个明确命令。跳转行、终止进程和变量修改每次单独确认；变量应用前复读栈帧和原值，发生漂移即拒绝。连接或超时导致远端结果不确定时只读复查状态，绝不自动重放控制动作。`SAP_MCP_ALLOWED_DEBUG_USERS` 支持逗号分隔多个用户，未配置时仅允许当前 `SAP_USER`。QAS/PRD 不注册任何调试控制工具，只保留已有现场读取。
 
+### DEV 受控质量检查
+
+`previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus` 只在 DEV `development-workbench` 中开放。预览冻结明确的 ABAP Unit 或 ATC 范围；ATC variant 必须由用户明确指定，服务不自动猜测。运行只接受服务端计划编号并打开一次 MCP 原生确认。超时或断线记为 `UNKNOWN_OUTCOME`，此后只读检查状态和 SAP 证据，禁止盲目重跑。
+
 ### 可选 SM21 运行日志分析
 
-设置 `SAP_MCP_TOOL_PROFILE=development`、`diagnostic-readonly` 或 `legacy-full` 后，会开放只读的 `sm21Read` 与 `analyzeRuntimeErrors`。它们复用现有 ADT HTTP 登录会话，依赖 SAP 端部署 [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) 及其[部署说明](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md)，默认七工具 `safe` 模式不会开放这两个工具。
+设置 `SAP_MCP_TOOL_PROFILE=development`、`diagnostic-readonly`、`legacy-full` 或 `operations-readonly` 后，会开放只读的 `sm21Read` 与 `analyzeRuntimeErrors`。它们复用现有 ADT HTTP 登录会话，依赖 SAP 端部署 [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) 及其[部署说明](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md)。ST22 摘要使用独立的 `readRuntimeDumps`，必须提供带时区偏移的时间窗和有界 `limit`，不得退回原始 `dumps` 查询。
 
 不需要在 MCP 主机安装 `node-rfc`、SAP NW RFC SDK、JCo、NCo，也不需要 RFC destination 或额外客户端凭据。现有 ADT 用户只需 `S_ADMI_FCD=SM21`；MCP 工具参数不接受凭据。
 
 ### 性能与资源护栏
 
-`safe`、`development`、`diagnostic-readonly` 与 `legacy-full` 的所有工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整源码变更、对象创建、调试控制或高级操作流程在同一个 gate 内执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
+全部七个 Profile 的工具统一经过中央参数和响应保护。FIFO 执行门控只保护使用共享有状态 ADT 客户端的操作；原生确认等待、本地状态查询和 `healthcheck` 不占 SAP 执行槽。确认成功后，完整源码变更、对象创建、调试控制、高级操作或质量检查流程在同一个 gate 内执行。默认并发数为 `1`，因为 ADT 操作共享 Cookie、CSRF、会话类型和锁生命周期。只有在受控 SAP DEV 环境验证后才应提高并发数。
 
 | 环境变量 | 默认值 | 有效范围 | 用途 |
 | --- | ---: | --- | --- |
@@ -91,7 +100,7 @@
 
 配置越界时服务启动失败。显式查询或搜索数量超过上限会在访问 SAP 前拒绝，不静默截断，也不改写 SQL。`getObjectSource` 分页是在首次完整读取 SAP 后使用受限的进程内会话缓存切分，不是 SAP 服务端分页。写请求超时代表远端结果未知，必须先检查对象或变更计划状态，再决定是否重试，禁止盲目重复写入。
 
-在 `development`、`diagnostic-readonly` 和 `legacy-full` 中，`healthcheck` 只证明本地 MCP 进程可响应，并返回非敏感的已配置 host、client、profile 和 role；它不访问 SAP，且明确返回 `sapConnectionVerified: false`。使用只读 `adtCoreDiscovery` 验证 SAP 登录与 ADT 可达性，并在其他 SAP 调用前核对配置身份与目标实例一致。七工具 `safe` profile 不开放这两个通用诊断工具。
+在开放该工具的 Profile 中，`healthcheck` 只证明本地 MCP 进程可响应，并返回非敏感的已配置 host、client、profile 和 role；它不访问 SAP，且明确返回 `sapConnectionVerified: false`。使用 `inspectSapSystem` 分别报告 configured identity 和独立探测的 SAP ADT capability；允许 partial success，不从配置身份推断产品版本或具体权限。七工具 `safe` profile 不开放这两个通用诊断工具。
 
 审计 JSONL 仍逐条等待并串行落盘。服务不自动轮转或删除审计日志；部署环境必须负责保留、归档、磁盘容量告警和访问控制。
 
@@ -145,7 +154,10 @@
 
 截至 2026-08-14，当前自动化基线已经覆盖内置 ADT 客户端、全部注册工具、Profile/角色策略和受控工作流：
 
-- **自动化验证**：49 个 Jest 测试套件、353 项测试全部通过，覆盖内置客户端表面、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
+- **自动化验证**：61 个 Jest 测试套件、421 项测试全部通过，覆盖内置客户端表面、四个高层只读工具、受控质量检查、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
+- **动态目录验证**：2026-08-17 使用真实 `dist/index.js` 完成 35 个 profile/role runtime session 和 14 个隐藏工具直调拒绝检查，未调用 SAP。
+- **真实 SAP 只读验证**：四个新高层读取已在配置的 DEV/QAS/PRD 系统通过；证据未保存业务行、dump 文本或源码。
+- **仍未验证**：真实 ATC/ABAP Unit 执行、SAP 写入和安全调试控制。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
@@ -154,7 +166,7 @@
 - **对象创建与抓包实测**：`PROGRAM ZMCP_CREATE_TEST` 已完成真实创建并保留。Eclipse ADT 3.60.2 对 `ZMCP_ADT_TRACE + Z_MCP_ADT_TRACE` 的会话证明：组合创建不单独激活函数组，参数直接写入 `source/main`，函数模块使用仅含 `uri + name` 且 `preauditRequested=true` 的激活请求。MCP 使用该协议创建 `ZMCP_IF_TEST + Z_MCP_IF_TEST` 时，创建、写入、语法检查、解锁和激活均成功；SAP 随后把换行改为 CRLF，并将签名后分隔区补为三个空行，旧复核规则误判后安全补偿成功，两个对象只读搜索确认无残留。现已增加函数模块专用受限格式比较，仍需重启后做最终真实 DEV 成功复测。
 - **激活未知结果保护**：激活请求抛出超时或连接异常时，先只读核对 active/inactive 版本；无法确定远端结果时撤销自动删除资格并进入人工检查状态，禁止盲目重试。
 - **HTTP 超时**：已使用本机停滞 HTTP 端点端到端确认底层 ADT 客户端在配置 `5000 ms` 时约 5 秒取消请求；没有通过故意运行慢查询压测 SAP。
-- **待专项验证**：15 个新增只读/校验/预览操作在当前真实 SAP 系统的端点兼容性，全部新增 DDIC/包迁移/RAP 写入，安全调试的真实 SAP DEV 控制动作，调试/ATC/trace 长任务行为，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。fake client 自动化测试不能建立真实 SAP 端点或写入成功结论。
+- **待专项验证**：四个高层只读工具在当前真实 SAP 系统的端点兼容性，真实 ATC/ABAP Unit 执行，全部新增 DDIC/包迁移/RAP 写入，安全调试的真实 SAP DEV 控制动作，调试/ATC/trace 长任务行为，提高 `SAP_MCP_MAX_CONCURRENT_TOOLS` 后的共享会话行为，以及不同 SAP 版本、权限模型和生产部署。fake client 自动化测试不能建立真实 SAP 端点、质量执行或写入成功结论。
 
 以上结论不代表已经穷举所有 SAP 版本、权限模型、网络故障或恢复过程再次失败的场景。出现 `ROLLBACK_FAILED` 或 `UNLOCK_FAILED` 时应停止自动重试并人工检查 ADT/SAP，避免反复写入扩大风险。
 

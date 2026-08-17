@@ -49,9 +49,11 @@ describe('SafetyPolicy', () => {
   });
 
   it('allows development-profile source reads outside DEV but keeps mutations DEV-only', () => {
-    const policy = new SafetyPolicy({ ...validOptions, systemRole: 'QAS', toolProfile: 'development', auditPath: undefined });
-    expect(() => policy.assertReadAllowed('Z_TEST_PROGRAM')).not.toThrow();
-    expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).toThrow('Source mutations require');
+    for (const toolProfile of ['development', 'development-workbench']) {
+      const policy = new SafetyPolicy({ ...validOptions, systemRole: 'QAS', toolProfile, auditPath: undefined });
+      expect(() => policy.assertReadAllowed('Z_TEST_PROGRAM')).not.toThrow();
+      expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).toThrow('Source mutations require');
+    }
   });
 
   it('rejects objects outside configured namespaces', () => {
@@ -77,6 +79,9 @@ describe('SafetyPolicy', () => {
     expect(parseToolProfile('legacy-full')).toBe('legacy-full');
     expect(parseToolProfile('development')).toBe('development');
     expect(parseToolProfile('diagnostic-readonly')).toBe('diagnostic-readonly');
+    expect(parseToolProfile('development-workbench')).toBe('development-workbench');
+    expect(parseToolProfile('business-readonly')).toBe('business-readonly');
+    expect(parseToolProfile('operations-readonly')).toBe('operations-readonly');
     expect(() => parseToolProfile('unsafe')).toThrow('Unsupported SAP_MCP_TOOL_PROFILE');
   });
 
@@ -85,6 +90,12 @@ describe('SafetyPolicy', () => {
     expect(policy.assertDebugControlAllowed('devuser')).toBe('DEVUSER');
     expect(policy.debugAuthTtlMs).toBe(900_000);
     expect(policy.allowedDebugUsers).toEqual(new Set(['DEVUSER']));
+  });
+
+  it('allows DEV source mutation and debug control in development-workbench', () => {
+    const policy = new SafetyPolicy({ ...validOptions, toolProfile: 'development-workbench' });
+    expect(() => policy.assertMutationAllowed('Z_TEST_PROGRAM')).not.toThrow();
+    expect(policy.assertDebugControlAllowed('DEVUSER')).toBe('DEVUSER');
   });
 
   it('supports multiple explicitly allow-listed debug users', () => {

@@ -241,6 +241,8 @@ describe('server guardrail integration helpers', () => {
     ['applyDdicPropertyChange', false],
     ['applyPackageChange', false],
     ['applyRapOperation', false],
+    ['runQualityCheck', false],
+    ['getQualityCheckStatus', false],
     ['healthcheck', false],
     ['inspectAbapObject', true],
     ['previewAbapChange', true],
@@ -251,6 +253,7 @@ describe('server guardrail integration helpers', () => {
     ['previewDdicPropertyChange', true],
     ['previewPackageChange', true],
     ['previewRapOperation', true],
+    ['previewQualityCheck', true],
     ['searchObject', true]
   ] as const)('classifies %s SAP gate usage as %s', (toolName, expected) => {
     expect(usesSapExecutionGate(toolName)).toBe(expected);

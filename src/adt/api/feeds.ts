@@ -68,6 +68,8 @@ export interface Dump {
   author?: string
   text: string
   type: string
+  published?: Date
+  updated?: Date
 }
 
 export interface DumpCategory {
@@ -133,20 +135,21 @@ const parseDumps = (body: string): DumpsFeed => {
   const { href } = xmlNodeAttr(raw?.link)
   const { title, updated } = raw
   const dumps = xmlArray(raw, "entry").map((e: any) => {
-    const {
-      category,
-      id,
-      author: { name: author },
-      summary: { "#text": text, "@_type": type }
-    } = e
+    const { id, published, updated: entryUpdated } = e
+    const author = xmlNode(e, "author", "name") || undefined
+    const summary = e.summary || {}
+    const text = typeof summary === "string" ? summary : summary["#text"] || ""
+    const type = typeof summary === "string" ? "text" : summary["@_type"] || "text"
     const links = xmlArray(e, "link").map(xmlNodeAttr)
     return {
-      categories: category.map(xmlNodeAttr),
+      categories: xmlArray(e, "category").map(xmlNodeAttr),
       links,
       id,
       author,
-      text: text,
-      type
+      text,
+      type,
+      published: published ? parseJsonDate(published) : undefined,
+      updated: entryUpdated ? parseJsonDate(entryUpdated) : undefined
     }
   })
   return { href, title, updated: parseJsonDate(updated), dumps }

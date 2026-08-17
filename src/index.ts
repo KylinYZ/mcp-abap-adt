@@ -41,6 +41,8 @@ import { Sm21Handlers } from './handlers/Sm21Handlers.js';
 import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
 import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
 import { SafeAdvancedHandlers } from './handlers/SafeAdvancedHandlers.js';
+import { SafeQualityHandlers } from './handlers/SafeQualityHandlers.js';
+import { HighLevelReadHandlers } from './handlers/HighLevelReadHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
 import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
@@ -55,6 +57,8 @@ import { AdvancedOperationPlanStore } from './safe/AdvancedOperationPlanStore.js
 import { DdicPropertyChangeWorkflow } from './safe/DdicPropertyChangeWorkflow.js';
 import { PackageChangeWorkflow } from './safe/PackageChangeWorkflow.js';
 import { RapOperationWorkflow } from './safe/RapOperationWorkflow.js';
+import { QualityCheckPlanStore } from './safe/QualityCheckPlanStore.js';
+import { QualityCheckWorkflow } from './safe/QualityCheckWorkflow.js';
 import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
@@ -66,8 +70,12 @@ import { configureLogLevel } from './lib/logger.js';
 import { AdtHttpSm21Client } from './sm21/AdtHttpSm21Client.js';
 import { sm21ConfigFromEnvironment } from './sm21/config.js';
 import { selectProfileTools, isReadOnlyLegacyTool } from './config/ToolProfiles.js';
-import { assertToolCatalogClassified } from './config/ToolOperationPolicy.js';
+import { assertToolCatalogClassified, toolOperationClass } from './config/ToolOperationPolicy.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
+import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
+import { ClassicTableInspector } from './read/ClassicTableInspector.js';
+import { SystemInspector } from './read/SystemInspector.js';
+import { AbapMemberSourceReader } from './read/AbapMemberSourceReader.js';
 
 const environmentFile = selectEnvironmentFile(
   process.env.SAP_MCP_ENV_FILE,
@@ -88,6 +96,8 @@ export class AbapAdtServer extends Server {
   private safeAbapHandlers: SafeAbapHandlers;
   private safeDebugHandlers: SafeDebugHandlers;
   private safeAdvancedHandlers: SafeAdvancedHandlers;
+  private safeQualityHandlers: SafeQualityHandlers;
+  private highLevelReadHandlers: HighLevelReadHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
   private objectHandlers: ObjectHandlers;
@@ -120,7 +130,7 @@ export class AbapAdtServer extends Server {
     super(
       {
         name: "mcp-abap-abap-adt-api",
-        version: "0.3.0",
+        version: "0.4.0",
       },
       {
         capabilities: {
@@ -181,9 +191,20 @@ export class AbapAdtServer extends Server {
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
     this.rapGeneratorHandlers = new RapGeneratorHandlers(this.adtClient);
+    const objectResolver = new AbapObjectResolver(this.adtClient);
+    this.highLevelReadHandlers = new HighLevelReadHandlers(
+      new RuntimeDumpReader(this.adtClient),
+      new ClassicTableInspector(this.adtClient),
+      new SystemInspector(this.adtClient, {
+        host: this.safetyPolicy.systemHost,
+        client: this.safetyPolicy.client,
+        toolProfile: this.safetyPolicy.toolProfile,
+        systemRole: this.safetyPolicy.systemRole
+      }),
+      new AbapMemberSourceReader(this.adtClient, objectResolver)
+    );
     // SM21 reuses the authenticated ADT HTTP client; the custom SICF service remains read-only.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(this.adtClient.httpClient), sm21Config, this.adtClient);
-    const objectResolver = new AbapObjectResolver(this.adtClient);
     const changePlans = new ChangePlanStore(
       this.safetyPolicy.planTtlMs,
       () => Date.now(),
@@ -281,6 +302,25 @@ export class AbapAdtServer extends Server {
       })
     });
 
+    const qualityPlans = new QualityCheckPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
+    const qualityWorkflow = new QualityCheckWorkflow(
+      this.adtClient,
+      objectResolver,
+      this.safetyPolicy,
+      qualityPlans,
+      auditLogger
+    );
+    this.safeQualityHandlers = new SafeQualityHandlers(qualityWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
+    });
+
 
         // Setup tool handlers
     this.toolCatalog = this.createToolCatalog();
@@ -373,7 +413,9 @@ export class AbapAdtServer extends Server {
     const safeTools = this.safeAbapHandlers.getTools();
     const safeDebugTools = this.safeDebugHandlers.getTools();
     const controlledAdvancedTools = this.safeAdvancedHandlers.getTools();
+    const qualityTools = this.safeQualityHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
+    const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools];
     const legacyTools = [
         ...this.authHandlers.getTools(),
         ...this.transportHandlers.getTools(),
@@ -410,28 +452,47 @@ export class AbapAdtServer extends Server {
           }
         }
       ];
-    const completeCatalog = [...safeTools, ...safeDebugTools, ...controlledAdvancedTools, ...sm21Tools, ...legacyTools];
+    const completeCatalog = [
+      ...safeTools,
+      ...safeDebugTools,
+      ...controlledAdvancedTools,
+      ...qualityTools,
+      ...runtimeTools,
+      ...legacyTools
+    ];
     assertToolCatalogClassified(completeCatalog.map(tool => tool.name));
     return selectProfileTools(
       this.safetyPolicy.toolProfile,
       safeTools,
       legacyTools,
-      sm21Tools,
+      runtimeTools,
       safeDebugTools,
       this.safetyPolicy.systemRole,
-      controlledAdvancedTools
-    );
+      controlledAdvancedTools,
+      qualityTools
+    ).map(withCanonicalToolMetadata);
   }
 
   private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
         let result: unknown;
-        // Catalog filtering is advisory; this policy check also protects direct calls.
+        // Operation policy and runtime catalog membership both protect direct calls.
         this.safetyPolicy.assertToolOperationAllowed(toolName);
+        if (!this.toolCatalog.some(tool => tool.name === toolName)) {
+          throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the ${this.safetyPolicy.toolProfile} tool profile.`);
+        }
         if ((this.safetyPolicy.toolProfile === 'legacy-full'
           || this.safetyPolicy.toolProfile === 'development'
-          || this.safetyPolicy.toolProfile === 'diagnostic-readonly')
+          || this.safetyPolicy.toolProfile === 'development-workbench'
+          || this.safetyPolicy.toolProfile === 'diagnostic-readonly'
+          || this.safetyPolicy.toolProfile === 'operations-readonly')
           && this.sm21Handlers?.supports(toolName)) {
           return this.sm21Handlers.handle(toolName, limitedArguments);
+        }
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.highLevelReadHandlers.supports(toolName)) {
+          return this.highLevelReadHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.safeQualityHandlers.supports(toolName)) {
+          return this.safeQualityHandlers.handle(toolName, limitedArguments);
         }
         if (this.safetyPolicy.toolProfile === 'diagnostic-readonly'
           && toolName !== 'inspectAbapObject'
@@ -445,10 +506,12 @@ export class AbapAdtServer extends Server {
           );
           return result;
         }
-        if (this.safetyPolicy.toolProfile === 'development' && this.safeAdvancedHandlers.supports(toolName)) {
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.safeAdvancedHandlers.supports(toolName)) {
           return this.safeAdvancedHandlers.handle(toolName, limitedArguments);
         }
-        if (this.safetyPolicy.toolProfile === 'development' && this.safeDebugHandlers.supports(toolName)) {
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.safeDebugHandlers.supports(toolName)) {
           return this.safeDebugHandlers.handle(toolName, limitedArguments);
         }
         if (this.safetyPolicy.toolProfile === 'safe') {
@@ -458,7 +521,7 @@ export class AbapAdtServer extends Server {
           );
         }
 
-        if (this.safetyPolicy.toolProfile === 'development'
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && !isReadOnlyLegacyTool(toolName)) {
           throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the ${this.safetyPolicy.toolProfile} tool profile.`);
         }
@@ -708,6 +771,29 @@ export class AbapAdtServer extends Server {
       console.error('[MCP Error]', error);
     };
   }
+}
+
+function withCanonicalToolMetadata(tool: ToolDefinition): ToolDefinition {
+  const operationClass = toolOperationClass(tool.name);
+  if (!operationClass) throw new Error(`MCP tool '${tool.name}' has no operation policy classification.`);
+  const local = operationClass === 'local';
+  const readOnly = local || operationClass === 'read-only';
+  const metadataClass = local ? 'local-only' : readOnly ? 'read-only tenant' : 'mutating tenant';
+  return {
+    ...tool,
+    annotations: {
+      readOnlyHint: readOnly,
+      destructiveHint: !readOnly,
+      idempotentHint: readOnly,
+      openWorldHint: !local,
+      ...tool.annotations
+    },
+    _meta: {
+      operationClass: metadataClass,
+      approvalRequired: false,
+      ...tool._meta
+    }
+  };
 }
 
 export async function main(): Promise<void> {

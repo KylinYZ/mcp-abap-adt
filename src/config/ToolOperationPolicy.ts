@@ -7,6 +7,7 @@ export type ToolOperationClass =
   | 'source-mutation'
   | 'debug-control'
   | 'advanced-mutation'
+  | 'quality-execution'
   | 'other-mutation';
 
 export const RAW_ADVANCED_MUTATION_TOOL_NAMES = new Set([
@@ -26,7 +27,7 @@ export const CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES = new Set([
 
 const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
-  'getDebugOperationStatus', 'revokeDebugSession'
+  'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -51,7 +52,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'objectStructureElements', 'typeHierarchy', 'objectEnhancements', 'getDomainProperties',
   'getDataElementProperties', 'getTextElements', 'atcDocumentation', 'changePackagePreview',
   'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent', 'rapGenGetUiConfig',
-  'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable'
+  'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
+  'readRuntimeDumps', 'describeClassicTable', 'inspectSapSystem', 'getAbapMemberSource'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([
@@ -82,12 +84,17 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES
 ]);
 
+const QUALITY_EXECUTION_TOOL_NAMES = new Set([
+  'previewQualityCheck', 'runQualityCheck'
+]);
+
 const CLASS_SETS: ReadonlyArray<readonly [ToolOperationClass, Set<string>]> = [
   ['local', LOCAL_TOOL_NAMES],
   ['read-only', READ_ONLY_TOOL_NAMES],
   ['source-mutation', SOURCE_MUTATION_TOOL_NAMES],
   ['debug-control', DEBUG_CONTROL_TOOL_NAMES],
   ['advanced-mutation', ADVANCED_MUTATION_TOOL_NAMES],
+  ['quality-execution', QUALITY_EXECUTION_TOOL_NAMES],
   ['other-mutation', OTHER_MUTATION_TOOL_NAMES]
 ];
 
@@ -136,11 +143,20 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'Raw DDIC, package, RAP generation, and publication operations require DEV legacy-full.'
     );
   }
-  if (CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES.has(toolName) && (profile !== 'development' || systemRole !== 'DEV')) {
+  if (CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
     throw new SafeAbapError(
       'POLICY_DENIED',
       'policy',
-      'Controlled DDIC, package, and RAP operations require DEV development profile.'
+      'Controlled DDIC, package, and RAP operations require DEV development or development-workbench profile.'
+    );
+  }
+  if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)
+    && (profile !== 'development-workbench' || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Quality checks require DEV development-workbench profile.'
     );
   }
 }

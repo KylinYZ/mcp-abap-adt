@@ -8,7 +8,7 @@ DISCLAIMER: This server is still experimental. The default `safe` profile adds a
 
 The MCP-Server `mcp-abap-abap-adt-api` connects MCP clients to SAP ABAP Development Tools (ADT). The complete ADT client is embedded under `src/adt/`; installation and runtime do not depend on the external `abap-adt-api` npm package. The embedded baseline is derived from upstream `abap-adt-api` 8.4.2 under the MIT License, with exact revisions and update instructions recorded in [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md).
 
-> **Distribution status (2026-08-14):** source version `0.3.0` has **not** been published to npm or the MCP Registry. Install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The npm and registry fields in `package.json` and `server.json` are release metadata for a possible future publication, not proof of a live package.
+> **Distribution status (2026-08-17):** source version `0.4.0` has **not** been published to npm or the MCP Registry. Install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The npm and registry fields in `package.json` and `server.json` are release metadata for a possible future publication, not proof of a live package.
 
 For a complete Windows setup and operating walkthrough, see the [Chinese Usage Guide](docs/使用指南.md).
 
@@ -16,16 +16,19 @@ For a complete Windows setup and operating walkthrough, see the [Chinese Usage G
 
 ## Features
 
-The current code registers four profile-specific tool surfaces:
+The current code registers seven profile-specific tool surfaces:
 
 | Profile | Tool count | Scope | Recommended use |
 | --- | ---: | --- | --- |
 | `safe` (default) | 7 | Guarded read/change workflows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE`, plus guarded creation of `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE` | Normal AI-assisted ABAP development |
-| `development` | 114 | 7 safe source tools + 8 safe debug tools + 2 runtime-log tools + 6 controlled advanced tools + 91 approved read-only ADT tools | Development and DEV incident investigation |
-| `diagnostic-readonly` | 94 | 1 guarded source-read tool + 2 runtime-log tools + 91 approved read-only ADT tools | Business and operations diagnosis on DEV/QAS/PRD |
-| `legacy-full` | 157 | 7 safe tools + 2 SM21/ST22 tools + 148 raw low-level ADT tools | Compatibility and expert direct control on DEV only |
+| `development` | 118 | Backward-compatible broad DEV development and diagnosis surface | Existing development clients |
+| `diagnostic-readonly` | 98 | Backward-compatible broad read-only diagnosis surface | Existing diagnostic clients |
+| `legacy-full` | 161 | 7 safe tools + 6 high-level runtime tools + 148 raw low-level ADT tools | Compatibility and expert direct control on DEV only |
+| `development-workbench` | 81 | Focused development, safe debug, controlled advanced operations, and quality checks | ABAP development Skill |
+| `business-readonly` | 17 | Schema-first bounded business-data evidence | Business-data Skill on DEV/QAS/PRD |
+| `operations-readonly` | 40 | Runtime, transport/version, trace, and existing debug-state evidence | Operations Skill on DEV/QAS/PRD |
 
-The embedded surface adds 21 explicit raw tools for object structure elements, type hierarchy, enhancements, DDIC properties and text elements, ATC documentation, package migration, and RAP generation/publication. The `development` profile exposes their 15 read/validate/preview operations plus six guarded `preview`/`apply` tools for DDIC changes, package migration, and RAP operations. The [Chinese Usage Guide](docs/使用指南.md#4-mcp-功能与工具清单) contains the exhaustive catalog and workflow reference.
+The embedded surface adds 21 explicit raw tools for object structure elements, type hierarchy, enhancements, DDIC properties and text elements, ATC documentation, package migration, and RAP generation/publication. Version `0.4.0` also adds four high-level read tools: bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource`. The development Workbench adds `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` for controlled ATC/ABAP Unit execution. The [Chinese Usage Guide](docs/使用指南.md#4-mcp-功能与工具清单) contains the exhaustive catalog and workflow reference.
 
 ### Default `safe` profile
 
@@ -42,7 +45,7 @@ The embedded surface adds 21 explicit raw tools for object structure elements, t
 
 Use `development` only for a DEV instance. Use `diagnostic-readonly` for instances that expose only read-only evidence. System role overrides profile: QAS, PRD, a missing role, or an unknown role permits only local and read-only operations even if configured as `development` or `legacy-full`; hidden mutation tools are also rejected at dispatch before an ADT client call.
 
-Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the raw ADT surface is explicitly required. On DEV it registers 157 tools, including six raw DDIC/package/RAP mutation tools. Raw mutation, generation, publication, and deletion bypass guarded preview/apply workflows and are not the recommended AI-assisted path. They still require explicit user authority for each real write.
+Set `SAP_MCP_TOOL_PROFILE=legacy-full` only when the raw ADT surface is explicitly required. On DEV it registers 161 tools, including six raw DDIC/package/RAP mutation tools. Raw mutation, generation, publication, and deletion bypass guarded preview/apply workflows and are not the recommended AI-assisted path. They still require explicit user authority for each real write.
 
 ### Controlled advanced DEV operations
 
@@ -54,15 +57,21 @@ The `development` profile adds `previewDebugOperation`, `applyDebugOperation`, `
 
 `SAP_MCP_ALLOWED_DEBUG_USERS` accepts a comma-separated allow-list; when omitted, only the current `SAP_USER` is allowed. `SAP_MCP_DEBUG_AUTH_TTL_SECONDS` defaults to `900` and accepts 60–3600. Host, client, DEV role, `development` profile, and writable audit path are checked before any debug-control ADT call.
 
+### Controlled DEV quality checks
+
+`previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` are available only in the DEV `development-workbench` profile. Preview freezes an explicit ABAP Unit or ATC scope; ATC requires an explicit variant and never guesses one. Run accepts only the server-managed plan and opens one native MCP confirmation. A timeout or lost response becomes `UNKNOWN_OUTCOME`; inspect status and SAP evidence read-only and never replay the run blindly.
+
+The member-level source returned by `getAbapMemberSource` is for focused reading only. Any source mutation must first obtain the complete object source from `inspectAbapObject` and use that complete source as the preview baseline.
+
 ### Optional SM21 runtime-log analysis
 
-With `development`, `diagnostic-readonly`, or `legacy-full`, the server exposes read-only `sm21Read` and `analyzeRuntimeErrors`. They reuse the existing ADT HTTP login session and require the SAP-side [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) SICF handler and its [deployment instructions](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md); they are not part of the default seven-tool `safe` profile.
+With `development`, `diagnostic-readonly`, `legacy-full`, or `operations-readonly`, the server exposes read-only `sm21Read` and `analyzeRuntimeErrors`. They reuse the existing ADT HTTP login session and require the SAP-side [`ZCL_MCP_SM21_ADT_HTTP`](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP.abap) SICF handler and its [deployment instructions](sap/adt-http/ZCL_MCP_SM21_ADT_HTTP-deployment.md); they are not part of the default seven-tool `safe` profile. Bounded ST22 summaries use `readRuntimeDumps` independently and never fall back to the raw `dumps` query surface.
 
 No `node-rfc`, SAP NW RFC SDK, JCo, NCo, RFC destination, or extra client credentials are required. The existing ADT user needs `S_ADMI_FCD=SM21`; MCP tools never accept credentials as arguments.
 
 ### Performance and resource guardrails
 
-Central argument and response limits protect every tool in `safe`, `development`, `diagnostic-readonly`, and `legacy-full`. The FIFO execution gate protects operations that use the shared stateful ADT client; native confirmation waiting, local status tools, and `healthcheck` do not occupy a SAP slot. After confirmation succeeds, the complete source-change, creation, debug-control, or advanced workflow runs inside that same gate. The default concurrency is `1` because ADT operations share cookies, CSRF token, session type, and lock lifecycle. Increase it only after controlled SAP DEV validation.
+Central argument and response limits protect every tool in all seven profiles. The FIFO execution gate protects operations that use the shared stateful ADT client; native confirmation waiting, local status tools, and `healthcheck` do not occupy a SAP slot. After confirmation succeeds, the complete source-change, creation, debug-control, advanced, or quality workflow runs inside that same gate. The default concurrency is `1` because ADT operations share cookies, CSRF token, session type, and lock lifecycle. Increase it only after controlled SAP DEV validation.
 
 | Environment variable | Default | Accepted range | Purpose |
 | --- | ---: | --- | --- |
@@ -91,7 +100,7 @@ Central argument and response limits protect every tool in `safe`, `development`
 
 Invalid values fail startup. Explicit query or search limits above the configured maximum are rejected before SAP is called; results are never silently truncated and SQL is never rewritten. `getObjectSource` pagination uses a bounded in-process session cache after the first full SAP read, not SAP server-side pagination. A write timeout means the remote result is unknown: inspect the object or change-plan state before deciding whether to retry, and never blindly replay a mutation.
 
-In `development`, `diagnostic-readonly`, and `legacy-full`, `healthcheck` proves only that the local MCP process is responsive and reports its configured non-secret host, client, profile, and role. It does not contact SAP and returns `sapConnectionVerified: false`. Use the read-only `adtCoreDiscovery` tool to verify SAP authentication and ADT reachability, then compare the configured identity with the intended MCP instance before any other SAP work. The seven-tool `safe` profile does not expose either general diagnostic tool.
+In every profile that exposes it, `healthcheck` proves only that the local MCP process is responsive and reports its configured non-secret host, client, profile, and role. It does not contact SAP and returns `sapConnectionVerified: false`. Use `inspectSapSystem` to report configured identity separately from independently probed ADT capabilities and preserve partial success; do not infer a product release or authorization from configuration alone. The seven-tool `safe` profile does not expose either general diagnostic tool.
 
 Audit JSONL writes remain awaited and serialized. The server does not rotate or delete audit logs; the deployment environment must provide retention, archival, disk-capacity alerts, and access control.
 
@@ -140,16 +149,18 @@ Change plans are in-memory, short-lived, and single-use. They are lost when the 
 
 ### Verification status
 
-As of 2026-08-14, the current automated baseline covers the embedded ADT client, all registered tools, profile/role policy, and guarded workflows:
+As of 2026-08-17, the current automated baseline covers the embedded ADT client, all registered tools, profile/role policy, and guarded workflows:
 
-- Automated verification: 49 Jest suites and 353 tests cover the embedded client surface, 21 raw tools, six controlled advanced tools, safe source/debug workflows, profile/role dispatch, request/response limits, bounded state, source normalization, SM21 behavior, logging, and serialized audit writes.
+- Automated verification: 61 Jest suites and 421 tests cover the embedded client surface, high-level read tools, controlled quality workflow, 21 raw tools, six controlled advanced tools, safe source/debug workflows, profile/role dispatch, request/response limits, bounded state, source normalization, SM21 behavior, logging, and serialized audit writes.
 - Real SAP DEV verification: successful inspect, preview, lock, write, syntax check, unlock, activation, reread, and audit flows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE` test objects.
 - Real protection verification: preview syntax rejection, user-held lock rejection, source drift rejection before lock, plan invalidation after MCP restart, natural plan expiry, single-use enforcement, native confirmation apply/cancel behavior, and confirmation timeout behavior.
 - Real rollback verification: a controlled one-time activation failure after the source write triggered a new recovery lock, original-source restoration, unlock, real reactivation, original-hash verification, and `ROLLED_BACK`; no residual lock or matching inactive object remained.
 - Real SAP DEV guardrail verification: query/search limits, search defaults, response replacement with `413`, paged-source cache hits, LRU eviction, 60-second TTL expiry, and same-process FIFO/queue-full `429` behavior passed the isolated read-only smoke test. SAP ADT table preview consistently returned one lookahead row beyond `rowNumber` on this system.
 - Real normalization verification: `ZCODEX_MCP_TEST` completed as `APPLIED` with `LINE_ENDING_NORMALIZED`, successful activation/unlock, and a matching reread hash.
 - HTTP timeout verification: a local stalled HTTP endpoint confirmed that the underlying ADT client cancels at approximately five seconds when configured for `5000 ms`, without intentionally running a slow SAP query.
-- Pending dedicated verification: the 15 new read/validate/preview operations against the configured real SAP system, all new DDIC/package/RAP mutations, all safe debug control actions against a real SAP DEV debuggee, debugger/ATC/trace long-task behavior, shared-session behavior above one concurrent tool, other SAP releases and authorization models, and production deployment behavior. Fake-client tests do not establish real SAP endpoint support or write success.
+- Runtime-catalog verification: the dynamic validator launched the real built server for 35 profile/role sessions and 14 direct-dispatch rejection cases, checked schemas, annotations, operation classes, approval metadata, role filtering, and catalog sizes, and made no SAP network calls.
+- Real SAP read-only verification: `inspectSapSystem`, bounded `readRuntimeDumps`, `describeClassicTable` for `T000`, and `getAbapMemberSource` for a standard function module passed on the configured DEV/QAS/PRD systems without retaining business rows, dump text, or source.
+- Pending dedicated verification: real ATC or ABAP Unit execution; all new DDIC/package/RAP mutations; all safe debug control actions against a real SAP DEV debuggee; shared-session behavior above one concurrent tool; other SAP releases and authorization models; and production deployment behavior. Fake-client tests do not establish real quality execution or write success.
 
 This does not claim exhaustive testing of every SAP release, authorization model, network failure, or cascading recovery failure. `ROLLBACK_FAILED` and `UNLOCK_FAILED` deliberately require manual ADT/SAP inspection rather than unsafe repeated mutation.
 

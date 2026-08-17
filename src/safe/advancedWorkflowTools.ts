@@ -25,8 +25,12 @@ export function advancedContext(policy: SafetyPolicy): AdvancedPlanContext {
 }
 
 export function assertAdvancedMutationAllowed(policy: SafetyPolicy, objectName: string): void {
-  if (policy.toolProfile !== 'development' || policy.systemRole !== 'DEV') {
-    throw new SafeAbapError('POLICY_DENIED', 'POLICY', 'Controlled advanced operations require the development profile on SAP_MCP_SYSTEM_ROLE=DEV.');
+  if ((policy.toolProfile !== 'development' && policy.toolProfile !== 'development-workbench') || policy.systemRole !== 'DEV') {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'POLICY',
+      'Controlled advanced operations require the development or development-workbench profile on SAP_MCP_SYSTEM_ROLE=DEV.'
+    );
   }
   policy.assertMutationAllowed(objectName);
 }

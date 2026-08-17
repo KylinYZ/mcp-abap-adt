@@ -10,7 +10,14 @@ export interface RequestLimitGuardrails {
 
 type ArgumentsValue = Record<string, unknown>;
 
-const ADVANCED_TOOL_FIELDS: Record<string, readonly string[]> = {
+const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
+  readRuntimeDumps: ['from', 'to', 'limit', 'user', 'objectName', 'runtimeError', 'exception'],
+  describeClassicTable: ['tableName'],
+  inspectSapSystem: [],
+  getAbapMemberSource: ['objectName', 'objectType', 'memberName', 'version'],
+  previewQualityCheck: ['kind', 'objects', 'variant', 'riskLevel', 'duration', 'timeoutSeconds'],
+  runQualityCheck: ['qualityPlanId'],
+  getQualityCheckStatus: ['qualityPlanId'],
   previewDdicPropertyChange: ['operation'],
   applyDdicPropertyChange: ['operationPlanId'],
   previewPackageChange: ['objectType', 'objectName', 'oldPackage', 'newPackage', 'transportRequest'],
@@ -55,6 +62,8 @@ export function applyToolArgumentLimits(
     result.rowNumber = validatedLimit('rowNumber', result.rowNumber, guardrails.queryDefaultRows, guardrails.queryMaxRows);
   } else if (toolName === 'searchObject') {
     result.max = validatedLimit('max', result.max, guardrails.searchDefaultResults, guardrails.searchMaxResults);
+  } else if (toolName === 'readRuntimeDumps') {
+    result.limit = validatedLimit('limit', result.limit, 20, 50);
   }
   assertAdvancedToolArgumentShape(toolName, result);
   assertSafeDebugArgumentShape(toolName, result);
@@ -62,7 +71,7 @@ export function applyToolArgumentLimits(
 }
 
 function assertAdvancedToolArgumentShape(toolName: string, argumentsValue: ArgumentsValue): void {
-  const allowedFields = ADVANCED_TOOL_FIELDS[toolName];
+  const allowedFields = STRICT_TOOL_FIELDS[toolName];
   if (!allowedFields) return;
 
   const unexpected = Object.keys(argumentsValue).filter(field => !allowedFields.includes(field));
@@ -76,12 +85,25 @@ function assertAdvancedToolArgumentShape(toolName: string, argumentsValue: Argum
   for (const field of ['packageName', 'srvbName', 'transport', 'lockHandle', 'genId', 'category', 'version']) {
     assertBoundedIdentifier(argumentsValue[field], field, field === 'lockHandle' ? 512 : 255);
   }
+  for (const field of ['from', 'to']) assertBoundedIdentifier(argumentsValue[field], field, 40);
+  for (const field of ['user', 'objectName', 'runtimeError', 'exception']) assertBoundedIdentifier(argumentsValue[field], field, 128);
+  for (const field of ['objectType', 'memberName']) assertBoundedIdentifier(argumentsValue[field], field, 128);
+  for (const field of ['kind', 'variant', 'riskLevel', 'duration', 'qualityPlanId']) {
+    assertBoundedIdentifier(argumentsValue[field], field, field === 'qualityPlanId' ? 128 : 64);
+  }
+  assertBoundedIdentifier(argumentsValue.tableName, 'tableName', 30);
 
   if (argumentsValue.checks !== undefined) {
     assertBoundedStringArray(argumentsValue.checks, 'checks', 16, 64);
   }
   if (argumentsValue.elements !== undefined && (!Array.isArray(argumentsValue.elements) || argumentsValue.elements.length > 500)) {
     throw new McpError(400, 'elements must be an array with no more than 500 entries.');
+  }
+  if (toolName === 'previewQualityCheck') {
+    if (!Array.isArray(argumentsValue.objects) || argumentsValue.objects.length < 1 || argumentsValue.objects.length > 20) {
+      throw new McpError(400, 'objects must contain between one and twenty entries.');
+    }
+    assertBoundedJson(argumentsValue.objects, 'objects');
   }
 
   for (const field of ['properties', 'metaData', 'elements', 'refactoring', 'content']) {

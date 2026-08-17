@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-17
+- Add bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource` read tools.
+- Add DEV-only `development-workbench`, `business-readonly`, and `operations-readonly` task profiles while preserving broad compatibility profiles.
+- Add controlled `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` with explicit ATC variants, one native confirmation, and no replay after `UNKNOWN_OUTCOME`.
+- Add uniform MCP annotations and `_meta` operation/approval metadata to every runtime tool, plus catalog integrity tests and dynamic runtime validation.
+- Keep QAS, PRD, missing, and unknown roles local/read-only, including direct-dispatch rejection of hidden mutation tools.
+- This modified version remains source-only and has not been published to npm or the MCP Registry.
+
 ## [0.3.0] - 2026-08-14
 - Embed the complete `abap-adt-api` 8.4.2 client source with preserved MIT attribution, a stable local import boundary, and cancellable debugger-listener behavior.
 - Add 21 explicit raw MCP tools for structure, hierarchy, enhancements, DDIC/text, ATC documentation, package migration, and RAP generation/publication.

@@ -230,15 +230,20 @@ export async function atcCheckVariant(
 export async function createAtcRun(
   h: AdtHTTP,
   variant: string,
-  mainUrl: string,
-  maxResults = 100
+  mainUrl: string | string[],
+  maxResults = 100,
+  timeoutMs?: number
 ): Promise<AtcRunResult> {
+  const mainUrls = Array.isArray(mainUrl) ? mainUrl : [mainUrl]
+  const references = mainUrls
+    .map(item => `<adtcore:objectReference adtcore:uri="${encodeEntity(item)}"/>`)
+    .join("\n")
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <atc:run maximumVerdicts="${maxResults}" xmlns:atc="http://www.sap.com/adt/atc">
 	<objectSets xmlns:adtcore="http://www.sap.com/adt/core">
 		<objectSet kind="inclusive">
 			<adtcore:objectReferences>
-				<adtcore:objectReference adtcore:uri="${mainUrl}"/>
+				${references}
 			</adtcore:objectReferences>
 		</objectSet>
 	</objectSets>
@@ -249,7 +254,7 @@ export async function createAtcRun(
   }
   const response = await h.request(
     `/sap/bc/adt/atc/runs?worklistId=${variant}`,
-    { method: "POST", headers, body }
+    { method: "POST", headers, body, ...(timeoutMs === undefined ? {} : { timeout: timeoutMs }) }
   )
   const raw = fullParse(response.body, {
     removeNSPrefix: true,

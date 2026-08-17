@@ -9,7 +9,12 @@ const guardrails = {
 };
 
 describe('request limits', () => {
-  it.each([['tableContents', 'rowNumber', 200], ['runQuery', 'rowNumber', 200], ['searchObject', 'max', 50]] as const)
+  it.each([
+    ['tableContents', 'rowNumber', 200],
+    ['runQuery', 'rowNumber', 200],
+    ['searchObject', 'max', 50],
+    ['readRuntimeDumps', 'limit', 20]
+  ] as const)
   ('adds the configured default for %s', (toolName, field, expected) => {
     const argumentsValue = toolName === 'runQuery' ? { sqlQuery: 'SELECT * FROM z_demo' } : {};
     expect(applyToolArgumentLimits(toolName, argumentsValue, guardrails)).toMatchObject({ [field]: expected });
@@ -66,6 +71,28 @@ describe('request limits', () => {
     expect(() => applyToolArgumentLimits('rapGenPublishService', { srvbName: 42 }, roomy)).toThrow('srvbName');
   });
 
+  it('rejects raw query or SQL fields on high-level read tools', () => {
+    expect(() => applyToolArgumentLimits('readRuntimeDumps', {
+      from: '2026-08-16T00:00:00+08:00',
+      to: '2026-08-16T01:00:00+08:00',
+      query: 'and ( equals ( user , ADMIN ) )'
+    }, guardrails)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('describeClassicTable', {
+      tableName: 'T000',
+      sqlQuery: 'SELECT * FROM T000'
+    }, guardrails)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('inspectSapSystem', { url: '/sap/bc/adt/discovery' }, guardrails))
+      .toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('getAbapMemberSource', {
+      objectType: 'CLASS', objectName: 'ZCL_DEMO', memberName: 'RUN', sourceUrl: '/arbitrary'
+    }, guardrails)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('readRuntimeDumps', {
+      from: '2026-08-16T00:00:00+08:00',
+      to: '2026-08-16T01:00:00+08:00',
+      limit: 51
+    }, guardrails)).toThrow('limit');
+  });
+
   it('enforces bounded arrays and JSON structure for advanced operations', () => {
     const roomy = { ...guardrails, maxArgumentBytes: 10_000_000 };
     expect(() => applyToolArgumentLimits('rapGenValidateInitial', {
@@ -94,6 +121,22 @@ describe('request limits', () => {
     expect(() => applyToolArgumentLimits('rapGenPreview', {
       genId: 'uiservice', refObjectUri: '/ref', content: { scalar: 'allowed', nested: [1, true, null] }
     }, roomy)).not.toThrow();
+  });
+
+  it('rejects unbounded or unexpected quality-check input', () => {
+    const roomy = { ...guardrails, maxArgumentBytes: 1_000_000 };
+    expect(() => applyToolArgumentLimits('previewQualityCheck', {
+      kind: 'ABAP_UNIT', objects: []
+    }, roomy)).toThrow('one and twenty');
+    expect(() => applyToolArgumentLimits('previewQualityCheck', {
+      kind: 'ABAP_UNIT', objects: Array(21).fill({ objectType: 'CLASS', objectName: 'ZCL_TEST' })
+    }, roomy)).toThrow('one and twenty');
+    expect(() => applyToolArgumentLimits('previewQualityCheck', {
+      kind: 'ABAP_UNIT', objects: [{ objectType: 'CLASS', objectName: 'ZCL_TEST' }], mainUrl: '/arbitrary'
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('runQualityCheck', {
+      qualityPlanId: 'plan', confirmedByUser: true
+    }, roomy)).toThrow('does not accept fields');
   });
 
   it('rejects empty or non-query SQL while ignoring keywords inside literals and comments', () => {

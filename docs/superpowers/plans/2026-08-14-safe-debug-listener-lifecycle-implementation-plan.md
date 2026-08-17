@@ -477,10 +477,10 @@ session registry 为 Attach、栈/变量读取和控制命令提供同一把逐 
 
 ```powershell
 node scripts/validate-mcp-contract.mjs ..\mcp-abap-abap-adt-api
-python C:\Users\068157\.codex\skills\skill-creator\scripts\quick_validate.py skills\sap-abap-development
-python C:\Users\068157\.codex\skills\skill-creator\scripts\quick_validate.py skills\sap-business-data-diagnosis
-python C:\Users\068157\.codex\skills\skill-creator\scripts\quick_validate.py skills\sap-system-operations-diagnosis
-python C:\Users\068157\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py .
+python "$env:USERPROFILE\.codex\skills\skill-creator\scripts\quick_validate.py" skills\sap-abap-development
+python "$env:USERPROFILE\.codex\skills\skill-creator\scripts\quick_validate.py" skills\sap-business-data-diagnosis
+python "$env:USERPROFILE\.codex\skills\skill-creator\scripts\quick_validate.py" skills\sap-system-operations-diagnosis
+python "$env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py" .
 ```
 
 本地安装验证使用 `update_plugin_cachebuster.py` 和既有本地 marketplace 名称重新安装，然后在新任务中测试；不手改 marketplace 文件。

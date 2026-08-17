@@ -19,7 +19,7 @@ npm run build
 git diff --check
 ```
 
-当前自动化基线为 49 个测试套件、353 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
+当前 runtime catalog 基线为 `safe=7`、`development=118`、`diagnostic-readonly=98`、`legacy-full=161`、`development-workbench=81`、`business-readonly=17`、`operations-readonly=40`；自动化基线为 61 个测试套件、421 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
 
 ## 目录与约定
 

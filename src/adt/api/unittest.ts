@@ -1,7 +1,7 @@
 import * as t from "io-ts"
 import { validateParseResult } from ".."
 import { AdtHTTP } from "../AdtHTTP"
-import { fullParse, xmlArray, xmlFlatArray, xmlNodeAttr } from "../utilities"
+import { encodeEntity, fullParse, xmlArray, xmlFlatArray, xmlNodeAttr } from "../utilities"
 import { parseUri, uriParts } from "./urlparser"
 
 export interface UnitTestStackEntry {
@@ -105,9 +105,14 @@ export const DefaultUnitTestRunFlags: UnitTestRunFlags = {
 
 export async function runUnitTest(
   h: AdtHTTP,
-  url: string,
-  flags: UnitTestRunFlags = DefaultUnitTestRunFlags
+  url: string | string[],
+  flags: UnitTestRunFlags = DefaultUnitTestRunFlags,
+  timeoutMs?: number
 ) {
+  const urls = Array.isArray(url) ? url : [url]
+  const references = urls
+    .map(item => `<adtcore:objectReference adtcore:uri="${encodeEntity(item)}"/>`)
+    .join("\n")
   const headers = { "Content-Type": "application/*", Accept: "application/*" }
   const body = `<?xml version="1.0" encoding="UTF-8"?>
   <aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
@@ -124,7 +129,7 @@ export async function runUnitTest(
   <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
     <objectSet kind="inclusive">
       <adtcore:objectReferences>
-        <adtcore:objectReference adtcore:uri="${url}"/>
+        ${references}
       </adtcore:objectReferences>
     </objectSet>
   </adtcore:objectSets>
@@ -132,7 +137,8 @@ export async function runUnitTest(
   const response = await h.request("/sap/bc/adt/abapunit/testruns", {
     method: "POST",
     headers,
-    body
+    body,
+    ...(timeoutMs === undefined ? {} : { timeout: timeoutMs })
   })
   const raw = fullParse(response.body)
 

@@ -54,6 +54,10 @@ export interface AuditEvent {
   verificationHash?: string;
   partialSuccess?: boolean;
   unknownOutcome?: boolean;
+  qualityPlanId?: string;
+  qualityCheckKind?: string;
+  qualityObjectCount?: number;
+  qualityVariantHash?: string;
 }
 
 export class AuditLogger {

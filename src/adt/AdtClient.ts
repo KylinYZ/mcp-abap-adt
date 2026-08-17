@@ -906,10 +906,11 @@ export class ADTClient {
     return fixEdits(this.h, proposal, source)
   }
   public unitTestRun(
-    url: string,
-    flags: UnitTestRunFlags = DefaultUnitTestRunFlags
+    url: string | string[],
+    flags: UnitTestRunFlags = DefaultUnitTestRunFlags,
+    timeoutMs?: number
   ) {
-    return runUnitTest(this.h, url, flags)
+    return runUnitTest(this.h, url, flags, timeoutMs)
   }
 
   public unitTestEvaluation(
@@ -1507,8 +1508,8 @@ export class ADTClient {
     return atcCheckVariant(this.h, variant)
   }
 
-  public createAtcRun(variant: string, mainUrl: string, maxResults = 100) {
-    return createAtcRun(this.h, variant, mainUrl, maxResults)
+  public createAtcRun(variant: string, mainUrl: string | string[], maxResults = 100, timeoutMs?: number) {
+    return createAtcRun(this.h, variant, mainUrl, maxResults, timeoutMs)
   }
 
   public atcWorklists(runResultId: string): Promise<AtcWorkList>

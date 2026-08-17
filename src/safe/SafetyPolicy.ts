@@ -72,7 +72,9 @@ export class SafetyPolicy {
   }
 
   assertReadAllowed(objectName: string): void {
-    const sourceReadAllowed = this.toolProfile === 'development' || this.toolProfile === 'diagnostic-readonly'
+    const sourceReadAllowed = this.toolProfile === 'development'
+      || this.toolProfile === 'development-workbench'
+      || this.toolProfile === 'diagnostic-readonly'
       ? new Set(['DEV', 'QAS', 'PRD']).has(this.systemRole)
       : this.systemRole === 'DEV';
     if (!sourceReadAllowed) {
@@ -94,8 +96,8 @@ export class SafetyPolicy {
   }
 
   assertMutationAllowed(objectName: string): void {
-    if (this.toolProfile !== 'safe' && this.toolProfile !== 'development') {
-      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Source mutations require the safe or development tool profile.');
+    if (this.toolProfile !== 'safe' && this.toolProfile !== 'development' && this.toolProfile !== 'development-workbench') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Source mutations require the safe, development, or development-workbench tool profile.');
     }
     if (this.systemRole !== 'DEV') {
       throw new SafeAbapError('POLICY_DENIED', 'policy', 'Source mutations require SAP_MCP_SYSTEM_ROLE=DEV.');
@@ -107,8 +109,8 @@ export class SafetyPolicy {
   }
 
   assertDebugControlAllowed(targetUser: string): string {
-    if (this.toolProfile !== 'development') {
-      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Debug control requires the development tool profile.');
+    if (this.toolProfile !== 'development' && this.toolProfile !== 'development-workbench') {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'Debug control requires the development or development-workbench tool profile.');
     }
     if (this.systemRole !== 'DEV') {
       throw new SafeAbapError('POLICY_DENIED', 'policy', 'Debug control requires SAP_MCP_SYSTEM_ROLE=DEV.');
@@ -128,6 +130,20 @@ export class SafetyPolicy {
       throw new SafeAbapError('POLICY_DENIED', 'policy', `SAP user ${normalizedUser || '(empty)'} is not in SAP_MCP_ALLOWED_DEBUG_USERS.`);
     }
     return normalizedUser;
+  }
+
+  assertQualityCheckAllowed(objectName: string): void {
+    if (this.toolProfile !== 'development-workbench' || this.systemRole !== 'DEV') {
+      throw new SafeAbapError(
+        'POLICY_DENIED',
+        'policy',
+        'Quality checks require SAP_MCP_SYSTEM_ROLE=DEV with the development-workbench profile.'
+      );
+    }
+    this.assertReadAllowed(objectName);
+    if (!this.auditPath) {
+      throw new SafeAbapError('POLICY_DENIED', 'policy', 'SAP_MCP_AUDIT_PATH is required for quality checks.');
+    }
   }
 
   assertTransportFormat(transportRequest: string): string {
@@ -157,10 +173,18 @@ export class SafetyPolicy {
 
 export function parseToolProfile(value?: string): ToolProfile {
   const normalized = String(value || 'safe').trim().toLowerCase();
-  if (normalized === 'safe' || normalized === 'development' || normalized === 'diagnostic-readonly' || normalized === 'legacy-full') {
+  if (normalized === 'safe'
+    || normalized === 'development'
+    || normalized === 'diagnostic-readonly'
+    || normalized === 'legacy-full'
+    || normalized === 'development-workbench'
+    || normalized === 'business-readonly'
+    || normalized === 'operations-readonly') {
     return normalized;
   }
-  throw new Error(`Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use 'safe', 'development', 'diagnostic-readonly', or 'legacy-full'.`);
+  throw new Error(
+    `Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use safe, development, diagnostic-readonly, legacy-full, development-workbench, business-readonly, or operations-readonly.`
+  );
 }
 
 export function normalizeObjectName(value: string): string {
