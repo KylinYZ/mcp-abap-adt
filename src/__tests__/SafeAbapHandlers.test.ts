@@ -246,7 +246,7 @@ describe('SafeAbapHandlers', () => {
   });
 
   it('locks the documented development and diagnostic-readonly tool counts', () => {
-    expect(READ_ONLY_LEGACY_TOOL_COUNT).toBe(91);
+    expect(READ_ONLY_LEGACY_TOOL_COUNT).toBe(92);
     const safeTools = Array.from({ length: 7 }, (_, index) => ({
       name: index === 0 ? 'inspectAbapObject' : `safe-${index}`,
       description: 'safe',
@@ -268,7 +268,7 @@ describe('SafeAbapHandlers', () => {
       'searchObject', 'findObjectPath', 'objectTypes', 'classIncludes', 'classComponents', 'syntaxCheckCode',
       'syntaxCheckCdsUrl', 'codeCompletion', 'findDefinition', 'usageReferences', 'syntaxCheckTypes',
       'codeCompletionFull', 'codeCompletionElement', 'usageReferenceSnippets', 'fixProposals', 'fragmentMappings',
-      'abapDocumentation', 'inactiveObjects', 'objectRegistrationInfo', 'validateNewObject', 'nodeContents',
+      'abapDocumentation', 'getObjectSource', 'inactiveObjects', 'objectRegistrationInfo', 'validateNewObject', 'nodeContents',
       'mainPrograms', 'featureDetails', 'collectionFeatureDetails', 'findCollectionByUrl', 'loadTypes',
       'adtDiscovery', 'adtCoreDiscovery', 'adtCompatibiliyGraph', 'unitTestEvaluation',
       'unitTestOccurrenceMarkers', 'prettyPrinterSetting', 'prettyPrinter', 'gitRepos', 'gitExternalRepoInfo',
@@ -289,7 +289,7 @@ describe('SafeAbapHandlers', () => {
       inputSchema: { type: 'object', properties: {} }
     }));
 
-    expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(108);
-    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(94);
+    expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(109);
+    expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(95);
   });
 });

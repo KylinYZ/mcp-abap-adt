@@ -23,7 +23,7 @@ function policy(): SafetyPolicy {
     systemRole: 'DEV',
     allowedHosts: 'dev.example.com',
     allowedClients: '100',
-    allowedNamespaces: 'Z,Y',
+    allowedNamespaces: 'Z,Y,LZ,LY',
     auditPath: 'C:\\audit',
     toolProfile: 'safe'
   });
@@ -261,6 +261,87 @@ describe('AbapChangeWorkflow', () => {
       status: 'ROLLED_BACK',
       rollbackSourceMatchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED'
     });
+  });
+
+  it('applies a function-group include without a main-program context', async () => {
+    const originalSource = '* original function-group include';
+    const targetSource = '* changed function-group include';
+    const test = harness({ initialSource: originalSource });
+    const functionGroupInclude: ResolvedAbapObject = {
+      ...object,
+      objectType: 'INCLUDE',
+      objectName: 'LZFG_SAP2EAMTOP',
+      adtType: 'FUGR/I',
+      objectUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop',
+      sourceUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop/source/main',
+      lockUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop',
+      activationName: 'LZFG_SAP2EAMTOP',
+      activationUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop'
+    };
+    (test.workflow as any).resolver.resolve.mockResolvedValue(functionGroupInclude);
+
+    await test.workflow.preview({
+      objectType: 'INCLUDE', objectName: functionGroupInclude.objectName,
+      newSource: targetSource, transportRequest: 'DEVK900001'
+    });
+    await test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' });
+
+    expect(test.client.transportInfo).toHaveBeenCalledWith(functionGroupInclude.sourceUrl, 'ZPKG', 'I');
+    expect(test.client.syntaxCheck).toHaveBeenNthCalledWith(
+      1, functionGroupInclude.sourceUrl, functionGroupInclude.objectUrl, targetSource, undefined, 'active'
+    );
+    expect(test.client.syntaxCheck).toHaveBeenNthCalledWith(
+      2, functionGroupInclude.sourceUrl, functionGroupInclude.objectUrl, targetSource, undefined, 'active'
+    );
+    expect(test.client.lock).toHaveBeenCalledWith(functionGroupInclude.objectUrl, 'MODIFY');
+    expect(test.client.setObjectSource).toHaveBeenCalledWith(
+      functionGroupInclude.sourceUrl, targetSource, 'secret-lock', 'DEVK900001'
+    );
+    expect(test.client.unLock).toHaveBeenCalledWith(functionGroupInclude.objectUrl, 'secret-lock');
+    expect(test.client.activate).toHaveBeenCalledWith(
+      functionGroupInclude.objectName, functionGroupInclude.objectUrl, undefined, true
+    );
+    expect(test.workflow.status('plan-1')).toMatchObject({ status: 'APPLIED', sourceMatchType: 'EXACT' });
+  });
+
+  it('restores a function-group include with the same context-free activation request', async () => {
+    const originalSource = '* original function-group include';
+    const targetSource = '* changed function-group include';
+    const test = harness({ initialSource: originalSource, activationResults: [false, true] });
+    const functionGroupInclude: ResolvedAbapObject = {
+      ...object,
+      objectType: 'INCLUDE',
+      objectName: 'LZFG_SAP2EAMTOP',
+      adtType: 'FUGR/I',
+      objectUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop',
+      sourceUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop/source/main',
+      lockUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop',
+      activationName: 'LZFG_SAP2EAMTOP',
+      activationUrl: '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop'
+    };
+    (test.workflow as any).resolver.resolve.mockResolvedValue(functionGroupInclude);
+
+    await test.workflow.preview({
+      objectType: 'INCLUDE', objectName: functionGroupInclude.objectName,
+      newSource: targetSource, transportRequest: 'DEVK900001'
+    });
+    await expect(test.workflow.apply({
+      changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({ code: 'ACTIVATION_FAILED', details: { plan: { status: 'ROLLED_BACK' } } });
+
+    expect(test.client.setObjectSource).toHaveBeenNthCalledWith(
+      1, functionGroupInclude.sourceUrl, targetSource, 'secret-lock', 'DEVK900001'
+    );
+    expect(test.client.setObjectSource).toHaveBeenNthCalledWith(
+      2, functionGroupInclude.sourceUrl, originalSource, 'secret-lock', 'DEVK900001'
+    );
+    expect(test.client.activate).toHaveBeenNthCalledWith(
+      1, functionGroupInclude.objectName, functionGroupInclude.objectUrl, undefined, true
+    );
+    expect(test.client.activate).toHaveBeenNthCalledWith(
+      2, functionGroupInclude.objectName, functionGroupInclude.objectUrl, undefined, true
+    );
+    expect(test.workflow.status('plan-1')).toMatchObject({ status: 'ROLLED_BACK', rollbackSourceMatchType: 'EXACT' });
   });
 
   it('accepts SAP line-ending normalization without rolling back', async () => {

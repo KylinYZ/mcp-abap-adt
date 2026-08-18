@@ -8,9 +8,9 @@
 
 `@kylinyz/mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务，是 [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) 的修改版分支，使用独立的 npm 作用域名发布。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
 
-> **分发状态（2026-08-18）：** `0.4.0` 已以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm。推荐在 MCP 配置中使用带作用域且固定版本的包名。原作者不带作用域的 `mcp-abap-abap-adt-api`（0.1.1）是独立的旧版本。
+> **分发状态（2026-08-18）：** `0.5.0` 已以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm。推荐在 MCP 配置中使用带作用域且固定版本的包名。原作者不带作用域的 `mcp-abap-abap-adt-api`（0.1.1）是独立的旧版本。
 
-完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
+完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。从本地 `.tgz` 或源码入口切换到 npm 线上包时，使用 [npm 线上版本迁移指南](docs/npm线上版本迁移指南.md)。
 
 > **相关项目：** 如果需要更高层、以只读为主的 ABAP 工具（例如 `GetProgram`、`GetClass`、`GetTable`），请使用独立的 [`mcp-abap-adt`](https://github.com/mario-andreschak/mcp-abap-adt) 项目。本项目提供的是较底层的 ADT 能力，并在其上增加了默认启用的安全源码变更门面。
 
@@ -21,14 +21,14 @@
 | Profile | 工具数 | 功能范围 | 建议用途 |
 | --- | ---: | --- | --- |
 | `safe`（默认） | 7 | 受控读取/修改 `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`，以及受控创建 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` | 日常 AI 辅助 ABAP 开发 |
-| `development` | 118 | 向后兼容的宽开发与诊断工具面 | 现有开发客户端 |
-| `diagnostic-readonly` | 98 | 向后兼容的宽只读诊断工具面 | 现有诊断客户端 |
+| `development` | 119 | 向后兼容的宽开发与诊断工具面 | 现有开发客户端 |
+| `diagnostic-readonly` | 99 | 向后兼容的宽只读诊断工具面 | 现有诊断客户端 |
 | `legacy-full` | 161 | 7 个安全工具 + 6 个高层运行工具 + 148 个原始低层 ADT 工具 | 仅 DEV 的兼容与专家直接控制 |
-| `development-workbench` | 81 | 聚焦开发、安全调试、受控高级操作和质量检查 | ABAP 开发 Skill |
+| `development-workbench` | 82 | 聚焦开发、安全调试、受控高级操作和质量检查 | ABAP 开发 Skill |
 | `business-readonly` | 17 | 先取 schema、再做有界业务数据读取 | 业务数据 Skill |
 | `operations-readonly` | 40 | 运行、版本、trace 和已有调试现场证据 | 运维 Skill |
 
-`0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。成员级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。大型源码可使用可选 `startLine`/`maxLines` 分页，每页都返回完整源码哈希和行覆盖信息，调用方必须拒绝缺页或哈希漂移。
+`0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。按 SAP 返回的精确 ADT URL 读取源码的 `getObjectSource` 在 `development`、`diagnostic-readonly`、`legacy-full` 和 `development-workbench` 中开放，但不进入 `safe`、业务和运维 Profile。成员级或 URL 级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。大型源码可使用可选 `startLine`/`maxLines` 分页，每页都返回完整源码哈希和行覆盖信息，调用方必须拒绝缺页或哈希漂移。
 
 内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 
@@ -182,7 +182,7 @@
 将 SAP 凭据保存在版本库之外的私有环境文件中，并让每个 MCP 进程通过绝对路径 `SAP_MCP_ENV_FILE` 选择对应配置。一个进程的 Profile 在启动时固定，多 Profile 或多 SAP 环境必须分别配置进程别名。
 
 ```cmd
-npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0
+npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0
 ```
 
 MCP 配置示例：
@@ -192,7 +192,7 @@ MCP 配置示例：
   "mcpServers": {
     "mcp-abap-abap-adt-api": {
       "command": "npx",
-      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.4.0"],
+      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.5.0"],
       "env": {
         "SAP_MCP_ENV_FILE": "D:\\sap-mcp-config\\sap-dev.env"
       }
@@ -320,7 +320,7 @@ DDIC、包迁移或 RAP 写入必须使用 development 的受控 preview/apply �
 
 ## 常见问题
 
-- **npm 包解析失败**：使用带作用域且固定版本的 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`。不带作用域的包是上游独立旧版本；无法访问 npm 时，可从本分支源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
+- **npm 包解析失败**：使用带作用域且固定版本的 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0`。不带作用域的包是上游独立旧版本；无法访问 npm 时，可从本分支源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
 - **SAP 连接失败**：检查 URL、用户、密码、客户端、ADT 权限、网络连通性以及 `SICF` 中的 `/sap/bc/adt` 服务。
 - **自签名证书错误**：仅在开发环境设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`。
 - **`CONFIRMATION_UNSUPPORTED`**：改用支持 MCP form elicitation 的客户端，或明确启用安全性较低的文字确认降级。

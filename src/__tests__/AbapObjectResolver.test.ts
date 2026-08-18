@@ -97,6 +97,43 @@ describe('AbapObjectResolver', () => {
     expect(resolved.sourceUrl).toBe(sourceUrl);
   });
 
+  it('resolves a function-group include without requesting a main-program context', async () => {
+    const objectName = 'LZFG_SAP2EAMTOP';
+    const objectUrl = '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop';
+    const sourceUrl = `${objectUrl}/source/main`;
+    const client = fakeClient({
+      searchObject: jest.fn().mockResolvedValue([{
+        // SAP may identify the parent unit in search metadata, so the exact include name must also be recoverable from the URI.
+        'adtcore:name': 'ZFG_SAP2EAM',
+        'adtcore:type': 'FUGR/I',
+        'adtcore:uri': objectUrl,
+        'adtcore:packageName': 'ZPKG'
+      }]),
+      objectStructure: jest.fn().mockResolvedValue({
+        objectUrl,
+        metaData: metadata(objectName, 'FUGR/I', 'source/main'),
+        links: []
+      }),
+      mainPrograms: jest.fn().mockRejectedValue(new Error('must not be called'))
+    });
+
+    const resolved = await new AbapObjectResolver(client).resolve('INCLUDE', objectName);
+
+    expect(resolved).toMatchObject({
+      objectType: 'INCLUDE',
+      objectName,
+      adtType: 'FUGR/I',
+      objectUrl,
+      sourceUrl,
+      lockUrl: objectUrl,
+      activationName: objectName,
+      activationUrl: objectUrl,
+      packageName: 'ZPKG'
+    });
+    expect(resolved.mainProgram).toBeUndefined();
+    expect(client.mainPrograms).not.toHaveBeenCalled();
+  });
+
   it('uses the type-specific ADT URI when search metadata names an include unit', async () => {
     const objectUrl = '/sap/bc/adt/programs/programs/zprog';
     const client = fakeClient({

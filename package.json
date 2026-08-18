@@ -1,6 +1,6 @@
 {
   "name": "@kylinyz/mcp-abap-abap-adt-api",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "mcpName": "io.github.kylinyz/mcp-abap-abap-adt-api",
   "main": "dist/index.js",
   "bin": {

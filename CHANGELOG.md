@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-08-18
+- Resolve exact `FUGR/I` function-group includes through the guarded inspect/preview/apply workflow without adding an invalid main-program context.
+- Expose read-only `getObjectSource` in `development`, `diagnostic-readonly`, and `development-workbench` while keeping it out of `safe`, business, and operations profiles.
 
 ## [0.4.0] - 2026-08-18
 - Publish the fork to npm as `@kylinyz/mcp-abap-abap-adt-api`, with repository/homepage/issues pointing to `KylinYZ/mcp-abap-adt` and registry id `io.github.kylinyz/mcp-abap-abap-adt-api`. The upstream author remains credited and MIT attribution is unchanged.

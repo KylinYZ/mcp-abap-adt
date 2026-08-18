@@ -6,8 +6,8 @@
 
 ## 当前分发状态
 
-- `0.4.0` 已于 2026-08-18 以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
-- 常规安装使用 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`；本地开发、契约验证或未发布修改仍使用 `node` 启动当前源码构建的 `dist/index.js`。
+- `0.5.0` 已于 2026-08-18 以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
+- 常规安装使用 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0`；本地开发、契约验证或未发布修改仍使用 `node` 启动当前源码构建的 `dist/index.js`。
 - 不要给出不带作用域的 `npx mcp-abap-abap-adt-api`，那会解析到原作者的独立旧包；Marketplace/MCP Registry 状态仍需单独核验。
 
 ## 开发与验证
@@ -19,7 +19,7 @@ npm run build
 git diff --check
 ```
 
-当前 runtime catalog 基线为 `safe=7`、`development=118`、`diagnostic-readonly=98`、`legacy-full=161`、`development-workbench=81`、`business-readonly=17`、`operations-readonly=40`；自动化基线为 61 个测试套件、430 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
+当前 runtime catalog 基线为 `safe=7`、`development=119`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=82`、`business-readonly=17`、`operations-readonly=40`；自动化基线为 61 个测试套件、434 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
 
 ## 目录与约定
 

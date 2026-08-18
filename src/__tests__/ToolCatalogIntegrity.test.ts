@@ -30,10 +30,10 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 118],
-    ['diagnostic-readonly', 98],
+    ['development', 119],
+    ['diagnostic-readonly', 99],
     ['legacy-full', 161],
-    ['development-workbench', 81],
+    ['development-workbench', 82],
     ['business-readonly', 17],
     ['operations-readonly', 40]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
@@ -78,6 +78,17 @@ describe('tool catalog integrity and raw advanced role policy', () => {
       .toEqual(expect.arrayContaining(['inspectSapSystem', 'describeClassicTable']));
     expect((configureServer('DEV', 'operations-readonly') as any).toolCatalog.map((tool: { name: string }) => tool.name))
       .toEqual(expect.arrayContaining(['inspectSapSystem', 'readRuntimeDumps']));
+  });
+
+  it('exposes direct URL source reads only in development and diagnostic profiles', () => {
+    for (const profile of ['development', 'diagnostic-readonly', 'legacy-full', 'development-workbench']) {
+      const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+      expect(names).toContain('getObjectSource');
+    }
+    for (const profile of ['safe', 'business-readonly', 'operations-readonly']) {
+      const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+      expect(names).not.toContain('getObjectSource');
+    }
   });
 
   it.each(['QAS', 'PRD', '', 'UNKNOWN'])('hides and rejects raw advanced writes for role %p', async role => {

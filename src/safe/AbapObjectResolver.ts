@@ -26,12 +26,14 @@ export class AbapObjectResolver {
       }
 
       const searchResult = matches[0];
+      const functionGroupInclude = objectType === 'INCLUDE' && isFunctionGroupInclude(searchResult);
       const structure = await this.client.objectStructure(searchResult['adtcore:uri'], 'active');
       const objectUrl = validateAdtUri(structure.objectUrl || searchResult['adtcore:uri'], 'object URL');
       const sourceUrl = resolveSourceUrl(structure, objectUrl);
       let mainProgram: string | undefined;
 
-      if (objectType === 'INCLUDE') {
+      if (objectType === 'INCLUDE' && !functionGroupInclude) {
+        // Program includes need a unique syntax/activation context; function-group includes are standalone FUGR/I resources.
         const mainPrograms = await this.client.mainPrograms(objectUrl);
         if (mainPrograms.length !== 1) {
           throw new SafeAbapError(
@@ -103,7 +105,7 @@ function matchesObject(
     case 'PROGRAM':
       return adtType.startsWith('PROG/P') || uri.includes('/PROGRAMS/PROGRAMS/');
     case 'INCLUDE':
-      return adtType.startsWith('PROG/I') || uri.includes('/PROGRAMS/INCLUDES/');
+      return adtType.startsWith('PROG/I') || uri.includes('/PROGRAMS/INCLUDES/') || isFunctionGroupInclude(result);
     case 'CLASS':
       return adtType.startsWith('CLAS/') || uri.includes('/OO/CLASSES/');
     case 'FUNCTION_MODULE':
@@ -118,11 +120,25 @@ function uriObjectName(uri: string, objectType: SupportedObjectType): string | u
     CLASS: '/OO/CLASSES/',
     FUNCTION_MODULE: '/FMODULES/'
   };
-  const marker = markers[objectType];
+  const marker = objectType === 'INCLUDE'
+    && uri.includes('/FUNCTIONS/GROUPS/')
+    && uri.includes('/INCLUDES/')
+    ? '/INCLUDES/'
+    : markers[objectType];
   const markerIndex = uri.indexOf(marker);
   const relevant = markerIndex >= 0 ? uri.slice(markerIndex + marker.length) : '';
   const segments = relevant.split('/').filter(Boolean);
   return segments[0]?.toUpperCase();
+}
+
+function isFunctionGroupInclude(
+  result: { 'adtcore:type': string; 'adtcore:uri': string }
+): boolean {
+  const adtType = String(result['adtcore:type'] || '').toUpperCase();
+  const uri = safeDecode(result['adtcore:uri']).toUpperCase();
+  return adtType.startsWith('FUGR/I')
+    && uri.includes('/FUNCTIONS/GROUPS/')
+    && uri.includes('/INCLUDES/');
 }
 
 function resolveSourceUrl(

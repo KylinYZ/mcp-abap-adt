@@ -8,7 +8,7 @@ DISCLAIMER: This server is still experimental. The default `safe` profile adds a
 
 The MCP-Server `@kylinyz/mcp-abap-abap-adt-api` connects MCP clients to SAP ABAP Development Tools (ADT). It is a modified fork of [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) published under a distinct scoped npm name. The complete ADT client is embedded under `src/adt/`; installation and runtime do not depend on the external `abap-adt-api` npm package. The embedded baseline is derived from upstream `abap-adt-api` 8.4.2 under the MIT License, with exact revisions and update instructions recorded in [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md).
 
-> **Distribution status (2026-08-18):** version `0.4.0` is published on npm as `@kylinyz/mcp-abap-abap-adt-api`. Use the scoped package name and pin the version for reproducible MCP configuration. The unscoped upstream package `mcp-abap-abap-adt-api` (0.1.1) by mario-andreschak is a separate, older release.
+> **Distribution status (2026-08-18):** version `0.5.0` is published on npm as `@kylinyz/mcp-abap-abap-adt-api`. Use the scoped package name and pin the version for reproducible MCP configuration. The unscoped upstream package `mcp-abap-abap-adt-api` (0.1.1) by mario-andreschak is a separate, older release.
 
 For a complete Windows setup and operating walkthrough, see the [Chinese Usage Guide](docs/使用指南.md).
 
@@ -21,14 +21,14 @@ The current code registers seven profile-specific tool surfaces:
 | Profile | Tool count | Scope | Recommended use |
 | --- | ---: | --- | --- |
 | `safe` (default) | 7 | Guarded read/change workflows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE`, plus guarded creation of `PROGRAM`, `FUNCTION_GROUP`, and `FUNCTION_MODULE` | Normal AI-assisted ABAP development |
-| `development` | 118 | Backward-compatible broad DEV development and diagnosis surface | Existing development clients |
-| `diagnostic-readonly` | 98 | Backward-compatible broad read-only diagnosis surface | Existing diagnostic clients |
+| `development` | 119 | Backward-compatible broad DEV development and diagnosis surface | Existing development clients |
+| `diagnostic-readonly` | 99 | Backward-compatible broad read-only diagnosis surface | Existing diagnostic clients |
 | `legacy-full` | 161 | 7 safe tools + 6 high-level runtime tools + 148 raw low-level ADT tools | Compatibility and expert direct control on DEV only |
-| `development-workbench` | 81 | Focused development, safe debug, controlled advanced operations, and quality checks | ABAP development Skill |
+| `development-workbench` | 82 | Focused development, safe debug, controlled advanced operations, and quality checks | ABAP development Skill |
 | `business-readonly` | 17 | Schema-first bounded business-data evidence | Business-data Skill on DEV/QAS/PRD |
 | `operations-readonly` | 40 | Runtime, transport/version, trace, and existing debug-state evidence | Operations Skill on DEV/QAS/PRD |
 
-The embedded surface adds 21 explicit raw tools for object structure elements, type hierarchy, enhancements, DDIC properties and text elements, ATC documentation, package migration, and RAP generation/publication. Version `0.4.0` also adds four high-level read tools: bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource`. The development Workbench adds `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` for controlled ATC/ABAP Unit execution. The [Chinese Usage Guide](docs/使用指南.md#4-mcp-功能与工具清单) contains the exhaustive catalog and workflow reference.
+The embedded surface adds 21 explicit raw tools for object structure elements, type hierarchy, enhancements, DDIC properties and text elements, ATC documentation, package migration, and RAP generation/publication. Version `0.4.0` also adds four high-level read tools: bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource`. Direct URL source reading through `getObjectSource` is available in `development`, `diagnostic-readonly`, `legacy-full`, and `development-workbench`, but remains outside `safe`, business, and operations profiles. The development Workbench adds `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` for controlled ATC/ABAP Unit execution. The [Chinese Usage Guide](docs/使用指南.md#4-mcp-功能与工具清单) contains the exhaustive catalog and workflow reference.
 
 ### Default `safe` profile
 
@@ -174,7 +174,7 @@ This does not claim exhaustive testing of every SAP release, authorization model
 Keep credentials in a private environment file and point `SAP_MCP_ENV_FILE` at its absolute path. A single server process has one fixed tool profile, so multi-profile or multi-system setups must start one process per alias.
 
 ```cmd
-npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0
+npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0
 ```
 
 Example MCP configuration:
@@ -184,7 +184,7 @@ Example MCP configuration:
   "mcpServers": {
     "mcp-abap-abap-adt-api": {
       "command": "npx",
-      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.4.0"],
+      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.5.0"],
       "env": {
         "SAP_MCP_ENV_FILE": "C:\\path\\to\\sap-dev.env"
       }
@@ -351,7 +351,7 @@ When working with ABAP objects, you may encounter errors related to unknown fiel
 
 ## Troubleshooting
 
-*   **Package resolution errors:** use the scoped, pinned command `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`. The unscoped package is a separate upstream release. If npm access is unavailable, build this fork from source and configure the client with `node` plus the absolute path to `dist/index.js`.
+*   **Package resolution errors:** use the scoped, pinned command `npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0`. The unscoped package is a separate upstream release. If npm access is unavailable, build this fork from source and configure the client with `node` plus the absolute path to `dist/index.js`.
 *   **SAP connection errors:** verify your credentials (`SAP_URL`, `SAP_USER`, `SAP_PASSWORD`, `SAP_CLIENT`), confirm the system is reachable, that your user has ADT authorizations, and that `/sap/bc/adt` is active in `SICF`.
 *   **TLS / self-signed certificate errors:** for development only, set `NODE_TLS_REJECT_UNAUTHORIZED=0` (env var or in the client `env` block).
 *   **`CONFIRMATION_UNSUPPORTED`:** use a client that supports MCP form elicitation, or explicitly enable the weaker text fallback.
