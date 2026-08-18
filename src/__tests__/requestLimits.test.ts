@@ -93,6 +93,27 @@ describe('request limits', () => {
     }, guardrails)).toThrow('limit');
   });
 
+  it('validates inspect source paging before dispatch', () => {
+    expect(applyToolArgumentLimits('inspectAbapObject', {
+      objectType: 'PROGRAM', objectName: 'ZTEST', startLine: 301, maxLines: 300
+    }, guardrails)).toEqual({
+      objectType: 'PROGRAM', objectName: 'ZTEST', startLine: 301, maxLines: 300
+    });
+    expect(() => applyToolArgumentLimits('inspectAbapObject', {
+      objectType: 'PROGRAM', objectName: 'ZTEST', sourceUrl: '/arbitrary'
+    }, guardrails)).toThrow('does not accept fields');
+    for (const value of [0, -1, 1.5, '2', Number.NaN, Number.POSITIVE_INFINITY, 10_000_001]) {
+      expect(() => applyToolArgumentLimits('inspectAbapObject', {
+        objectType: 'PROGRAM', objectName: 'ZTEST', startLine: value
+      }, guardrails)).toThrow('startLine');
+    }
+    for (const value of [0, -1, 1.5, '2', Number.NaN, Number.POSITIVE_INFINITY, 1_001]) {
+      expect(() => applyToolArgumentLimits('inspectAbapObject', {
+        objectType: 'PROGRAM', objectName: 'ZTEST', maxLines: value
+      }, guardrails)).toThrow('maxLines');
+    }
+  });
+
   it('enforces bounded arrays and JSON structure for advanced operations', () => {
     const roomy = { ...guardrails, maxArgumentBytes: 10_000_000 };
     expect(() => applyToolArgumentLimits('rapGenValidateInitial', {

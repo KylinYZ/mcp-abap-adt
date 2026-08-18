@@ -62,12 +62,26 @@ export class SafeAbapHandlers {
     return [
       {
         name: 'inspectAbapObject',
-        description: 'Read the complete source and metadata of one allow-listed PROGRAM, INCLUDE, CLASS, or FUNCTION_MODULE object.',
+        description: 'Read source and metadata for one allow-listed PROGRAM, INCLUDE, CLASS, or FUNCTION_MODULE. Omit paging for the complete source; use startLine/maxLines for large source and verify a stable sourceHash across every page.',
         inputSchema: {
           type: 'object',
           properties: {
             objectType: { type: 'string', description: 'PROGRAM, INCLUDE, CLASS, or FUNCTION_MODULE' },
-            objectName: { type: 'string', description: 'Exact ABAP object name' }
+            objectName: { type: 'string', description: 'Exact ABAP object name' },
+            startLine: {
+              type: 'number',
+              description: 'Optional 1-based source line. Use with maxLines for large sources.',
+              minimum: 1,
+              maximum: 10_000_000,
+              optional: true
+            },
+            maxLines: {
+              type: 'number',
+              description: 'Optional maximum source lines to return. Recommended page size: 300.',
+              minimum: 1,
+              maximum: 1_000,
+              optional: true
+            }
           },
           required: ['objectType', 'objectName']
         },
@@ -216,7 +230,14 @@ export class SafeAbapHandlers {
   async handle(toolName: string, args: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
     switch (toolName) {
       case 'inspectAbapObject':
-        return this.workflow.inspect(String(args.objectType || ''), String(args.objectName || ''));
+        return this.workflow.inspect(
+          String(args.objectType || ''),
+          String(args.objectName || ''),
+          {
+            startLine: args.startLine as number | undefined,
+            maxLines: args.maxLines as number | undefined
+          }
+        );
       case 'previewAbapChange':
         return this.previewChange({
           objectType: String(args.objectType || ''),

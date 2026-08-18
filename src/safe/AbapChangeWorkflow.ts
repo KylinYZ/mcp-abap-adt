@@ -24,6 +24,11 @@ export interface AuditSink {
   append(event: AuditEvent): Promise<void>;
 }
 
+export interface InspectSourcePage {
+  startLine?: number;
+  maxLines?: number;
+}
+
 export interface PreviewChangeInput {
   objectType: SupportedObjectType | string;
   objectName: string;
@@ -46,16 +51,52 @@ export class AbapChangeWorkflow {
     private readonly audit: AuditSink
   ) {}
 
-  async inspect(objectType: string, objectName: string): Promise<Record<string, unknown>> {
+  async inspect(
+    objectType: string,
+    objectName: string,
+    page: InspectSourcePage = {}
+  ): Promise<Record<string, unknown>> {
     this.policy.assertReadAllowed(objectName);
+    const startLine = inspectPageValue(page.startLine, 'startLine', 10_000_000) ?? 1;
+    const maxLines = inspectPageValue(page.maxLines, 'maxLines', 1_000);
     const object = await this.resolver.resolve(objectType, objectName);
-    const source = await this.client.getObjectSource(object.sourceUrl);
+    const fullSource = await this.client.getObjectSource(object.sourceUrl);
+    const lines = splitSourceLines(fullSource);
+    const totalLines = lines.length;
+    if (startLine > totalLines) {
+      throw new SafeAbapError(
+        'VALIDATION_FAILED',
+        'inspect',
+        `startLine ${startLine} exceeds the ${totalLines}-line source.`
+      );
+    }
+
+    const hasPaging = page.startLine !== undefined || page.maxLines !== undefined;
+    if (!hasPaging) {
+      return {
+        status: 'success',
+        object,
+        source: fullSource,
+        sourceHash: sourceHash(fullSource),
+        totalLines
+      };
+    }
+
+    const startIndex = startLine - 1;
+    const endIndex = maxLines === undefined
+      ? totalLines
+      : Math.min(totalLines, startIndex + maxLines);
+    const selectedLines = lines.slice(startIndex, endIndex);
     return {
       status: 'success',
       object,
-      source,
-      sourceHash: sourceHash(source),
-      totalLines: lineCount(source)
+      // Preserve original line terminators so consecutive pages reconstruct exact source bytes.
+      source: selectedLines.join(''),
+      sourceHash: sourceHash(fullSource),
+      totalLines,
+      startLine,
+      returnedLines: selectedLines.length,
+      hasMore: endIndex < totalLines
     };
   }
 
@@ -470,5 +511,38 @@ function asSafeError(error: unknown): SafeAbapError {
 }
 
 function lineCount(source: string): number {
-  return source.replace(/\r\n/g, '\n').split('\n').length;
+  return splitSourceLines(source).length;
+}
+
+function splitSourceLines(source: string): string[] {
+  const lines: string[] = [];
+  let start = 0;
+  let index = 0;
+  while (index < source.length) {
+    if (source[index] !== '\r' && source[index] !== '\n') {
+      index += 1;
+      continue;
+    }
+    const end = source[index] === '\r' && source[index + 1] === '\n'
+      ? index + 2
+      : index + 1;
+    lines.push(source.slice(start, end));
+    start = end;
+    index = end;
+  }
+  // Keep the final empty logical line after a trailing newline for backward-compatible totals.
+  lines.push(source.slice(start));
+  return lines;
+}
+
+function inspectPageValue(value: number | undefined, field: string, maximum: number): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || value <= 0 || value > maximum) {
+    throw new SafeAbapError(
+      'VALIDATION_FAILED',
+      'inspect',
+      `${field} must be a positive integer no greater than ${maximum}.`
+    );
+  }
+  return value;
 }

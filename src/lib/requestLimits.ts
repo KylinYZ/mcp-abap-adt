@@ -11,6 +11,7 @@ export interface RequestLimitGuardrails {
 type ArgumentsValue = Record<string, unknown>;
 
 const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
+  inspectAbapObject: ['objectType', 'objectName', 'startLine', 'maxLines'],
   readRuntimeDumps: ['from', 'to', 'limit', 'user', 'objectName', 'runtimeError', 'exception'],
   describeClassicTable: ['tableName'],
   inspectSapSystem: [],
@@ -64,6 +65,13 @@ export function applyToolArgumentLimits(
     result.max = validatedLimit('max', result.max, guardrails.searchDefaultResults, guardrails.searchMaxResults);
   } else if (toolName === 'readRuntimeDumps') {
     result.limit = validatedLimit('limit', result.limit, 20, 50);
+  } else if (toolName === 'inspectAbapObject') {
+    if (result.startLine !== undefined) {
+      result.startLine = validatedLimit('startLine', result.startLine, 1, 10_000_000);
+    }
+    if (result.maxLines !== undefined) {
+      result.maxLines = validatedLimit('maxLines', result.maxLines, 300, 1_000);
+    }
   }
   assertAdvancedToolArgumentShape(toolName, result);
   assertSafeDebugArgumentShape(toolName, result);

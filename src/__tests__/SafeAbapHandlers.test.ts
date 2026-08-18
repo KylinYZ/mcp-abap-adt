@@ -4,6 +4,7 @@ import { READ_ONLY_LEGACY_TOOL_COUNT } from '../config/ToolProfiles';
 describe('SafeAbapHandlers', () => {
   it('exposes only the seven approved high-level tools', () => {
     const handlers = new SafeAbapHandlers({} as never);
+    const inspectTool = handlers.getTools().find(tool => tool.name === 'inspectAbapObject');
     const applyTool = handlers.getTools().find(tool => tool.name === 'applyAbapChange');
     const previewCreationTool = handlers.getTools().find(tool => tool.name === 'previewAbapObjectCreation');
     const applyCreationTool = handlers.getTools().find(tool => tool.name === 'applyAbapObjectCreation');
@@ -29,6 +30,15 @@ describe('SafeAbapHandlers', () => {
       _meta: { operationClass: 'mutating tenant', approvalRequired: true }
     });
     expect(applyTool?.inputSchema.properties).not.toHaveProperty('confirmedByUser');
+    expect(inspectTool).toMatchObject({
+      inputSchema: {
+        required: ['objectType', 'objectName'],
+        properties: {
+          startLine: { type: 'number', minimum: 1, maximum: 10_000_000, optional: true },
+          maxLines: { type: 'number', minimum: 1, maximum: 1_000, optional: true }
+        }
+      }
+    });
     expect(previewCreationTool).toMatchObject({
       inputSchema: {
         required: ['objects', 'transportRequest'],
@@ -66,6 +76,38 @@ describe('SafeAbapHandlers', () => {
       _meta: { operationClass: 'mutating tenant', approvalRequired: true }
     });
     expect(applyCreationTool?.inputSchema.properties).not.toHaveProperty('confirmedByUser');
+  });
+
+  it('dispatches optional inspect paging without changing the default object contract', async () => {
+    const workflow = { inspect: jest.fn().mockResolvedValue({ status: 'success' }) };
+    const handlers = new SafeAbapHandlers(workflow as never);
+
+    await handlers.handle('inspectAbapObject', {
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      startLine: 301,
+      maxLines: 300
+    });
+    await handlers.handle('inspectAbapObject', { objectType: 'PROGRAM', objectName: 'ZTEST' });
+
+    expect(workflow.inspect).toHaveBeenNthCalledWith(1, 'PROGRAM', 'ZTEST', { startLine: 301, maxLines: 300 });
+    expect(workflow.inspect).toHaveBeenNthCalledWith(2, 'PROGRAM', 'ZTEST', {
+      startLine: undefined,
+      maxLines: undefined
+    });
+  });
+
+  it('does not silently drop malformed inspect paging on direct dispatch', async () => {
+    const workflow = { inspect: jest.fn().mockRejectedValue(new Error('startLine must be a positive integer')) };
+    const handlers = new SafeAbapHandlers(workflow as never);
+
+    await expect(handlers.handle('inspectAbapObject', {
+      objectType: 'PROGRAM', objectName: 'ZTEST', startLine: '301'
+    })).rejects.toThrow('startLine');
+    expect(workflow.inspect).toHaveBeenCalledWith('PROGRAM', 'ZTEST', {
+      startLine: '301',
+      maxLines: undefined
+    });
   });
 
   it('dispatches creation preview, confirmation, and status to the creation workflow', async () => {

@@ -107,6 +107,47 @@ describe('AbapChangeWorkflow', () => {
     expect(test.auditEvents).toEqual([]);
   });
 
+  it('returns byte-preserving source pages with a stable full-source hash', async () => {
+    const source = 'REPORT ztest.\r\nFORM first.\nENDFORM.\rFORM last.\rENDFORM.\n';
+    const test = harness({ initialSource: source });
+
+    const first = await test.workflow.inspect('PROGRAM', 'ZTEST', { startLine: 1, maxLines: 3 });
+    const second = await test.workflow.inspect('PROGRAM', 'ZTEST', { startLine: 4, maxLines: 3 });
+
+    expect(first).toMatchObject({
+      source: 'REPORT ztest.\r\nFORM first.\nENDFORM.\r',
+      totalLines: 6,
+      startLine: 1,
+      returnedLines: 3,
+      hasMore: true
+    });
+    expect(second).toMatchObject({
+      source: 'FORM last.\rENDFORM.\n',
+      totalLines: 6,
+      startLine: 4,
+      returnedLines: 3,
+      hasMore: false
+    });
+    expect(`${first.source}${second.source}`).toBe(source);
+    expect(second.sourceHash).toBe(first.sourceHash);
+  });
+
+  it.each([
+    [{ startLine: 0 }, 'startLine'],
+    [{ startLine: 10_000_001 }, 'startLine'],
+    [{ maxLines: 0 }, 'maxLines'],
+    [{ maxLines: 1_001 }, 'maxLines']
+  ] as const)('rejects invalid inspect page %p', async (page, field) => {
+    const test = harness();
+    await expect(test.workflow.inspect('PROGRAM', 'ZTEST', page)).rejects.toThrow(field);
+  });
+
+  it('rejects a page starting beyond the current source', async () => {
+    const test = harness({ initialSource: 'REPORT ztest.\nWRITE / test.' });
+    await expect(test.workflow.inspect('PROGRAM', 'ZTEST', { startLine: 3, maxLines: 1 }))
+      .rejects.toThrow('exceeds the 2-line source');
+  });
+
   it('previews without locking or writing, then applies the exact plan once', async () => {
     const test = harness();
     const preview = await test.workflow.preview({
