@@ -6,9 +6,9 @@ DISCLAIMER: This server is still experimental. The default `safe` profile adds a
 
 ## Description
 
-The MCP-Server `mcp-abap-abap-adt-api` connects MCP clients to SAP ABAP Development Tools (ADT). The complete ADT client is embedded under `src/adt/`; installation and runtime do not depend on the external `abap-adt-api` npm package. The embedded baseline is derived from upstream `abap-adt-api` 8.4.2 under the MIT License, with exact revisions and update instructions recorded in [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md).
+The MCP-Server `@kylinyz/mcp-abap-abap-adt-api` connects MCP clients to SAP ABAP Development Tools (ADT). It is a modified fork of [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) published under a distinct scoped npm name. The complete ADT client is embedded under `src/adt/`; installation and runtime do not depend on the external `abap-adt-api` npm package. The embedded baseline is derived from upstream `abap-adt-api` 8.4.2 under the MIT License, with exact revisions and update instructions recorded in [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md).
 
-> **Distribution status (2026-08-17):** source version `0.4.0` has **not** been published to npm or the MCP Registry. Install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The npm and registry fields in `package.json` and `server.json` are release metadata for a possible future publication, not proof of a live package.
+> **Distribution status (2026-08-17):** this fork is prepared for publication to npm as `@kylinyz/mcp-abap-abap-adt-api` and is **not yet live**. Until it is published, install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The upstream package `mcp-abap-abap-adt-api` (0.1.1) by mario-andreschak is a separate, older release.
 
 For a complete Windows setup and operating walkthrough, see the [Chinese Usage Guide](docs/使用指南.md).
 
@@ -61,7 +61,7 @@ The `development` profile adds `previewDebugOperation`, `applyDebugOperation`, `
 
 `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` are available only in the DEV `development-workbench` profile. Preview freezes an explicit ABAP Unit or ATC scope; ATC requires an explicit variant and never guesses one. Run accepts only the server-managed plan and opens one native MCP confirmation. A timeout or lost response becomes `UNKNOWN_OUTCOME`; inspect status and SAP evidence read-only and never replay the run blindly.
 
-The member-level source returned by `getAbapMemberSource` is for focused reading only. Any source mutation must first obtain the complete object source from `inspectAbapObject` and use that complete source as the preview baseline.
+The member-level source returned by `getAbapMemberSource` is for focused reading only. Any source mutation must first obtain the complete object source from `inspectAbapObject` and use that complete source as the preview baseline. Large objects may be read with optional `startLine`/`maxLines` pages; every page returns the full-source hash and line coverage metadata, and callers must reject gaps or hash drift.
 
 ### Optional SM21 runtime-log analysis
 
@@ -108,7 +108,7 @@ Audit JSONL writes remain awaited and serialized. The server does not rotate or 
 
 `SAP_MCP_TOOL_PROFILE=safe` is the default and exposes only these tools:
 
-- `inspectAbapObject`: returns the complete source and metadata for one exact, allow-listed `PROGRAM`, `INCLUDE`, `CLASS`, or `FUNCTION_MODULE`.
+- `inspectAbapObject`: returns the complete source and metadata for one exact, allow-listed `PROGRAM`, `INCLUDE`, `CLASS`, or `FUNCTION_MODULE`; optional `startLine`/`maxLines` pages preserve source bytes and carry the complete-source hash.
 - `previewAbapChange`: validates the target, existing transport, proposed complete source, and syntax; then returns a complete diff and short-lived plan.
 - `applyAbapChange`: applies only the previously previewed plan after explicit user confirmation, with drift detection, activation, verification, rollback, and unlock handling.
 - `getAbapChangeStatus`: returns local plan status without complete source, credentials, cookies, or lock handles.
@@ -120,7 +120,7 @@ Set `SAP_MCP_TOOL_PROFILE=legacy-full` only for explicit compatibility needs. It
 
 ### Required workflow
 
-1. Call `inspectAbapObject` for the exact object and use the returned complete source as the edit baseline.
+1. Call `inspectAbapObject` for the exact object and use the returned complete source as the edit baseline. For large source, page with a stable `sourceHash`, contiguous ranges, accumulated `totalLines`, and final `hasMore=false` before editing.
 2. Call `previewAbapChange` with the complete replacement source and an existing unreleased transport request.
 3. Show the complete Markdown diff returned in the tool content. Preview performs no lock, write, or activation.
 4. Call `applyAbapChange` directly with the returned `changePlanId`; do not ask for a separate chat confirmation. The server, not the model, obtains the single confirmation through the MCP client.
@@ -151,7 +151,7 @@ Change plans are in-memory, short-lived, and single-use. They are lost when the 
 
 As of 2026-08-17, the current automated baseline covers the embedded ADT client, all registered tools, profile/role policy, and guarded workflows:
 
-- Automated verification: 61 Jest suites and 421 tests cover the embedded client surface, high-level read tools, controlled quality workflow, 21 raw tools, six controlled advanced tools, safe source/debug workflows, profile/role dispatch, request/response limits, bounded state, source normalization, SM21 behavior, logging, and serialized audit writes.
+- Automated verification: 61 Jest suites and 430 tests cover the embedded client surface, high-level read tools, controlled quality workflow, 21 raw tools, six controlled advanced tools, safe source/debug workflows, profile/role dispatch, request/response limits, bounded state, source normalization, SM21 behavior, logging, and serialized audit writes.
 - Real SAP DEV verification: successful inspect, preview, lock, write, syntax check, unlock, activation, reread, and audit flows for `PROGRAM`, `INCLUDE`, `CLASS`, and `FUNCTION_MODULE` test objects.
 - Real protection verification: preview syntax rejection, user-held lock rejection, source drift rejection before lock, plan invalidation after MCP restart, natural plan expiry, single-use enforcement, native confirmation apply/cancel behavior, and confirmation timeout behavior.
 - Real rollback verification: a controlled one-time activation failure after the source write triggered a new recovery lock, original-source restoration, unlock, real reactivation, original-hash verification, and `ROLLED_BACK`; no residual lock or matching inactive object remained.

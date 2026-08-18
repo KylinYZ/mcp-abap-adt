@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Rebrand the fork's release identity for npm publication: scoped package name `@kylinyz/mcp-abap-abap-adt-api`, repository/homepage/issues pointing to `KylinYZ/mcp-abap-adt`, and registry id `io.github.kylinyz/mcp-abap-abap-adt-api`. The upstream author is credited in `contributors`; MIT attribution in `LICENSE` and `third-party/abap-adt-api/BASELINE.md` is unchanged.
+
 ## [0.4.0] - 2026-08-17
 - Add bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource` read tools.
 - Add DEV-only `development-workbench`, `business-readonly`, and `operations-readonly` task profiles while preserving broad compatibility profiles.

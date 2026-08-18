@@ -6,9 +6,9 @@
 
 ## 项目说明
 
-`mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
+`@kylinyz/mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务，是 [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) 的修改版分支，将以独立的 npm 作用域名发布。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
 
-> **分发状态（2026-08-17）：** 当前源码版本为 `0.4.0`，**尚未发布到 npm 或 MCP Registry**。必须在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。`package.json` 和 `server.json` 中的 npm/Registry 字段只是未来可能发布时使用的元数据，不代表线上已经存在可安装包。
+> **分发状态（2026-08-17）：** 本分支已准备好以 `@kylinyz/mcp-abap-abap-adt-api` 名称发布到 npm，但**尚未正式发布**。发布前仍需在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。原作者的 `mcp-abap-abap-adt-api`（0.1.1）是独立的旧版本。
 
 完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
 
@@ -28,7 +28,7 @@
 | `business-readonly` | 17 | 先取 schema、再做有界业务数据读取 | 业务数据 Skill |
 | `operations-readonly` | 40 | 运行、版本、trace 和已有调试现场证据 | 运维 Skill |
 
-`0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。成员级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。
+`0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。成员级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。大型源码可使用可选 `startLine`/`maxLines` 分页，每页都返回完整源码哈希和行覆盖信息，调用方必须拒绝缺页或哈希漂移。
 
 内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 
@@ -108,7 +108,7 @@
 
 默认 `SAP_MCP_TOOL_PROFILE=safe`，只暴露七个高层工具：
 
-- `inspectAbapObject`：读取一个精确且在白名单内的 `PROGRAM`、`INCLUDE`、`CLASS` 或 `FUNCTION_MODULE` 对象，返回完整源码、对象元数据和源码哈希。
+- `inspectAbapObject`：读取一个精确且在白名单内的 `PROGRAM`、`INCLUDE`、`CLASS` 或 `FUNCTION_MODULE` 对象，默认返回完整源码、对象元数据和源码哈希；可用 `startLine`/`maxLines` 分页并保留原始源码字节。
 - `previewAbapChange`：校验目标对象、传输请求、完整目标源码和语法，返回完整 diff 和短时变更计划；不修改 SAP。
 - `applyAbapChange`：在用户明确确认后执行先前生成的计划，包含源码漂移检查、锁定、写入、语法检查、解锁、激活、复读校验和失败恢复。
 - `getAbapChangeStatus`：读取本地计划状态和阶段结果，不返回完整源码、凭据、Cookie 或锁句柄。
@@ -118,7 +118,7 @@
 
 ### 标准操作流程
 
-1. 调用 `inspectAbapObject`，读取精确对象的完整当前源码，并以它作为编辑基线。
+1. 调用 `inspectAbapObject`，读取精确对象的完整当前源码，并以它作为编辑基线。大型源码必须分页检查相同 `sourceHash`、连续行范围、累计 `totalLines` 和末页 `hasMore=false`。
 2. 调用 `previewAbapChange`，传入完整替换源码和一个已有且未释放的传输请求。
 3. 向用户展示工具内容中服务器直接返回的完整 Markdown diff。预览不会锁定、写入或激活对象。
 4. 直接使用返回的 `changePlanId` 调用 `applyAbapChange`，不要再要求一次聊天文字确认。唯一确认由服务器通过 MCP 客户端获取，不能由模型自行声明。
@@ -154,7 +154,7 @@
 
 截至 2026-08-14，当前自动化基线已经覆盖内置 ADT 客户端、全部注册工具、Profile/角色策略和受控工作流：
 
-- **自动化验证**：61 个 Jest 测试套件、421 项测试全部通过，覆盖内置客户端表面、四个高层只读工具、受控质量检查、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
+- **自动化验证**：61 个 Jest 测试套件、430 项测试全部通过，覆盖内置客户端表面、四个高层只读工具、受控质量检查、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
 - **动态目录验证**：2026-08-17 使用真实 `dist/index.js` 完成 35 个 profile/role runtime session 和 14 个隐藏工具直调拒绝检查，未调用 SAP。
 - **真实 SAP 只读验证**：四个新高层读取已在配置的 DEV/QAS/PRD 系统通过；证据未保存业务行、dump 文本或源码。
 - **仍未验证**：真实 ATC/ABAP Unit 执行、SAP 写入和安全调试控制。
@@ -179,7 +179,7 @@
 
 ## 从源码安装
 
-当前修改版只支持源码安装，不支持通过 `npx`、npm 包或 MCP Marketplace 安装。
+发布前（或需要本地改动）时使用源码安装：
 
 ```cmd
 cd 包含当前修改的源码目录\mcp-abap-abap-adt-api
@@ -189,7 +189,7 @@ npm run build
 npm run start
 ```
 
-必须使用确实包含当前本地改动的源码副本。当前改动尚未通过 npm、MCP Registry 或正式 Release 分发，不能假定重新克隆上游仓库即可得到本文描述的版本。
+必须使用确实包含当前本地改动的源码副本。本分支以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm 之前，不能假定重新克隆上游仓库即可得到本文描述的版本。
 
 编辑 `.env`：
 
@@ -294,7 +294,7 @@ DDIC、包迁移或 RAP 写入必须使用 development 的受控 preview/apply �
 
 ## 常见问题
 
-- **通过 `npx` 或 Marketplace 找不到包**：当前修改版尚未发布。请从源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
+- **通过 `npx` 或 Marketplace 找不到包**：本分支尚未正式发布到 npm（发布名为 `@kylinyz/mcp-abap-abap-adt-api`）。发布前请从源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
 - **SAP 连接失败**：检查 URL、用户、密码、客户端、ADT 权限、网络连通性以及 `SICF` 中的 `/sap/bc/adt` 服务。
 - **自签名证书错误**：仅在开发环境设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`。
 - **`CONFIRMATION_UNSUPPORTED`**：改用支持 MCP form elicitation 的客户端，或明确启用安全性较低的文字确认降级。

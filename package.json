@@ -1,13 +1,15 @@
 {
-  "name": "mcp-abap-abap-adt-api",
+  "name": "@kylinyz/mcp-abap-abap-adt-api",
   "version": "0.4.0",
-  "mcpName": "io.github.mario-andreschak/mcp-abap-abap-adt-api",
+  "mcpName": "io.github.kylinyz/mcp-abap-abap-adt-api",
   "main": "dist/index.js",
   "bin": {
     "mcp-abap-abap-adt-api": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/__tests__",
+    "third-party"
   ],
   "scripts": {
     "test": "jest",
@@ -30,7 +32,10 @@
     "mcp",
     "model-context-protocol"
   ],
-  "author": "mario-andreschak",
+  "author": "KylinYZ",
+  "contributors": [
+    "mario-andreschak (original upstream mcp-abap-abap-adt-api)"
+  ],
   "description": "MCP server with an embedded ABAP ADT client, guarded development workflows, and read-only diagnostics for SAP systems",
   "license": "MIT",
   "publishConfig": {
@@ -38,11 +43,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mario-andreschak/mcp-abap-abap-adt-api.git"
+    "url": "git+https://github.com/KylinYZ/mcp-abap-adt.git"
   },
-  "homepage": "https://github.com/mario-andreschak/mcp-abap-abap-adt-api#readme",
+  "homepage": "https://github.com/KylinYZ/mcp-abap-adt#readme",
   "bugs": {
-    "url": "https://github.com/mario-andreschak/mcp-abap-abap-adt-api/issues"
+    "url": "https://github.com/KylinYZ/mcp-abap-adt/issues"
   },
   "engines": {
     "node": ">=18"

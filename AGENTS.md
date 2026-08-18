@@ -6,9 +6,9 @@
 
 ## 当前分发状态
 
-- 当前修改版尚未发布到 npm 或 MCP Registry，只支持源码安装。
-- 使用本地 `node` 启动 `dist/index.js`；不要给出 `npx mcp-abap-abap-adt-api` 或 Marketplace 安装指引。
-- `package.json` 与 `server.json` 中的 npm/Registry 字段是未来发布元数据，不代表已发布。
+- 本分支准备以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm（尚未正式发布）；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
+- 正式发布前使用本地 `node` 启动 `dist/index.js`；不要给出 `npx mcp-abap-abap-adt-api`（那是原作者的旧包）或 Marketplace 安装指引。
+- `package.json` 与 `server.json` 中的 npm/Registry 字段是发布元数据，不代表已发布。
 
 ## 开发与验证
 
@@ -19,7 +19,7 @@ npm run build
 git diff --check
 ```
 
-当前 runtime catalog 基线为 `safe=7`、`development=118`、`diagnostic-readonly=98`、`legacy-full=161`、`development-workbench=81`、`business-readonly=17`、`operations-readonly=40`；自动化基线为 61 个测试套件、421 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
+当前 runtime catalog 基线为 `safe=7`、`development=118`、`diagnostic-readonly=98`、`legacy-full=161`、`development-workbench=81`、`business-readonly=17`、`operations-readonly=40`；自动化基线为 61 个测试套件、430 项测试。修改源码、`.env` 或构建输出后，必须重启 MCP 客户端。
 
 ## 目录与约定
 
