@@ -1,6 +1,6 @@
 # SAP 激活后源码规范化复核设计
 
-> 状态：代码与自动化验证已完成；换行规范化成功路径的真实 SAP DEV 复测仍待执行。当前修改版尚未发布到 npm 或 MCP Registry。
+> 状态：代码与自动化验证已完成；换行规范化成功路径已完成真实 SAP DEV 复测。该能力已随 npm 包 `@kylinyz/mcp-abap-abap-adt-api@0.4.0` 发布；MCP Registry 状态另行核验。
 
 ## 1. 背景
 

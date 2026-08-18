@@ -6,3 +6,4 @@ coverage
 package-lock.json
 *.code-workspace
 .codegraph/
+.claude/settings.local.json

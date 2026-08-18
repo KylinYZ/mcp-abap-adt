@@ -6,9 +6,9 @@
 
 ## 当前分发状态
 
-- 本分支准备以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm（尚未正式发布）；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
-- 正式发布前使用本地 `node` 启动 `dist/index.js`；不要给出 `npx mcp-abap-abap-adt-api`（那是原作者的旧包）或 Marketplace 安装指引。
-- `package.json` 与 `server.json` 中的 npm/Registry 字段是发布元数据，不代表已发布。
+- `0.4.0` 已于 2026-08-18 以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
+- 常规安装使用 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`；本地开发、契约验证或未发布修改仍使用 `node` 启动当前源码构建的 `dist/index.js`。
+- 不要给出不带作用域的 `npx mcp-abap-abap-adt-api`，那会解析到原作者的独立旧包；Marketplace/MCP Registry 状态仍需单独核验。
 
 ## 开发与验证
 

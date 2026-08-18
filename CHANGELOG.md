@@ -2,15 +2,15 @@
 
 ## [Unreleased]
 
-- Rebrand the fork's release identity for npm publication: scoped package name `@kylinyz/mcp-abap-abap-adt-api`, repository/homepage/issues pointing to `KylinYZ/mcp-abap-adt`, and registry id `io.github.kylinyz/mcp-abap-abap-adt-api`. The upstream author is credited in `contributors`; MIT attribution in `LICENSE` and `third-party/abap-adt-api/BASELINE.md` is unchanged.
-
-## [0.4.0] - 2026-08-17
+## [0.4.0] - 2026-08-18
+- Publish the fork to npm as `@kylinyz/mcp-abap-abap-adt-api`, with repository/homepage/issues pointing to `KylinYZ/mcp-abap-adt` and registry id `io.github.kylinyz/mcp-abap-abap-adt-api`. The upstream author remains credited and MIT attribution is unchanged.
 - Add bounded `readRuntimeDumps`, schema-first `describeClassicTable`, partial-capability `inspectSapSystem`, and focused `getAbapMemberSource` read tools.
+- Add bounded, byte-preserving `inspectAbapObject` source pagination with stable full-source hashes and line-coverage metadata.
 - Add DEV-only `development-workbench`, `business-readonly`, and `operations-readonly` task profiles while preserving broad compatibility profiles.
 - Add controlled `previewQualityCheck`, `runQualityCheck`, and `getQualityCheckStatus` with explicit ATC variants, one native confirmation, and no replay after `UNKNOWN_OUTCOME`.
 - Add uniform MCP annotations and `_meta` operation/approval metadata to every runtime tool, plus catalog integrity tests and dynamic runtime validation.
 - Keep QAS, PRD, missing, and unknown roles local/read-only, including direct-dispatch rejection of hidden mutation tools.
-- This modified version remains source-only and has not been published to npm or the MCP Registry.
+- npm publication is verified for `0.4.0`; MCP Registry and Marketplace availability remain separate.
 
 ## [0.3.0] - 2026-08-14
 - Embed the complete `abap-adt-api` 8.4.2 client source with preserved MIT attribution, a stable local import boundary, and cancellable debugger-listener behavior.

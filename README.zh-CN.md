@@ -6,9 +6,9 @@
 
 ## 项目说明
 
-`@kylinyz/mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务，是 [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) 的修改版分支，将以独立的 npm 作用域名发布。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
+`@kylinyz/mcp-abap-abap-adt-api` 是一个连接 MCP 客户端与 SAP ABAP Development Tools（ADT）接口的 MCP 服务，是 [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) 的修改版分支，使用独立的 npm 作用域名发布。完整 ADT 客户端已经内置在 `src/adt/`，安装和运行不再依赖外部 `abap-adt-api` npm 包。内置源码基于上游 `abap-adt-api` 8.4.2 和 MIT License，精确提交、许可证与后续同步方法见 [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md)。
 
-> **分发状态（2026-08-17）：** 本分支已准备好以 `@kylinyz/mcp-abap-abap-adt-api` 名称发布到 npm，但**尚未正式发布**。发布前仍需在本项目源码目录安装依赖并构建，再让 MCP 客户端运行 `dist/index.js` 的绝对路径。原作者的 `mcp-abap-abap-adt-api`（0.1.1）是独立的旧版本。
+> **分发状态（2026-08-18）：** `0.4.0` 已以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm。推荐在 MCP 配置中使用带作用域且固定版本的包名。原作者不带作用域的 `mcp-abap-abap-adt-api`（0.1.1）是独立的旧版本。
 
 完整安装、客户端接入和操作步骤见 [使用指南](docs/使用指南.md)。
 
@@ -177,9 +177,35 @@
 - 用户具有所需 ADT 权限以及目标对象和传输请求的修改权限。
 - Node.js 18 或更高版本以及 npm。可用 `node -v` 和 `npm -v` 检查。
 
-## 从源码安装
+## 从 npm 安装（推荐）
 
-发布前（或需要本地改动）时使用源码安装：
+将 SAP 凭据保存在版本库之外的私有环境文件中，并让每个 MCP 进程通过绝对路径 `SAP_MCP_ENV_FILE` 选择对应配置。一个进程的 Profile 在启动时固定，多 Profile 或多 SAP 环境必须分别配置进程别名。
+
+```cmd
+npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0
+```
+
+MCP 配置示例：
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-abap-adt-api": {
+      "command": "npx",
+      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.4.0"],
+      "env": {
+        "SAP_MCP_ENV_FILE": "D:\\sap-mcp-config\\sap-dev.env"
+      }
+    }
+  }
+}
+```
+
+修改环境文件或 MCP 配置后，需要重启 MCP 客户端。
+
+## 从源码安装（本地开发）
+
+开发、验证本地改动或测试尚未发布的构建时使用源码安装：
 
 ```cmd
 cd 包含当前修改的源码目录\mcp-abap-abap-adt-api
@@ -189,7 +215,7 @@ npm run build
 npm run start
 ```
 
-必须使用确实包含当前本地改动的源码副本。本分支以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm 之前，不能假定重新克隆上游仓库即可得到本文描述的版本。
+必须使用本分支且确实包含目标修改的源码副本；不能假定重新克隆上游仓库即可得到本文描述的版本。
 
 编辑 `.env`：
 
@@ -294,7 +320,7 @@ DDIC、包迁移或 RAP 写入必须使用 development 的受控 preview/apply �
 
 ## 常见问题
 
-- **通过 `npx` 或 Marketplace 找不到包**：本分支尚未正式发布到 npm（发布名为 `@kylinyz/mcp-abap-abap-adt-api`）。发布前请从源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
+- **npm 包解析失败**：使用带作用域且固定版本的 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`。不带作用域的包是上游独立旧版本；无法访问 npm 时，可从本分支源码构建，并使用 `node` 加 `dist/index.js` 绝对路径启动。
 - **SAP 连接失败**：检查 URL、用户、密码、客户端、ADT 权限、网络连通性以及 `SICF` 中的 `/sap/bc/adt` 服务。
 - **自签名证书错误**：仅在开发环境设置 `NODE_TLS_REJECT_UNAUTHORIZED=0`。
 - **`CONFIRMATION_UNSUPPORTED`**：改用支持 MCP form elicitation 的客户端，或明确启用安全性较低的文字确认降级。

@@ -8,7 +8,7 @@ DISCLAIMER: This server is still experimental. The default `safe` profile adds a
 
 The MCP-Server `@kylinyz/mcp-abap-abap-adt-api` connects MCP clients to SAP ABAP Development Tools (ADT). It is a modified fork of [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) published under a distinct scoped npm name. The complete ADT client is embedded under `src/adt/`; installation and runtime do not depend on the external `abap-adt-api` npm package. The embedded baseline is derived from upstream `abap-adt-api` 8.4.2 under the MIT License, with exact revisions and update instructions recorded in [`third-party/abap-adt-api/BASELINE.md`](third-party/abap-adt-api/BASELINE.md).
 
-> **Distribution status (2026-08-17):** this fork is prepared for publication to npm as `@kylinyz/mcp-abap-abap-adt-api` and is **not yet live**. Until it is published, install dependencies and build it from this source checkout, then configure your MCP client to run the absolute path to `dist/index.js`. The upstream package `mcp-abap-abap-adt-api` (0.1.1) by mario-andreschak is a separate, older release.
+> **Distribution status (2026-08-18):** version `0.4.0` is published on npm as `@kylinyz/mcp-abap-abap-adt-api`. Use the scoped package name and pin the version for reproducible MCP configuration. The unscoped upstream package `mcp-abap-abap-adt-api` (0.1.1) by mario-andreschak is a separate, older release.
 
 For a complete Windows setup and operating walkthrough, see the [Chinese Usage Guide](docs/使用指南.md).
 
@@ -169,13 +169,39 @@ This does not claim exhaustive testing of every SAP release, authorization model
 - **An SAP ABAP System** reachable via ADT (ABAP Development Tools). You'll need the system URL, a username and password, and the client number. Ensure the `/sap/bc/adt` service is active in transaction `SICF` (your basis administrator can help).
 - **Node.js and npm** — download the LTS version from [nodejs.org](https://nodejs.org/). Verify with `node -v` and `npm -v`.
 
-## Install from source
+## Install from npm (recommended)
 
-This is currently the only supported installation path for the modified version.
+Keep credentials in a private environment file and point `SAP_MCP_ENV_FILE` at its absolute path. A single server process has one fixed tool profile, so multi-profile or multi-system setups must start one process per alias.
+
+```cmd
+npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0
+```
+
+Example MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-abap-adt-api": {
+      "command": "npx",
+      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.4.0"],
+      "env": {
+        "SAP_MCP_ENV_FILE": "C:\\path\\to\\sap-dev.env"
+      }
+    }
+  }
+}
+```
+
+Restart the MCP client after changing the environment file or MCP configuration.
+
+## Install from source (local development)
+
+Use a source checkout when developing, validating a local change, or testing an unreleased build.
 
 1. **Obtain the Current Source Checkout**
 
-   Use a local checkout or archive that actually contains the current modified files. The changes described here are not yet available from npm, the MCP Registry, or a published release. Do not assume a fresh clone of the upstream repository includes this local work.
+   Use this fork's checkout or an archive that contains the intended revision. Do not assume a fresh clone of the upstream repository contains this fork's changes.
 
    ```cmd
    cd PATH_TO_CURRENT_SOURCE\mcp-abap-abap-adt-api
@@ -325,7 +351,7 @@ When working with ABAP objects, you may encounter errors related to unknown fiel
 
 ## Troubleshooting
 
-*   **Package not found through `npx` or a marketplace:** the modified version is not published. Build from source and configure the client with `node` plus the absolute path to `dist/index.js`.
+*   **Package resolution errors:** use the scoped, pinned command `npx -y @kylinyz/mcp-abap-abap-adt-api@0.4.0`. The unscoped package is a separate upstream release. If npm access is unavailable, build this fork from source and configure the client with `node` plus the absolute path to `dist/index.js`.
 *   **SAP connection errors:** verify your credentials (`SAP_URL`, `SAP_USER`, `SAP_PASSWORD`, `SAP_CLIENT`), confirm the system is reachable, that your user has ADT authorizations, and that `/sap/bc/adt` is active in `SICF`.
 *   **TLS / self-signed certificate errors:** for development only, set `NODE_TLS_REJECT_UNAUTHORIZED=0` (env var or in the client `env` block).
 *   **`CONFIRMATION_UNSUPPORTED`:** use a client that supports MCP form elicitation, or explicitly enable the weaker text fallback.
