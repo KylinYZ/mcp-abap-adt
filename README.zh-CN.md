@@ -93,12 +93,19 @@
 | `SAP_MCP_DEBUG_AUTH_TTL_SECONDS` | `900` | 60–3600 | 绑定 Attach 上下文的会话授权有效期。 |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | 回滚失败后恢复源码保留时间。 |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`、`warn`、`info`、`debug` | 普通 stderr 日志最低级别。 |
+| `SAP_MCP_SESSION_RECOVERY` | `true` | `true`/`false` | stateful 会话失效时恢复并最多重放一次只读调用；写操作绝不重放。 |
+| `SAP_MCP_STATELESS_READS` | `false` | `true`/`false` | 将高层只读和 SM21 读请求切到独立 stateless 客户端；先在 DEV 验证。 |
+| `SAP_MCP_CREDENTIAL_COMMAND` | 未设置 | 绝对路径 | 外部凭据命令；接收 `SAP_MCP_CREDENTIAL_TARGET` 一个参数并输出一行密码。 |
+| `SAP_MCP_CREDENTIAL_TARGET` | 未设置 | 非空 | 传给外部凭据命令的目标名。 |
+| `SAP_MCP_REQUIRE_EXTERNAL_CREDENTIAL` | `false` | `true`/`false` | 开启后拒绝旧的 `SAP_PASSWORD` 回退。 |
 | `SAP_MCP_SM21_TIMEZONE` | `UTC` | IANA 时区名称 | 将工具 ISO 时间转换为 SAP 时间戳。 |
 | `SAP_MCP_SM21_MAX_WINDOW_HOURS` | `24` | 1–24 | SM21 时间窗硬上限。 |
 | `SAP_MCP_SM21_DEFAULT_PAGE_SIZE` | `100` | 1–500 | SM21 默认返回行数。 |
 | `SAP_MCP_SM21_MAX_PAGE_SIZE` | `500` | 1–500 | SM21 单页行数硬上限。 |
 
 配置越界时服务启动失败。显式查询或搜索数量超过上限会在访问 SAP 前拒绝，不静默截断，也不改写 SQL。`getObjectSource` 分页是在首次完整读取 SAP 后使用受限的进程内会话缓存切分，不是 SAP 服务端分页。写请求超时代表远端结果未知，必须先检查对象或变更计划状态，再决定是否重试，禁止盲目重复写入。
+
+stateful ADT HTTP 会话与 SAP GUI 登录彼此独立。只读调用收到明确的会话失效响应时，服务会清理本地 Cookie/CSRF，互斥重登并最多重放该只读调用一次；写入、锁、调试、质量、传输和激活操作只返回“远端结果未知”，不会自动重放。生产建议使用外部凭据命令并移除 `SAP_PASSWORD`；兼容回退只输出一次脱敏警告。
 
 在开放该工具的 Profile 中，`healthcheck` 只证明本地 MCP 进程可响应，并返回非敏感的已配置 host、client、profile 和 role；它不访问 SAP，且明确返回 `sapConnectionVerified: false`。使用 `inspectSapSystem` 分别报告 configured identity 和独立探测的 SAP ADT capability；允许 partial success，不从配置身份推断产品版本或具体权限。七工具 `safe` profile 不开放这两个通用诊断工具。
 

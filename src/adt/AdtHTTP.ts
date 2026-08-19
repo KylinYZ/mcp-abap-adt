@@ -65,6 +65,13 @@ export interface ClientOptions {
   signal?: AbortSignal
   auth?: BasicCredentials
   keepAlive?: boolean
+  sessionEventCallback?: (event: SessionEvent) => void
+}
+
+export type SessionEvent = {
+  type: "keepalive-success" | "keepalive-failure" | "reconnect" | "logout" | "drop-session"
+  status?: number
+  errorType?: string
 }
 
 export interface RequestOptions extends ClientOptions {
@@ -151,6 +158,7 @@ export class AdtHTTP {
   isClone: boolean = false
   private currentSession = session_types.stateless
   private _stateful: session_types = session_types.stateless
+  private configuredSession = session_types.stateless
   private needKeepalive = false
   readonly keepAlive?: NodeJS.Timer
   private commonHeaders: Record<string, string>
@@ -160,6 +168,7 @@ export class AdtHTTP {
   private httpclient: HttpClient
   private debugCallback?: LogCallback
   private loginPromise?: Promise<HttpClientResponse>
+  private sessionEventCallback?: (event: SessionEvent) => void
   get isStateful(): boolean {
     return (
       this.stateful === session_types.stateful ||
@@ -171,6 +180,11 @@ export class AdtHTTP {
     return this._stateful
   }
   set stateful(value: session_types) {
+    this._stateful = value
+    this.configuredSession = value
+    if (value !== session_types.keep) this.currentSession = value
+  }
+  private applySessionMode(value: session_types) {
     this._stateful = value
     if (value !== session_types.keep) this.currentSession = value
   }
@@ -211,6 +225,7 @@ export class AdtHTTP {
       ? new AxiosHttpClient(baseURLOrClient, config)
       : baseURLOrClient
     this.debugCallback = config?.debugCallback
+    this.sessionEventCallback = config?.sessionEventCallback
     if (config?.keepAlive)
       this.keepAlive = setInterval(() => this.keep_session(), 120000)
   }
@@ -239,24 +254,39 @@ export class AdtHTTP {
       this.loginPromise = undefined
     }
   }
+  async reconnect(): Promise<void> {
+    this.applySessionMode(this.configuredSession)
+    this.resetLocalSessionState(true)
+    await this.login()
+    this.notifySessionEvent({ type: "reconnect" })
+  }
   private cookie = new Map<string, string>()
   ascookies(): string {
     return [...this.cookie.values()].join("; ")
   }
   async logout(): Promise<void> {
-    this.stateful = session_types.stateless
-    await this._request("/sap/public/bc/icf/logoff", {})
-    // prevent autologin
-    this.auth = undefined
-    this.bearer = undefined
-    // new cookie jar
-    this.cookie.clear()
-    // clear token
-    this.csrfToken = FETCH_CSRF_TOKEN
+    const previousMode = this.stateful
+    this.applySessionMode(session_types.stateless)
+    try {
+      await this._request("/sap/public/bc/icf/logoff", {})
+    } finally {
+      // Keep configured credentials available for an explicit future login;
+      // local session state must be cleared even when SAP logoff fails.
+      this.resetLocalSessionState(true)
+      this.applySessionMode(previousMode)
+      this.notifySessionEvent({ type: "logout" })
+    }
   }
   async dropSession(): Promise<void> {
-    this.stateful = session_types.stateless
-    await this._request("/sap/bc/adt/compatibility/graph", {})
+    const previousMode = this.stateful
+    this.applySessionMode(session_types.stateless)
+    try {
+      await this._request("/sap/bc/adt/compatibility/graph", {})
+    } finally {
+      this.resetLocalSessionState(false)
+      this.applySessionMode(previousMode)
+      this.notifySessionEvent({ type: "drop-session" })
+    }
   }
   async request(
     url: string,
@@ -285,9 +315,31 @@ export class AdtHTTP {
     }
   }
   private keep_session = async () => {
-    if (this.needKeepalive && this.loggedin)
-      await this._request("/sap/bc/adt/compatibility/graph", {}).catch(() => {})
+    if (this.needKeepalive && this.loggedin) {
+      try {
+        await this._request("/sap/bc/adt/compatibility/graph", {})
+        this.notifySessionEvent({ type: "keepalive-success" })
+      } catch (error) {
+        const status = typeof (error as { status?: unknown })?.status === "number"
+          ? (error as { status: number }).status
+          : undefined
+        this.notifySessionEvent({
+          type: "keepalive-failure",
+          status,
+          errorType: isLoginError(error as AdtException) ? "session-expired" : "request-failed"
+        })
+      }
+    }
     this.needKeepalive = true
+  }
+  private resetLocalSessionState(clearBearer: boolean) {
+    this.cookie.clear()
+    this.csrfToken = FETCH_CSRF_TOKEN
+    this.needKeepalive = false
+    if (clearBearer) this.bearer = undefined
+  }
+  private notifySessionEvent(event: SessionEvent) {
+    this.sessionEventCallback?.(event)
   }
   private updateCookies(response: HttpClientResponse) {
     if (runningInNode) {

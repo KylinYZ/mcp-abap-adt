@@ -93,12 +93,19 @@ Central argument and response limits protect every tool in all seven profiles. T
 | `SAP_MCP_DEBUG_AUTH_TTL_SECONDS` | `900` | 60–3600 | Lifetime of one Attach-bound debug authorization. |
 | `SAP_MCP_ROLLBACK_FAILED_RETENTION_SECONDS` | `86400` | 3600–604800 | Recovery-source retention after rollback failure. |
 | `SAP_MCP_LOG_LEVEL` | `warn` | `error`, `warn`, `info`, `debug` | Minimum ordinary stderr log level. |
+| `SAP_MCP_SESSION_RECOVERY` | `true` | `true`/`false` | Recover an expired stateful session and replay one read-only call. Mutations are never replayed. |
+| `SAP_MCP_STATELESS_READS` | `false` | `true`/`false` | Route high-level and SM21 reads through a separate stateless client. Enable after DEV validation. |
+| `SAP_MCP_CREDENTIAL_COMMAND` | unset | absolute path | External credential helper; receives `SAP_MCP_CREDENTIAL_TARGET` as one argv value and returns one password line. |
+| `SAP_MCP_CREDENTIAL_TARGET` | unset | non-empty | Target name passed to the external credential helper. |
+| `SAP_MCP_REQUIRE_EXTERNAL_CREDENTIAL` | `false` | `true`/`false` | Refuse the legacy `SAP_PASSWORD` fallback when enabled. |
 | `SAP_MCP_SM21_TIMEZONE` | `UTC` | IANA time-zone name | Converts tool ISO timestamps to SAP timestamps. |
 | `SAP_MCP_SM21_MAX_WINDOW_HOURS` | `24` | 1–24 | SM21 time-window hard limit. |
 | `SAP_MCP_SM21_DEFAULT_PAGE_SIZE` | `100` | 1–500 | Default SM21 result rows. |
 | `SAP_MCP_SM21_MAX_PAGE_SIZE` | `500` | 1–500 | SM21 result-row hard limit. |
 
 Invalid values fail startup. Explicit query or search limits above the configured maximum are rejected before SAP is called; results are never silently truncated and SQL is never rewritten. `getObjectSource` pagination uses a bounded in-process session cache after the first full SAP read, not SAP server-side pagination. A write timeout means the remote result is unknown: inspect the object or change-plan state before deciding whether to retry, and never blindly replay a mutation.
+
+The stateful ADT session is independent from SAP GUI. When a read-only call receives a confirmed session-expiry response, the server clears local cookies/CSRF state, performs one mutually-exclusive login, and replays that read once. A write, lock, debug, quality, transport, or activation call returns an unknown-remote-result error instead of replaying. Production deployments should use the external credential helper and remove `SAP_PASSWORD`; the compatibility fallback emits one redacted warning.
 
 In every profile that exposes it, `healthcheck` proves only that the local MCP process is responsive and reports its configured non-secret host, client, profile, and role. It does not contact SAP and returns `sapConnectionVerified: false`. Use `inspectSapSystem` to report configured identity separately from independently probed ADT capabilities and preserve partial success; do not infer a product release or authorization from configuration alone. The seven-tool `safe` profile does not expose either general diagnostic tool.
 

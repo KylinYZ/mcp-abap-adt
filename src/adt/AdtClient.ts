@@ -471,9 +471,13 @@ export class ADTClient {
     if (!this.h.username) this.h = this.createHttp()
     return this.h.login()
   }
+  public reconnect() {
+    return this.h.reconnect()
+  }
   /**
    * Logs out current user, clearing cookies
-   * NOTE: you won't be able to login again with this client
+   * The local session is cleared while the configured credentials remain
+   * available for an explicit future login.
    *
    * @memberof ADTClient
    */

@@ -3,7 +3,7 @@ import { ADTClient } from '../adt/index.js';
 const expectedSurface = require('./fixtures/adt-client-surface.json') as string[];
 
 describe('embedded ADTClient public surface', () => {
-  it('keeps the reviewed 145 instance callables', () => {
+  it('keeps the reviewed instance callables', () => {
     const descriptors = Object.getOwnPropertyDescriptors(ADTClient.prototype) as Record<string, PropertyDescriptor>;
     const prototypeMethods = Object.entries(descriptors)
       .filter(([name, descriptor]) => name !== 'constructor'
@@ -16,7 +16,7 @@ describe('embedded ADTClient public surface', () => {
         && typeof (client as unknown as Record<string, unknown>)[name] === 'function');
 
     expect([...prototypeMethods, ...callableProperties].sort()).toEqual(expectedSurface);
-    expect(expectedSurface).toHaveLength(145);
+    expect(expectedSurface).toHaveLength(146);
   });
 
   it('keeps the four reviewed static helpers', () => {

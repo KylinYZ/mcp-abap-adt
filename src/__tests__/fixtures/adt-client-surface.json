@@ -95,6 +95,7 @@
   "rapGenPublishService",
   "rapGenValidateContent",
   "rapGenValidateInitial",
+  "reconnect",
   "reentranceTicket",
   "remoteRepoInfo",
   "renameEvaluate",

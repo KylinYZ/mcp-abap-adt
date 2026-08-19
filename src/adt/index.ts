@@ -2,6 +2,7 @@ export {
   AdtHTTP,
   session_types,
   ClientOptions,
+  SessionEvent,
   HttpResponse,
   HttpClient,
   HttpClientException,

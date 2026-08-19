@@ -175,6 +175,30 @@ export const isRequestCancelled = (e: unknown): boolean =>
 export const isLoginError = (adtErr: AdtException) =>
   (isHttpError(adtErr) && adtErr.status === 401) || isCsrfError(adtErr)
 
+/**
+ * Identifies an expired ADT session without treating ordinary HTTP failures
+ * as authentication failures. SAP may return a 400 XML error with the
+ * timeout text instead of the older CSRF response shape.
+ */
+export const isSessionExpiredError = (error: unknown): boolean => {
+  if (!isAdtException(error)) return false
+  if (isLoginError(error)) return true
+  if (isAdtError(error) && error.err === 401) return true
+  if (isHttpError(error) && error.status === 400) {
+    return /session\s+(timed\s*out|timeout)/i.test(error.message)
+  }
+  if (isAdtError(error) && error.err === 400) {
+    const responseText = [
+      error.message,
+      error.localizedMessage,
+      error.response?.statusText,
+      error.response?.body
+    ].filter(Boolean).join(" ")
+    return /session\s+(timed\s*out|timeout)/i.test(responseText)
+  }
+  return false
+}
+
 const simpleError = (response: HttpClientResponse) =>
   adtException(
     `Error ${response.status}:${response.statusText}`,

@@ -76,6 +76,9 @@ import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
 import { ClassicTableInspector } from './read/ClassicTableInspector.js';
 import { SystemInspector } from './read/SystemInspector.js';
 import { AbapMemberSourceReader } from './read/AbapMemberSourceReader.js';
+import { SessionSupervisor } from './lib/SessionSupervisor.js';
+import { sessionResilienceConfigFromEnvironment, type SessionResilienceConfig } from './config/SessionResilienceConfig.js';
+import { resolveSapPassword } from './config/CredentialProvider.js';
 
 const environmentFile = selectEnvironmentFile(
   process.env.SAP_MCP_ENV_FILE,
@@ -89,9 +92,11 @@ if (environmentFile.explicit && environmentLoad.error) {
 
 export class AbapAdtServer extends Server {
   private adtClient: ADTClient;
+  private sessionSupervisor?: SessionSupervisor;
   private safetyPolicy: SafetyPolicy;
   private readonly guardrails: RuntimeGuardrailValues;
   private readonly executionGate: ToolExecutionGate;
+  private readonly sessionResilience: SessionResilienceConfig;
   private toolCatalog: ToolDefinition[] = [];
   private safeAbapHandlers: SafeAbapHandlers;
   private safeDebugHandlers: SafeDebugHandlers;
@@ -126,7 +131,7 @@ export class AbapAdtServer extends Server {
     private rapGeneratorHandlers: RapGeneratorHandlers;
     private sm21Handlers?: Sm21Handlers;
 
-    constructor() {
+  constructor(passwordOverride?: string) {
     super(
       {
         name: "mcp-abap-abap-adt-api",
@@ -140,6 +145,7 @@ export class AbapAdtServer extends Server {
     );
 
     this.guardrails = RuntimeGuardrails.fromEnvironment();
+    this.sessionResilience = sessionResilienceConfigFromEnvironment();
     configureLogLevel(this.guardrails.logLevel);
     this.executionGate = new ToolExecutionGate(this.guardrails.maxConcurrentTools, this.guardrails.maxQueuedTools);
     sourceCache.configure({
@@ -147,7 +153,9 @@ export class AbapAdtServer extends Server {
       maxItemBytes: this.guardrails.sourceCacheMaxItemBytes,
       ttlMs: this.guardrails.sourceCacheTtlMs
     });
-    const missingVars = ['SAP_URL', 'SAP_USER', 'SAP_PASSWORD'].filter(v => !process.env[v]);
+    const sapPassword = passwordOverride || process.env.SAP_PASSWORD;
+    const missingVars = ['SAP_URL', 'SAP_USER'].filter(v => !process.env[v]);
+    if (!sapPassword) missingVars.push('SAP_PASSWORD (or external credential provider)');
     if (missingVars.length > 0) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
@@ -155,12 +163,18 @@ export class AbapAdtServer extends Server {
     this.adtClient = new ADTClient(
       process.env.SAP_URL as string,
       process.env.SAP_USER as string,
-      process.env.SAP_PASSWORD as string,
+      sapPassword as string,
       process.env.SAP_CLIENT as string,
       process.env.SAP_LANGUAGE as string,
-      adtClientOptions(this.guardrails)
+      {
+        ...adtClientOptions(this.guardrails),
+        sessionEventCallback: event => this.sessionSupervisor?.handleEvent(event)
+      }
     );
     this.adtClient.stateful = session_types.stateful
+    this.sessionSupervisor = new SessionSupervisor(this.adtClient, {
+      enabled: this.sessionResilience.sessionRecovery
+    });
     this.safetyPolicy = SafetyPolicy.fromEnvironment();
     const sm21Config = sm21ConfigFromEnvironment();
     
@@ -191,20 +205,26 @@ export class AbapAdtServer extends Server {
     this.refactorHandlers = new RefactorHandlers(this.adtClient);
     this.revisionHandlers = new RevisionHandlers(this.adtClient);
     this.rapGeneratorHandlers = new RapGeneratorHandlers(this.adtClient);
+    const readClient = this.sessionResilience.statelessReads
+      ? this.adtClient.statelessClone
+      : this.adtClient;
     const objectResolver = new AbapObjectResolver(this.adtClient);
+    const readObjectResolver = this.sessionResilience.statelessReads
+      ? new AbapObjectResolver(readClient)
+      : objectResolver;
     this.highLevelReadHandlers = new HighLevelReadHandlers(
-      new RuntimeDumpReader(this.adtClient),
-      new ClassicTableInspector(this.adtClient),
-      new SystemInspector(this.adtClient, {
+      new RuntimeDumpReader(readClient),
+      new ClassicTableInspector(readClient),
+      new SystemInspector(readClient, {
         host: this.safetyPolicy.systemHost,
         client: this.safetyPolicy.client,
         toolProfile: this.safetyPolicy.toolProfile,
         systemRole: this.safetyPolicy.systemRole
       }),
-      new AbapMemberSourceReader(this.adtClient, objectResolver)
+      new AbapMemberSourceReader(readClient, readObjectResolver)
     );
-    // SM21 reuses the authenticated ADT HTTP client; the custom SICF service remains read-only.
-    this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(this.adtClient.httpClient), sm21Config, this.adtClient);
+    // SM21 is read-only; it follows the stateless read rollout switch when enabled.
+    this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
       this.safetyPolicy.planTtlMs,
       () => Date.now(),
@@ -402,7 +422,12 @@ export class AbapAdtServer extends Server {
         this.guardrails,
         this.executionGate,
         usesSapExecutionGate(request.params.name),
-        limitedArguments => this.dispatchTool(request.params.name, limitedArguments),
+        limitedArguments => this.sessionSupervisor
+          ? this.sessionSupervisor.execute(
+            request.params.name,
+            () => this.dispatchTool(request.params.name, limitedArguments)
+          )
+          : this.dispatchTool(request.params.name, limitedArguments),
         result => this.serializeResult(result),
         error => this.handleError(error)
       );
@@ -737,6 +762,9 @@ export class AbapAdtServer extends Server {
                     toolProfile: this.safetyPolicy.toolProfile,
                     systemRole: this.safetyPolicy.systemRole
                   },
+                  session: this.sessionSupervisor?.snapshot(),
+                  sessionRecovery: this.sessionResilience.sessionRecovery,
+                  statelessReads: this.sessionResilience.statelessReads,
                   timestamp: new Date().toISOString()
                 };
                 break;
@@ -797,7 +825,8 @@ function withCanonicalToolMetadata(tool: ToolDefinition): ToolDefinition {
 }
 
 export async function main(): Promise<void> {
-  const server = new AbapAdtServer();
+  const password = await resolveSapPassword();
+  const server = new AbapAdtServer(password);
   await server.run();
 }
 
