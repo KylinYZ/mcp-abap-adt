@@ -421,7 +421,12 @@ export class ADTClient {
         pw,
         this.client,
         this.language,
-        this.options.options
+        {
+          ...this.options.options,
+          // Only the primary stateful client owns the 120-second keepalive timer.
+          keepAlive: false,
+          sessionEventCallback: undefined
+        }
       )
       this.pClone.pIsClone = true
     }

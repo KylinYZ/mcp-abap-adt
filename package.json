@@ -17,6 +17,7 @@
     "test:coverage": "jest --coverage",
     "test:sap-dev:readonly": "node ./scripts/sap-dev-readonly-smoke.mjs",
     "test:sap-dev:readonly:ttl": "node ./scripts/sap-dev-readonly-smoke.mjs --verify-ttl",
+    "test:sap-dev:session-resilience": "node ./scripts/sap-session-resilience-smoke.mjs",
     "test:adt-timeout": "node ./scripts/adt-timeout-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
     "build": "tsc -p tsconfig.json",

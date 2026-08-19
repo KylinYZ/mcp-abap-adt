@@ -23,7 +23,7 @@ const errorResult = (error: unknown) => {
 
 describe('server guardrail integration helpers', () => {
   it('passes the parsed timeout to ADT client options', () => {
-    expect(adtClientOptions({ ...guardrails, adtTimeoutMs: 12_345 })).toEqual({ timeout: 12_345 });
+    expect(adtClientOptions({ ...guardrails, adtTimeoutMs: 12_345 })).toEqual({ timeout: 12_345, keepAlive: true });
   });
 
   it('applies argument limits before dispatch', async () => {

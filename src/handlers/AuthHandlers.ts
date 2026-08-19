@@ -49,13 +49,14 @@ export class AuthHandlers extends BaseHandler {
   private async handleLogin(args: any) {
     const startTime = performance.now();
     try {
-      const loginResult = await this.adtclient.login();
+      await this.adtclient.login();
       this.trackRequest(startTime, true);
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(loginResult)
+            // ADTClient.login() intentionally returns no payload; keep MCP content valid.
+            text: JSON.stringify({ status: 'Logged in successfully' })
           }
         ]
       };

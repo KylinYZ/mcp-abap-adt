@@ -7,6 +7,15 @@ describe('AuthHandlers source cache lifecycle', () => {
     sourceCache.configure({ maxEntries: 10, maxItemBytes: 1_000, ttlMs: 1_000 });
   });
 
+  it('returns valid MCP content when ADT login has no response payload', async () => {
+    const client = { login: jest.fn().mockResolvedValue(undefined) };
+    const handlers = new AuthHandlers(client as unknown as ADTClient);
+
+    const result = await handlers.handle('login', {});
+
+    expect(result.content[0].text).toBe(JSON.stringify({ status: 'Logged in successfully' }));
+  });
+
   it.each(['logout', 'dropSession'] as const)('clears cached source after successful %s', async toolName => {
     const client = {
       logout: jest.fn().mockResolvedValue(undefined),

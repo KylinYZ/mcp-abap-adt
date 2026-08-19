@@ -226,8 +226,12 @@ export class AdtHTTP {
       : baseURLOrClient
     this.debugCallback = config?.debugCallback
     this.sessionEventCallback = config?.sessionEventCallback
-    if (config?.keepAlive)
-      this.keepAlive = setInterval(() => this.keep_session(), 120000)
+    if (config?.keepAlive) {
+      const timer = setInterval(() => this.keep_session(), 120000)
+      // Keepalive must not prevent graceful process/test shutdown.
+      timer.unref?.()
+      this.keepAlive = timer
+    }
   }
 
   async login(): Promise<any> {

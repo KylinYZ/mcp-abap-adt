@@ -2,8 +2,8 @@ import type { RuntimeGuardrailValues } from '../config/RuntimeGuardrails.js';
 import { ToolExecutionGate } from './ToolExecutionGate.js';
 import { applyToolArgumentLimits, assertToolResponseSize } from './requestLimits.js';
 
-export function adtClientOptions(guardrails: RuntimeGuardrailValues): { timeout: number } {
-  return { timeout: guardrails.adtTimeoutMs };
+export function adtClientOptions(guardrails: RuntimeGuardrailValues): { timeout: number; keepAlive: boolean } {
+  return { timeout: guardrails.adtTimeoutMs, keepAlive: true };
 }
 
 export function usesSapExecutionGate(toolName: string): boolean {
