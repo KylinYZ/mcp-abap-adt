@@ -71,9 +71,10 @@ describe('SessionSupervisor', () => {
     const supervisor = new SessionSupervisor(fakeClient(reconnect));
     await supervisor.execute('logout', async () => undefined);
 
-    await expect(supervisor.execute('searchObject', async () => {
-      throw expired();
-    })).rejects.toBeInstanceOf(AdtErrorException);
+    const operation = jest.fn(async () => { throw expired(); });
+    await expect(supervisor.execute('searchObject', operation)).rejects
+      .toMatchObject<Partial<SafeAbapError>>({ code: 'SESSION_EXPLICITLY_LOGGED_OUT' });
+    expect(operation).not.toHaveBeenCalled();
     expect(reconnect).not.toHaveBeenCalled();
     expect(supervisor.snapshot().state).toBe('explicitly-logged-out');
   });

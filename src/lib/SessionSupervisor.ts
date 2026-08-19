@@ -49,6 +49,7 @@ export class SessionSupervisor {
   }
 
   async execute<T>(toolName: string, operation: () => Promise<T>): Promise<T> {
+    const operationClass = toolOperationClass(toolName);
     if (toolName === 'login') {
       this.explicitlyLoggedOut = false;
       const result = await operation();
@@ -65,7 +66,14 @@ export class SessionSupervisor {
       }
     }
 
-    const operationClass = toolOperationClass(toolName);
+    if (this.explicitlyLoggedOut && operationClass && operationClass !== 'local') {
+      throw new SafeAbapError(
+        'SESSION_EXPLICITLY_LOGGED_OUT',
+        'session',
+        'The SAP session was explicitly logged out; automatic login is disabled.'
+      );
+    }
+
     const observedGeneration = this.generation;
     try {
       const result = await operation();

@@ -30,6 +30,7 @@ export type SafeErrorCode =
   | 'DEBUG_CONTEXT_MISSING'
   | 'DEBUG_STATE_DRIFT'
   | 'REMOTE_RESULT_UNKNOWN'
+  | 'SESSION_EXPLICITLY_LOGGED_OUT'
   | 'LOCK_FAILED'
   | 'WRITE_FAILED'
   | 'ACTIVATION_FAILED'
@@ -67,6 +68,8 @@ function nextStepFor(code: SafeErrorCode): string {
   switch (code) {
     case 'POLICY_DENIED':
       return 'Review the safe-profile allowlists and request an authorized DEV target before retrying.';
+    case 'SESSION_EXPLICITLY_LOGGED_OUT':
+      return 'Call login explicitly before issuing another SAP operation.';
     case 'CONFIRMATION_UNSUPPORTED':
       return 'Use an MCP client with form elicitation support or explicitly enable SAP_MCP_ALLOW_TEXT_CONFIRMATION.';
     case 'OBJECT_RESOLUTION_FAILED':
