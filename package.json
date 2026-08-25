@@ -20,6 +20,8 @@
     "test:sap-dev:session-resilience": "node ./scripts/sap-session-resilience-smoke.mjs",
     "test:adt-timeout": "node ./scripts/adt-timeout-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
+    "check:repository-creation-coverage": "npm run build --silent && node ./scripts/check-repository-creation-coverage.mjs",
+    "audit:eclipse-adt-creation": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/audit-eclipse-adt-creation.ps1",
     "build": "tsc -p tsconfig.json",
     "start": "node ./dist/index.js",
     "dev": "npx @modelcontextprotocol/inspector ./dist/index.js",
