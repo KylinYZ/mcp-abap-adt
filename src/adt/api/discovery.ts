@@ -5,6 +5,8 @@ import { fullParse, parse, xmlArray, xmlNodeAttr } from "../utilities"
 export interface AdtDiscoveryResult {
   collection: Array<{
     href: string
+    acceptedContentTypes?: string[]
+    category?: { term?: string; scheme?: string }
     templateLinks: Array<{
       rel: string
       template: string
@@ -38,6 +40,15 @@ export async function adtDiscovery(h: AdtHTTP) {
         collection: xmlArray(o, "app:collection").map((c: any) => {
           return {
             href: c["@_href"],
+            acceptedContentTypes: xmlArray<string>(c, "app:accept")
+              .map(value => String(value).trim())
+              .filter(Boolean),
+            category: c["atom:category"]
+              ? {
+                  term: c["atom:category"]["@_term"],
+                  scheme: c["atom:category"]["@_scheme"]
+                }
+              : undefined,
             templateLinks: xmlArray(
               c,
               "adtcomp:templateLinks",

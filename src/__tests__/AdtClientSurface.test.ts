@@ -16,7 +16,7 @@ describe('embedded ADTClient public surface', () => {
         && typeof (client as unknown as Record<string, unknown>)[name] === 'function');
 
     expect([...prototypeMethods, ...callableProperties].sort()).toEqual(expectedSurface);
-    expect(expectedSurface).toHaveLength(146);
+    expect(expectedSurface).toHaveLength(202);
   });
 
   it('keeps the four reviewed static helpers', () => {

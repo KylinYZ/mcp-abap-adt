@@ -38,6 +38,93 @@ import {
   CompletionProposal,
   CreatableTypeIds,
   createObject,
+  createControlledPackage,
+  ControlledPackageInput,
+  getControlledPackageConstraints,
+  readControlledPackage,
+  validateControlledPackage,
+  createControlledSourceObjectShell,
+  ControlledSourceObjectInput,
+  validateControlledSourceObject,
+  activateControlledTable,
+  activateControlledTableSettings,
+  ControlledTableShellInput,
+  ControlledTableSettingsDocument,
+  ControlledTableTechnicalSettings,
+  createControlledTableShell,
+  readControlledTable,
+  readControlledTableSettings,
+  readControlledTableSource,
+  runControlledTableCheck,
+  validateControlledTableShell,
+  writeControlledTableSettings,
+  writeControlledTableSource,
+  createControlledServiceBinding,
+  validateControlledServiceBinding,
+  ControlledServiceBindingInput,
+  createControlledStructureShell,
+  validateControlledStructureShell,
+  activateControlledStructure,
+  ControlledStructureShellInput,
+  ControlledStructureCreationResult,
+  activateControlledTypeGroup,
+  ControlledTypeGroupShellInput,
+  ControlledTypeGroupCreationResult,
+  validateControlledTypeGroupShell,
+  createControlledTypeGroupShell,
+  validateControlledTableTypeShell,
+  createControlledTableTypeShell,
+  readControlledTableType,
+  writeControlledTableType,
+  readControlledAbapTypeCapabilities,
+  activateControlledTableType,
+  ControlledTableTypeShellInput,
+  ControlledTableTypeProperties,
+  ControlledTableTypeDocument,
+  ControlledTableTypeCreationResult,
+  ControlledAbapTypeCapability,
+  ControlledLockObjectShellInput,
+  ControlledLockObjectCreationResult,
+  validateControlledLockObjectShell,
+  createControlledLockObjectShell,
+  validateControlledLogicalExternalSchema,
+  readControlledLogicalExternalSchemaSchema,
+  createControlledLogicalExternalSchemaShell,
+  readControlledLogicalExternalSchemaContent,
+  writeControlledLogicalExternalSchemaContent,
+  ControlledLogicalExternalSchemaShellInput,
+  ControlledLogicalExternalSchemaContent,
+  ControlledLogicalExternalSchemaCreationResult,
+  validateControlledNumberRangeObject,
+  readControlledNumberRangeObjectSchema,
+  createControlledNumberRangeObjectShell,
+  readControlledNumberRangeObjectContent,
+  writeControlledNumberRangeObjectContent,
+  ControlledNumberRangeObjectShellInput,
+  ControlledNumberRangeObjectContent,
+  ControlledNumberRangeObjectCreationResult,
+  validateControlledSapObjectType,
+  readControlledSapObjectTypeCreationContract,
+  createControlledSapObjectType,
+  readControlledSapObjectTypeContent,
+  ControlledSapObjectTypeShellInput,
+  ControlledSapObjectTypeCreationContent,
+  ControlledSapObjectTypeCreationResult,
+  validateControlledSapObjectNodeType,
+  readControlledSapObjectNodeTypeCreationContract,
+  createControlledSapObjectNodeType,
+  readControlledSapObjectNodeTypeContent,
+  ControlledSapObjectNodeTypeShellInput,
+  ControlledSapObjectNodeTypeCreationContent,
+  ControlledSapObjectNodeTypeCreationResult,
+  validateControlledChangeDocumentObject,
+  readControlledChangeDocumentObjectContract,
+  createControlledChangeDocumentObjectShell,
+  readControlledChangeDocumentObjectContent,
+  writeControlledChangeDocumentObjectContent,
+  ControlledChangeDocumentObjectShellInput,
+  ControlledChangeDocumentObjectContent,
+  ControlledChangeDocumentObjectCreationResult,
   createRepo,
   createTestInclude,
   createTransport,
@@ -733,6 +820,245 @@ export class ADTClient {
         transport
       })
     } else return createObject(this.h, optionsOrType)
+  }
+
+  public createObjectStateless(options: NewObjectOptions): Promise<void> {
+    // Eclipse ADT creates repository shells on a stateless resource session;
+    // enqueue sessions are reserved for the explicit lock/write lifecycle.
+    return this.statelessClone.createObject(options)
+  }
+
+  public validateControlledPackage(input: ControlledPackageInput, mode: 'basic' | 'full') {
+    return validateControlledPackage(this.h, input, mode)
+  }
+
+  public getControlledPackageConstraints(
+    input: Pick<ControlledPackageInput, 'name' | 'parentPackageName' | 'softwareComponent'>
+  ) {
+    return getControlledPackageConstraints(this.h, input)
+  }
+
+  public readControlledPackage(packageName: string) {
+    return readControlledPackage(this.h, packageName)
+  }
+
+  public createControlledPackage(input: ControlledPackageInput) {
+    return createControlledPackage(this.h, input)
+  }
+
+  public validateControlledSourceObject(input: ControlledSourceObjectInput) {
+    return validateControlledSourceObject(this.h, input)
+  }
+
+  public validateControlledServiceBinding(input: ControlledServiceBindingInput) {
+    return validateControlledServiceBinding(this.h, input)
+  }
+
+  public createControlledServiceBinding(input: ControlledServiceBindingInput) {
+    return createControlledServiceBinding(this.h, input)
+  }
+
+  public createControlledSourceObjectShell(input: ControlledSourceObjectInput) {
+    return createControlledSourceObjectShell(this.h, input)
+  }
+
+  public validateControlledTableShell(input: Pick<ControlledTableShellInput, 'name' | 'description'>) {
+    return validateControlledTableShell(this.h, input)
+  }
+
+  public createControlledTableShell(input: ControlledTableShellInput) {
+    return createControlledTableShell(this.h, input)
+  }
+
+  public readControlledTable(name: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledTable(this.h, name, version)
+  }
+
+  public readControlledTableSource(name: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledTableSource(this.h, name, version)
+  }
+
+  public writeControlledTableSource(name: string, source: string, lockHandle: string, transportRequest: string) {
+    return writeControlledTableSource(this.h, name, source, lockHandle, transportRequest)
+  }
+
+  public runControlledTableCheck(name: string, reporter: 'tableStatusCheck' | 'abapCheckRun', source?: string) {
+    return runControlledTableCheck(this.h, name, reporter, source)
+  }
+
+  public readControlledTableSettings(name: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledTableSettings(this.h, name, version)
+  }
+
+  public writeControlledTableSettings(
+    current: ControlledTableSettingsDocument,
+    settings: ControlledTableTechnicalSettings,
+    lockHandle: string,
+    transportRequest: string
+  ) {
+    return writeControlledTableSettings(this.h, current, settings, lockHandle, transportRequest)
+  }
+
+  public activateControlledTable(name: string) {
+    return activateControlledTable(this.h, name)
+  }
+
+  public activateControlledTableSettings(name: string) {
+    return activateControlledTableSettings(this.h, name)
+  }
+
+  public validateControlledStructureShell(input: Pick<ControlledStructureShellInput, 'name' | 'description'>) {
+    return validateControlledStructureShell(this.h, input)
+  }
+
+  public createControlledStructureShell(input: ControlledStructureShellInput, contentType: string): Promise<ControlledStructureCreationResult> {
+    return createControlledStructureShell(this.h, input, contentType)
+  }
+
+  public activateControlledStructure(name: string) {
+    return activateControlledStructure(this.h, name)
+  }
+
+  public validateControlledTypeGroupShell(input: Pick<ControlledTypeGroupShellInput, 'name' | 'description' | 'packageName'>) {
+    return validateControlledTypeGroupShell(this.h, input)
+  }
+
+  public createControlledTypeGroupShell(input: ControlledTypeGroupShellInput, contentType: string): Promise<ControlledTypeGroupCreationResult> {
+    return createControlledTypeGroupShell(this.h, input, contentType)
+  }
+
+  public activateControlledTypeGroup(name: string) {
+    return activateControlledTypeGroup(this.h, name)
+  }
+
+  public validateControlledTableTypeShell(input: Pick<ControlledTableTypeShellInput, 'name' | 'description'>) {
+    return validateControlledTableTypeShell(this.h, input)
+  }
+
+  public createControlledTableTypeShell(input: ControlledTableTypeShellInput): Promise<ControlledTableTypeCreationResult> {
+    return createControlledTableTypeShell(this.h, input)
+  }
+
+  public readControlledTableType(name: string, version?: 'active' | 'inactive' | 'workingArea'): Promise<ControlledTableTypeDocument> {
+    return readControlledTableType(this.h, name, version)
+  }
+
+  public writeControlledTableType(
+    name: string,
+    current: ControlledTableTypeDocument,
+    properties: ControlledTableTypeProperties,
+    lockHandle: string,
+    transportRequest: string
+  ): Promise<ControlledTableTypeDocument> {
+    return writeControlledTableType(this.h, name, current, properties, lockHandle, transportRequest)
+  }
+
+  public readControlledAbapTypeCapabilities(): Promise<ControlledAbapTypeCapability[]> {
+    return readControlledAbapTypeCapabilities(this.h)
+  }
+
+  public activateControlledTableType(name: string) {
+    return activateControlledTableType(this.h, name)
+  }
+
+  public validateControlledLockObjectShell(input: Pick<ControlledLockObjectShellInput, 'name' | 'description' | 'packageName'>) {
+    return validateControlledLockObjectShell(this.h, input)
+  }
+
+  public createControlledLockObjectShell(input: ControlledLockObjectShellInput, contentType: string): Promise<ControlledLockObjectCreationResult> {
+    return createControlledLockObjectShell(this.h, input, contentType)
+  }
+
+  public validateControlledLogicalExternalSchema(input: Pick<ControlledLogicalExternalSchemaShellInput, 'name' | 'description' | 'packageName'>) {
+    return validateControlledLogicalExternalSchema(this.h, input)
+  }
+
+  public readControlledLogicalExternalSchemaSchema() {
+    return readControlledLogicalExternalSchemaSchema(this.h)
+  }
+
+  public createControlledLogicalExternalSchemaShell(input: ControlledLogicalExternalSchemaShellInput, contentType: string): Promise<ControlledLogicalExternalSchemaCreationResult> {
+    return createControlledLogicalExternalSchemaShell(this.h, input, contentType)
+  }
+
+  public readControlledLogicalExternalSchemaContent(contentUrl: string, contentType: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledLogicalExternalSchemaContent(this.h, contentUrl, contentType, version)
+  }
+
+  public writeControlledLogicalExternalSchemaContent(contentUrl: string, content: ControlledLogicalExternalSchemaContent, contentType: string, lockHandle: string, transportRequest: string) {
+    return writeControlledLogicalExternalSchemaContent(this.h, contentUrl, content, contentType, lockHandle, transportRequest)
+  }
+
+  public validateControlledNumberRangeObject(input: Pick<ControlledNumberRangeObjectShellInput, 'name' | 'description' | 'packageName'>) {
+    return validateControlledNumberRangeObject(this.h, input)
+  }
+
+  public readControlledNumberRangeObjectSchema() {
+    return readControlledNumberRangeObjectSchema(this.h)
+  }
+
+  public createControlledNumberRangeObjectShell(input: ControlledNumberRangeObjectShellInput, contentType: string): Promise<ControlledNumberRangeObjectCreationResult> {
+    return createControlledNumberRangeObjectShell(this.h, input, contentType)
+  }
+
+  public readControlledNumberRangeObjectContent(contentUrl: string, contentType: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledNumberRangeObjectContent(this.h, contentUrl, contentType, version)
+  }
+
+  public writeControlledNumberRangeObjectContent(contentUrl: string, content: ControlledNumberRangeObjectContent, contentType: string, lockHandle: string, transportRequest: string) {
+    return writeControlledNumberRangeObjectContent(this.h, contentUrl, content, contentType, lockHandle, transportRequest)
+  }
+
+  public validateControlledSapObjectType(input: ControlledSapObjectTypeShellInput, content: ControlledSapObjectTypeCreationContent) {
+    return validateControlledSapObjectType(this.h, input, content)
+  }
+
+  public readControlledSapObjectTypeCreationContract() {
+    return readControlledSapObjectTypeCreationContract(this.h)
+  }
+
+  public createControlledSapObjectType(input: ControlledSapObjectTypeShellInput, content: ControlledSapObjectTypeCreationContent, contentType: string): Promise<ControlledSapObjectTypeCreationResult> {
+    return createControlledSapObjectType(this.h, input, content, contentType)
+  }
+
+  public readControlledSapObjectTypeContent(contentUrl: string, contentType: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledSapObjectTypeContent(this.h, contentUrl, contentType, version)
+  }
+
+  public validateControlledSapObjectNodeType(input: ControlledSapObjectNodeTypeShellInput, content: ControlledSapObjectNodeTypeCreationContent) {
+    return validateControlledSapObjectNodeType(this.h, input, content)
+  }
+
+  public readControlledSapObjectNodeTypeCreationContract() {
+    return readControlledSapObjectNodeTypeCreationContract(this.h)
+  }
+
+  public createControlledSapObjectNodeType(input: ControlledSapObjectNodeTypeShellInput, content: ControlledSapObjectNodeTypeCreationContent, contentType: string): Promise<ControlledSapObjectNodeTypeCreationResult> {
+    return createControlledSapObjectNodeType(this.h, input, content, contentType)
+  }
+
+  public readControlledSapObjectNodeTypeContent(contentUrl: string, contentType: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledSapObjectNodeTypeContent(this.h, contentUrl, contentType, version)
+  }
+
+  public validateControlledChangeDocumentObject(input: Pick<ControlledChangeDocumentObjectShellInput, 'name' | 'description' | 'packageName'>) {
+    return validateControlledChangeDocumentObject(this.h, input)
+  }
+
+  public readControlledChangeDocumentObjectContract() {
+    return readControlledChangeDocumentObjectContract(this.h)
+  }
+
+  public createControlledChangeDocumentObjectShell(input: ControlledChangeDocumentObjectShellInput, contentType: string): Promise<ControlledChangeDocumentObjectCreationResult> {
+    return createControlledChangeDocumentObjectShell(this.h, input, contentType)
+  }
+
+  public readControlledChangeDocumentObjectContent(contentUrl: string, contentType: string, version?: 'active' | 'inactive' | 'workingArea') {
+    return readControlledChangeDocumentObjectContent(this.h, contentUrl, contentType, version)
+  }
+
+  public writeControlledChangeDocumentObjectContent(contentUrl: string, content: ControlledChangeDocumentObjectContent, contentType: string, lockHandle: string, transportRequest: string) {
+    return writeControlledChangeDocumentObjectContent(this.h, contentUrl, content, contentType, lockHandle, transportRequest)
   }
 
   public async featureDetails(title: string) {

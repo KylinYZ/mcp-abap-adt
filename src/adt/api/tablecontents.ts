@@ -138,7 +138,9 @@ export const parseServiceBinding = (xml: string) => {
     for (const key of ["releaseSupported", "published", "repair", "bindingCreated"])
         attrs[key] = !`${attrs[key]}`.match(/false/i)
     const packageRef = xmlNodeAttr(s.serviceBinding.packageRef)
-    const links = s.serviceBinding.link.map(xmlNodeAttr)
+    // fast-xml-parser returns a single object for one link and an array for
+    // multiple links; normalize both forms for newly created bindings.
+    const links = xmlArray(s, "serviceBinding", "link").map(xmlNodeAttr)
     const parseService = (name: string) => (service: any) => {
         const { "@_version": version, "@_releaseState": releaseState } = service
         const serviceDefinition = xmlNodeAttr(service.serviceDefinition)

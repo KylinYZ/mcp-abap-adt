@@ -31,6 +31,11 @@ describe("AbortSignal requests", () => {
         request.on("close", () => result.end())
         return
       }
+      if (request.url === "/created") {
+        result.writeHead(201, { Location: "/sap/bc/adt/oo/interfaces/zif_created" })
+        result.end("created")
+        return
+      }
       result.writeHead(200)
       result.end("ok")
     })
@@ -69,6 +74,16 @@ describe("AbortSignal requests", () => {
     await expect(client.request({ url: "/ok" })).resolves.toMatchObject({
       body: "ok",
       status: 200
+    })
+  })
+
+  test("preserves ordinary response headers required by ADT create contracts", async () => {
+    const client = new AxiosHttpClient(baseURL)
+
+    await expect(client.request({ url: "/created", method: "POST" })).resolves.toMatchObject({
+      body: "created",
+      status: 201,
+      headers: { location: "/sap/bc/adt/oo/interfaces/zif_created" }
     })
   })
 

@@ -259,3 +259,16 @@ export {
   parseTraceResults,
   parseTraceStatements
 } from "./api/tracetypes"
+export * from "./api/packageCreation"
+export * from "./api/sourceObjectCreation"
+export * from "./api/tableCreation"
+export * from "./api/serviceBindingCreation"
+export * from "./api/structureCreation"
+export * from "./api/typeGroupCreation"
+export * from "./api/lockObjectCreation"
+export * from "./api/logicalExternalSchemaCreation"
+export * from "./api/numberRangeObjectCreation"
+export * from "./api/sapObjectTypeCreation"
+export * from "./api/sapObjectNodeTypeCreation"
+export * from "./api/changeDocumentObjectCreation"
+export * from "./api/tableTypeCreation"

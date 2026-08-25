@@ -50,7 +50,7 @@ const convertheaders = (
     }
   }
 
-  for (const k in Object.keys(raw)) {
+  for (const k of Object.keys(raw)) {
     const val = raw[k]
     if (val instanceof AxiosHeaders)
       headers = { ...headers, ...convertheaders(val) }

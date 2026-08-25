@@ -87,6 +87,7 @@ export interface NewObjectOptions {
   language?: string
   masterLanguage?: string
   masterSystem?: string
+  contentType?: string
 }
 export interface NewPackageOptions
   extends NewObjectOptions,
@@ -287,6 +288,7 @@ export async function validateNewObject(h: AdtHTTP, options: ValidateOptions) {
     method: "POST",
     qs: options
   })
+  if (!String(response.body || "").trim()) return { success: true } as ValidationResult
   const raw = fullParse(response.body)
   const results = xmlArray(raw, "asx:abap", "asx:values", "DATA") as any[]
   const record = (results && results[0]) || {}
@@ -322,7 +324,7 @@ export async function createObject(
   // will raise exceptions on failure
   await h.request(url, {
     body,
-    headers: { "Content-Type": "application/*" },
+    headers: { "Content-Type": options.contentType || "application/*" },
     method: "POST",
     qs
   })
