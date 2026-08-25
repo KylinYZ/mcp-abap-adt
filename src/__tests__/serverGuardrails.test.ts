@@ -228,6 +228,45 @@ describe('server guardrail integration helpers', () => {
     expect(order).toEqual(['creation-start', 'creation-end', 'legacy']);
   });
 
+  it('keeps repository-object confirmation outside the SAP gate without self-deadlocking', async () => {
+    const gate = new ToolExecutionGate(1, 2);
+    let acceptConfirmation!: () => void;
+    const confirmation = new Promise<void>(resolve => { acceptConfirmation = resolve; });
+    const order: string[] = [];
+    const execute = (
+      toolName: string,
+      dispatch: () => Promise<unknown>
+    ) => executeGuardedToolCall(
+      toolName,
+      {},
+      guardrails,
+      gate,
+      usesSapExecutionGate(toolName),
+      dispatch,
+      value => value,
+      errorResult
+    );
+
+    const apply = execute('applyRepositoryObjectCreation', async () => {
+      await confirmation;
+      // Confirmation waits outside the gate; only the accepted SAP workflow reserves it.
+      return gate.run(async () => {
+        order.push('repository-apply');
+        return { status: 'success' };
+      });
+    });
+    await Promise.resolve();
+    await expect(execute(
+      'getRepositoryObjectCreationStatus',
+      async () => ({ status: 'PREVIEWED' })
+    )).resolves.toEqual({ status: 'PREVIEWED' });
+    expect(order).toEqual([]);
+
+    acceptConfirmation();
+    await expect(apply).resolves.toEqual({ status: 'success' });
+    expect(order).toEqual(['repository-apply']);
+  });
+
   it.each([
     ['applyAbapChange', false],
     ['getAbapChangeStatus', false],
@@ -241,6 +280,10 @@ describe('server guardrail integration helpers', () => {
     ['applyDdicPropertyChange', false],
     ['applyPackageChange', false],
     ['applyRapOperation', false],
+    ['applyRepositoryObjectCreation', false],
+    ['getRepositoryObjectCreationStatus', false],
+    ['applyRepositoryObjectCleanup', false],
+    ['getRepositoryObjectCleanupStatus', false],
     ['runQualityCheck', false],
     ['getQualityCheckStatus', false],
     ['healthcheck', false],

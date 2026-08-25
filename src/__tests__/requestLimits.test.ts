@@ -160,6 +160,72 @@ describe('request limits', () => {
     }, roomy)).toThrow('does not accept fields');
   });
 
+  it('rejects repository creation control fields and caller confirmation bypasses', () => {
+    const roomy = { ...guardrails, maxArgumentBytes: 1_000_000 };
+    expect(() => applyToolArgumentLimits('applyRepositoryObjectCreation', {
+      creationPlanId: 'plan-1', confirmed: true
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'DATABASE_TABLE', name: 'ZTABLE', description: 'Table', transportRequest: 'DEVK900001',
+      fields: [{ name: 'CLIENT', type: 'CLNT', annotations: ['arbitrary'] }]
+    }, roomy)).toThrow('control field');
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'PACKAGE', name: 'ZPKG', description: 'Package', transportRequest: 'DEVK900001',
+      url: '/sap/bc/adt/packages'
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('getRepositoryObjectCreationStatus', {
+      creationPlanId: 'x'.repeat(129)
+    }, roomy)).toThrow('creationPlanId');
+    expect(() => applyToolArgumentLimits('applyRepositoryObjectCleanup', {
+      cleanupPlanId: 'cleanup-1', confirmed: true
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCleanup', {
+      objectKind: 'PROGRAM', name: 'ZVPROG2', url: '/caller-controlled'
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCleanup', {
+      objectKind: 'FUNCTION_GROUP_INCLUDE', name: 'LZVFG1Z01', parentName: 'ZVFG1'
+    }, roomy)).not.toThrow();
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'CDS_METADATA_EXTENSION', name: 'ZE_TEST', description: 'Extension', packageName: 'Z001',
+      transportRequest: 'DEVK900001', referencedObjectName: 'ZI_TEST',
+      source: 'annotate entity ZI_TEST with { field; }'
+    }, roomy)).not.toThrow();
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'DDIC_DOMAIN', name: 'ZDOM_TEST', description: 'Domain', packageName: 'Z001',
+      transportRequest: 'DEVK900001', properties: {
+        typeInformation: { datatype: 'CHAR', length: 10, decimals: 0 },
+        outputInformation: { length: 10, signExists: false, lowercase: false, ampmFormat: false }
+      }
+    }, roomy)).not.toThrow();
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'BEHAVIOR_DEFINITION', name: 'ZI_TEST', description: 'Behavior', packageName: 'Z001',
+      transportRequest: 'DEVK900001', referencedObjectName: 'ZI_TEST',
+      source: 'define behavior for ZI_TEST { create; }', mediaType: 'application/*'
+    }, roomy)).toThrow('does not accept fields');
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'NUMBER_RANGE_OBJECT', name: 'ZNR_TEST', description: 'Number range', packageName: 'Z001',
+      transportRequest: 'DEVK900001', numberLengthDomain: 'CHAR10', percentWarning: 10,
+      untilYear: false, rolling: false, prefix: false, buffering: 'none', bufferedNumbers: 0
+    }, roomy)).not.toThrow();
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'SAP_OBJECT_NODE_TYPE', name: 'ZmcpNode', description: 'Node', packageName: 'Z001',
+      transportRequest: 'DEVK900001', sapObjectTypeName: 'ZMCPRONT', rootNode: true
+    }, roomy)).not.toThrow();
+    expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'CHANGE_DOCUMENT_OBJECT', name: 'ZMCPCHDO', description: 'Change document', packageName: 'Z001',
+      transportRequest: 'DEVK900001', category: 'standard',
+      tablesAndStructures: [{ name: 'ZTAB', multipleChanges: true }],
+      errorMessage: { id: 'CD', number: '600' }
+    }, roomy)).not.toThrow();
+  });
+
+  it('allows the published bounded message-class messages field', () => {
+    expect(applyToolArgumentLimits('previewRepositoryObjectCreation', {
+      objectKind: 'MESSAGE_CLASS', name: 'ZVMSG', description: 'Messages', packageName: 'Z001',
+      transportRequest: 'S4HK900009', messages: [{ number: '001', text: 'Campaign message' }]
+    }, guardrails)).toMatchObject({ messages: [{ number: '001', text: 'Campaign message' }] });
+  });
+
   it('rejects empty or non-query SQL while ignoring keywords inside literals and comments', () => {
     expect(() => assertReadOnlyQuery('runQuery', '')).toThrow('read-only query');
     expect(() => assertReadOnlyQuery('runQuery', 'DESCRIBE z_demo')).toThrow('SELECT or WITH');

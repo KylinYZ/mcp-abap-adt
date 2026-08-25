@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { config } from 'dotenv';
+import { randomUUID } from 'crypto';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -42,6 +43,10 @@ import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
 import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
 import { SafeAdvancedHandlers } from './handlers/SafeAdvancedHandlers.js';
 import { SafeQualityHandlers } from './handlers/SafeQualityHandlers.js';
+import {
+  RepositoryObjectCreationHandlers,
+  REPOSITORY_VALIDATION_CLEANUP_TOOL_NAMES
+} from './handlers/RepositoryObjectCreationHandlers.js';
 import { HighLevelReadHandlers } from './handlers/HighLevelReadHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
@@ -59,6 +64,31 @@ import { PackageChangeWorkflow } from './safe/PackageChangeWorkflow.js';
 import { RapOperationWorkflow } from './safe/RapOperationWorkflow.js';
 import { QualityCheckPlanStore } from './safe/QualityCheckPlanStore.js';
 import { QualityCheckWorkflow } from './safe/QualityCheckWorkflow.js';
+import { RepositoryObjectCreationRegistry } from './safe/RepositoryObjectCreationRegistry.js';
+import { RepositoryObjectCreationPlanStore } from './safe/RepositoryObjectCreationPlanStore.js';
+import { RepositoryObjectCreationWorkflow } from './safe/RepositoryObjectCreationWorkflow.js';
+import { RepositoryObjectCleanupPlanStore } from './safe/RepositoryObjectCleanupPlanStore.js';
+import { RepositoryObjectCleanupWorkflow } from './safe/RepositoryObjectCleanupWorkflow.js';
+import { RepositoryCreationConfirmationChallengeStore } from './safe/RepositoryCreationConfirmationChallengeStore.js';
+import { createRepositoryCreationConfirmationProvider } from './safe/RepositoryCreationConfirmationProvider.js';
+import { INITIAL_REPOSITORY_CREATION_CAPABILITIES } from './safe/repositoryCreationCapabilities.js';
+import { PackageCreationAdapter } from './safe/adapters/PackageCreationAdapter.js';
+import { DatabaseTableCreationAdapter } from './safe/adapters/DatabaseTableCreationAdapter.js';
+import { AbapSourceCreationAdapter, FunctionGroupIncludeCreationAdapter } from './safe/adapters/AbapSourceCreationAdapter.js';
+import { FunctionGroupCreationAdapter } from './safe/adapters/FunctionGroupCreationAdapter.js';
+import { SourceObjectCreationAdapter } from './safe/adapters/SourceObjectCreationAdapter.js';
+import { ServiceBindingCreationAdapter } from './safe/adapters/ServiceBindingCreationAdapter.js';
+import { StructureCreationAdapter } from './safe/adapters/StructureCreationAdapter.js';
+import { TypeGroupCreationAdapter } from './safe/adapters/TypeGroupCreationAdapter.js';
+import { TableTypeCreationAdapter } from './safe/adapters/TableTypeCreationAdapter.js';
+import { LockObjectCreationAdapter } from './safe/adapters/LockObjectCreationAdapter.js';
+import { LogicalExternalSchemaCreationAdapter } from './safe/adapters/LogicalExternalSchemaCreationAdapter.js';
+import { NumberRangeObjectCreationAdapter } from './safe/adapters/NumberRangeObjectCreationAdapter.js';
+import { SapObjectTypeCreationAdapter } from './safe/adapters/SapObjectTypeCreationAdapter.js';
+import { SapObjectNodeTypeCreationAdapter } from './safe/adapters/SapObjectNodeTypeCreationAdapter.js';
+import { ChangeDocumentObjectCreationAdapter } from './safe/adapters/ChangeDocumentObjectCreationAdapter.js';
+import { DataElementCreationAdapter, DomainCreationAdapter } from './safe/adapters/DdicPrimitiveCreationAdapter.js';
+import { MessageClassCreationAdapter } from './safe/adapters/MessageClassCreationAdapter.js';
 import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
@@ -102,6 +132,7 @@ export class AbapAdtServer extends Server {
   private safeDebugHandlers: SafeDebugHandlers;
   private safeAdvancedHandlers: SafeAdvancedHandlers;
   private safeQualityHandlers: SafeQualityHandlers;
+  private repositoryObjectCreationHandlers: RepositoryObjectCreationHandlers;
   private highLevelReadHandlers: HighLevelReadHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
@@ -176,6 +207,19 @@ export class AbapAdtServer extends Server {
       enabled: this.sessionResilience.sessionRecovery
     });
     this.safetyPolicy = SafetyPolicy.fromEnvironment();
+    const repositoryCreationContext = {
+      systemHost: this.safetyPolicy.systemHost,
+      client: this.safetyPolicy.client,
+      sapUser: this.safetyPolicy.sapUser,
+      systemRole: this.safetyPolicy.systemRole,
+      toolProfile: this.safetyPolicy.toolProfile,
+      realDevValidationEnabled: this.safetyPolicy.realDevValidationEnabled,
+      realDevValidationObjects: [...this.safetyPolicy.realDevValidationObjects],
+      realDevValidationPrefix: this.safetyPolicy.realDevValidationPrefix,
+      realDevValidationPackage: this.safetyPolicy.realDevValidationPackage,
+      realDevValidationTransport: this.safetyPolicy.realDevValidationTransport
+    };
+    const repositoryCreationRegistry = new RepositoryObjectCreationRegistry(INITIAL_REPOSITORY_CREATION_CAPABILITIES);
     const sm21Config = sm21ConfigFromEnvironment();
     
     // Initialize handlers
@@ -254,6 +298,118 @@ export class AbapAdtServer extends Server {
         this.guardrails.rollbackFailedRetentionMs
       ),
       auditLogger
+    );
+    const repositoryCreationWorkflow = new RepositoryObjectCreationWorkflow(
+      repositoryCreationRegistry,
+      repositoryCreationContext,
+      new RepositoryObjectCreationPlanStore(
+        this.safetyPolicy.planTtlMs,
+        () => Date.now(),
+        undefined,
+        this.guardrails.changePlanMaxEntries
+      ),
+      [
+        new AbapSourceCreationAdapter('PROGRAM', creationWorkflow),
+        new FunctionGroupCreationAdapter(creationWorkflow),
+        new AbapSourceCreationAdapter('FUNCTION_MODULE', creationWorkflow),
+        new FunctionGroupIncludeCreationAdapter(creationWorkflow),
+        new PackageCreationAdapter(this.adtClient, this.safetyPolicy),
+        new DatabaseTableCreationAdapter(this.adtClient, this.safetyPolicy),
+        new StructureCreationAdapter(this.adtClient, this.safetyPolicy),
+        new TypeGroupCreationAdapter(this.adtClient, this.safetyPolicy),
+        new TableTypeCreationAdapter(this.adtClient, this.safetyPolicy),
+        new LockObjectCreationAdapter(this.adtClient, this.safetyPolicy),
+        new LogicalExternalSchemaCreationAdapter(this.adtClient, this.safetyPolicy),
+        new NumberRangeObjectCreationAdapter(this.adtClient, this.safetyPolicy),
+        new SapObjectTypeCreationAdapter(this.adtClient, this.safetyPolicy),
+        new SapObjectNodeTypeCreationAdapter(this.adtClient, this.safetyPolicy),
+        new ChangeDocumentObjectCreationAdapter(this.adtClient, this.safetyPolicy),
+        new DomainCreationAdapter(this.adtClient, this.safetyPolicy),
+        new DataElementCreationAdapter(this.adtClient, this.safetyPolicy),
+        new MessageClassCreationAdapter(this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('ABAP_CLASS', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('ABAP_INTERFACE', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('PROGRAM_INCLUDE', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_DATA_DEFINITION', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_ACCESS_CONTROL', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_METADATA_EXTENSION', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_ANNOTATION_DEFINITION', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('SERVICE_DEFINITION', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('BEHAVIOR_DEFINITION', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_TYPE', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_ASPECT', this.adtClient, this.safetyPolicy),
+        new SourceObjectCreationAdapter('CDS_ENTITY_BUFFER', this.adtClient, this.safetyPolicy),
+        new ServiceBindingCreationAdapter(this.adtClient, this.safetyPolicy)
+      ]
+    );
+    const repositoryConfirmationSessionId = randomUUID();
+    const repositoryConfirmationChallenges = new RepositoryCreationConfirmationChallengeStore();
+    const repositoryConfirmationProvider = createRepositoryCreationConfirmationProvider({
+      environment: process.env,
+      platform: process.platform,
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+    });
+    const repositoryCleanupWorkflow = new RepositoryObjectCleanupWorkflow(
+      this.adtClient,
+      repositoryCreationRegistry,
+      repositoryCreationContext,
+      new RepositoryObjectCleanupPlanStore(
+        this.safetyPolicy.planTtlMs,
+        () => Date.now(),
+        undefined,
+        this.guardrails.changePlanMaxEntries
+      )
+    );
+    this.repositoryObjectCreationHandlers = new RepositoryObjectCreationHandlers(
+      repositoryCreationRegistry,
+      repositoryCreationContext,
+      repositoryCreationWorkflow,
+      {
+        provider: repositoryConfirmationProvider,
+        challengeStore: repositoryConfirmationChallenges,
+        sessionId: repositoryConfirmationSessionId,
+        applyConfirmed: creationPlanId => this.executionGate.run(() => repositoryCreationWorkflow.apply(creationPlanId)),
+        audit: event => auditLogger.append({
+          correlationId: `repository-confirmation:${event.plan.creationPlanId}`,
+          creationPlanId: event.plan.creationPlanId,
+          eventType: `REPOSITORY_CREATION_CONFIRMATION_${event.challengeStatus}`,
+          systemHost: event.plan.systemHost,
+          client: event.plan.client,
+          systemRole: event.plan.systemRole,
+          objectType: event.plan.target.objectKind,
+          objectName: event.plan.target.objectName,
+          parentObject: event.plan.target.parentName,
+          packageName: event.plan.target.packageName || event.plan.target.parentName,
+          transportRequest: event.plan.transportRequest,
+          targetHash: event.plan.payloadHash,
+          confirmationMode: event.providerMode,
+          resultSummary: event.action,
+          success: event.challengeStatus !== 'CANCELLED'
+        })
+      },
+      repositoryCleanupWorkflow,
+      {
+        provider: repositoryConfirmationProvider,
+        sessionId: `${repositoryConfirmationSessionId}:cleanup`,
+        applyConfirmed: cleanupPlanId => this.executionGate.run(() => repositoryCleanupWorkflow.apply(cleanupPlanId)),
+        audit: event => auditLogger.append({
+          correlationId: `repository-cleanup-confirmation:${event.plan.cleanupPlanId}`,
+          creationPlanId: event.plan.cleanupPlanId,
+          eventType: `REPOSITORY_CLEANUP_CONFIRMATION_${event.challengeStatus}`,
+          systemHost: event.plan.systemHost,
+          client: event.plan.client,
+          systemRole: event.plan.systemRole,
+          objectType: event.plan.target.objectKind,
+          objectName: event.plan.target.objectName,
+          packageName: event.plan.target.packageName,
+          transportRequest: event.plan.transportRequest,
+          targetHash: event.plan.payloadHash,
+          confirmationMode: event.providerMode,
+          resultSummary: event.action,
+          success: event.challengeStatus !== 'CANCELLED'
+        })
+      }
     );
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
@@ -415,7 +571,7 @@ export class AbapAdtServer extends Server {
       return { tools: this.toolCatalog };
     });
 
-    this.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       return executeGuardedToolCall(
         request.params.name,
         (request.params.arguments || {}) as Record<string, unknown>,
@@ -425,9 +581,9 @@ export class AbapAdtServer extends Server {
         limitedArguments => this.sessionSupervisor
           ? this.sessionSupervisor.execute(
             request.params.name,
-            () => this.dispatchTool(request.params.name, limitedArguments)
+            () => this.dispatchTool(request.params.name, limitedArguments, extra.signal)
           )
-          : this.dispatchTool(request.params.name, limitedArguments),
+          : this.dispatchTool(request.params.name, limitedArguments, extra.signal),
         result => this.serializeResult(result),
         error => this.handleError(error)
       );
@@ -437,7 +593,14 @@ export class AbapAdtServer extends Server {
   private createToolCatalog(): ToolDefinition[] {
     const safeTools = this.safeAbapHandlers.getTools();
     const safeDebugTools = this.safeDebugHandlers.getTools();
-    const controlledAdvancedTools = this.safeAdvancedHandlers.getTools();
+    const completeControlledAdvancedTools = [
+      ...this.safeAdvancedHandlers.getTools(),
+      ...this.repositoryObjectCreationHandlers.getTools(true)
+    ];
+    // Cleanup tools are catalogued for policy completeness but never exposed outside validation.
+    const controlledAdvancedTools = completeControlledAdvancedTools.filter(tool => (
+      this.safetyPolicy.realDevValidationEnabled || !REPOSITORY_VALIDATION_CLEANUP_TOOL_NAMES.has(tool.name)
+    ));
     const qualityTools = this.safeQualityHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
     const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools];
@@ -480,7 +643,7 @@ export class AbapAdtServer extends Server {
     const completeCatalog = [
       ...safeTools,
       ...safeDebugTools,
-      ...controlledAdvancedTools,
+      ...completeControlledAdvancedTools,
       ...qualityTools,
       ...runtimeTools,
       ...legacyTools
@@ -498,7 +661,11 @@ export class AbapAdtServer extends Server {
     ).map(withCanonicalToolMetadata);
   }
 
-  private async dispatchTool(toolName: string, limitedArguments: Record<string, unknown>): Promise<unknown> {
+  private async dispatchTool(
+    toolName: string,
+    limitedArguments: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<unknown> {
         let result: unknown;
         // Operation policy and runtime catalog membership both protect direct calls.
         this.safetyPolicy.assertToolOperationAllowed(toolName);
@@ -518,6 +685,9 @@ export class AbapAdtServer extends Server {
         }
         if (this.safeQualityHandlers.supports(toolName)) {
           return this.safeQualityHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.repositoryObjectCreationHandlers.supports(toolName)) {
+          return this.repositoryObjectCreationHandlers.handle(toolName, limitedArguments, signal);
         }
         if (this.safetyPolicy.toolProfile === 'diagnostic-readonly'
           && toolName !== 'inspectAbapObject'

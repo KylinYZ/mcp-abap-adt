@@ -19,6 +19,10 @@ export function usesSapExecutionGate(toolName: string): boolean {
     && toolName !== 'applyDdicPropertyChange'
     && toolName !== 'applyPackageChange'
     && toolName !== 'applyRapOperation'
+    && toolName !== 'applyRepositoryObjectCreation'
+    && toolName !== 'getRepositoryObjectCreationStatus'
+    && toolName !== 'applyRepositoryObjectCleanup'
+    && toolName !== 'getRepositoryObjectCleanupStatus'
     && toolName !== 'runQualityCheck'
     && toolName !== 'getQualityCheckStatus'
     && toolName !== 'healthcheck';

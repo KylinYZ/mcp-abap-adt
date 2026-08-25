@@ -30,10 +30,10 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 119],
+    ['development', 124],
     ['diagnostic-readonly', 99],
     ['legacy-full', 161],
-    ['development-workbench', 82],
+    ['development-workbench', 87],
     ['business-readonly', 17],
     ['operations-readonly', 40]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
@@ -88,6 +88,61 @@ describe('tool catalog integrity and raw advanced role policy', () => {
     for (const profile of ['safe', 'business-readonly', 'operations-readonly']) {
       const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
       expect(names).not.toContain('getObjectSource');
+    }
+  });
+
+  it('exposes repository creation capabilities only in DEV development profiles', () => {
+    const expected = [
+      'listRepositoryObjectCreationCapabilities', 'describeRepositoryObjectCreation',
+      'previewRepositoryObjectCreation', 'applyRepositoryObjectCreation', 'getRepositoryObjectCreationStatus'
+    ];
+    for (const profile of ['development', 'development-workbench']) {
+      const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+      expect(names).toEqual(expect.arrayContaining(expected));
+    }
+    for (const profile of ['safe', 'diagnostic-readonly', 'legacy-full', 'business-readonly', 'operations-readonly']) {
+      const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+      expect(names).toEqual(expect.not.arrayContaining(expected));
+    }
+  });
+
+  it.each(['QAS', 'PRD', '', 'UNKNOWN'])('hides and rejects repository creation capabilities for role %p', async role => {
+    const server = configureServer(role, 'development');
+    const handlers = (server as any).repositoryObjectCreationHandlers;
+    const handle = jest.spyOn(handlers, 'handle');
+
+    expect((server as any).toolCatalog.map((tool: { name: string }) => tool.name))
+      .not.toContain('listRepositoryObjectCreationCapabilities');
+    await expect((server as any).dispatchTool('listRepositoryObjectCreationCapabilities', {}))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED' });
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('exposes validation cleanup only while the bounded validation switch is complete', () => {
+    Object.assign(process.env, {
+      SAP_MCP_REAL_DEV_VALIDATION: 'true',
+      SAP_MCP_REAL_DEV_VALIDATION_OBJECTS: 'PROGRAM',
+      SAP_MCP_REAL_DEV_VALIDATION_PREFIX: 'ZV',
+      SAP_MCP_REAL_DEV_VALIDATION_PACKAGE: 'Z001',
+      SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT: 'S4HK900009'
+    });
+    try {
+      for (const profile of ['development', 'development-workbench']) {
+        const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+        expect(names).toEqual(expect.arrayContaining([
+          'previewRepositoryObjectCleanup', 'applyRepositoryObjectCleanup', 'getRepositoryObjectCleanupStatus'
+        ]));
+      }
+      for (const profile of ['safe', 'diagnostic-readonly', 'legacy-full', 'business-readonly', 'operations-readonly']) {
+        const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+        expect(names).not.toContain('previewRepositoryObjectCleanup');
+      }
+    } finally {
+      delete process.env.SAP_MCP_REAL_DEV_VALIDATION;
+      delete process.env.SAP_MCP_REAL_DEV_VALIDATION_OBJECTS;
+      delete process.env.SAP_MCP_REAL_DEV_VALIDATION_PREFIX;
+      delete process.env.SAP_MCP_REAL_DEV_VALIDATION_PACKAGE;
+      delete process.env.SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT;
     }
   });
 

@@ -19,6 +19,22 @@ const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
   previewQualityCheck: ['kind', 'objects', 'variant', 'riskLevel', 'duration', 'timeoutSeconds'],
   runQualityCheck: ['qualityPlanId'],
   getQualityCheckStatus: ['qualityPlanId'],
+  listRepositoryObjectCreationCapabilities: [],
+  describeRepositoryObjectCreation: ['objectKind'],
+  previewRepositoryObjectCreation: [
+    'objectKind', 'name', 'description', 'packageName', 'parentPackageName', 'parentFunctionGroup',
+    'softwareComponent', 'transportLayer', 'transportRequest', 'source', 'initialFunctionModule',
+    'referencedObjectName', 'properties', 'fields', 'technicalSettings', 'primaryTable', 'defaultRemoteSchemaName',
+    'abapLanguageVersion', 'numberLengthDomain', 'percentWarning', 'subType', 'untilYear', 'rolling',
+    'prefix', 'transactionId', 'buffering', 'bufferedNumbers', 'typeCategory', 'sapObjectTypeName',
+    'rootNode', 'serviceDefinition', 'bindingType', 'bindingCategory', 'category',
+    'tablesAndStructures', 'errorMessage', 'messages', 'rowType', 'initialRowCount', 'accessType', 'primaryKey', 'secondaryKeys'
+  ],
+  applyRepositoryObjectCreation: ['creationPlanId'],
+  getRepositoryObjectCreationStatus: ['creationPlanId'],
+  previewRepositoryObjectCleanup: ['objectKind', 'name', 'parentName'],
+  applyRepositoryObjectCleanup: ['cleanupPlanId'],
+  getRepositoryObjectCleanupStatus: ['cleanupPlanId'],
   previewDdicPropertyChange: ['operation'],
   applyDdicPropertyChange: ['operationPlanId'],
   previewPackageChange: ['objectType', 'objectName', 'oldPackage', 'newPackage', 'transportRequest'],
@@ -99,6 +115,13 @@ function assertAdvancedToolArgumentShape(toolName: string, argumentsValue: Argum
   for (const field of ['kind', 'variant', 'riskLevel', 'duration', 'qualityPlanId']) {
     assertBoundedIdentifier(argumentsValue[field], field, field === 'qualityPlanId' ? 128 : 64);
   }
+  for (const field of [
+    'objectKind', 'name', 'description', 'packageName', 'parentPackageName', 'parentFunctionGroup',
+    'softwareComponent', 'transportLayer', 'transportRequest', 'referencedObjectName', 'creationPlanId',
+    'cleanupPlanId', 'parentName'
+  ]) {
+    assertBoundedIdentifier(argumentsValue[field], field, field === 'description' ? 120 : 128);
+  }
   assertBoundedIdentifier(argumentsValue.tableName, 'tableName', 30);
 
   if (argumentsValue.checks !== undefined) {
@@ -117,6 +140,31 @@ function assertAdvancedToolArgumentShape(toolName: string, argumentsValue: Argum
   for (const field of ['properties', 'metaData', 'elements', 'refactoring', 'content']) {
     if (argumentsValue[field] !== undefined) assertBoundedJson(argumentsValue[field], field);
   }
+  if (toolName === 'previewRepositoryObjectCreation') {
+    for (const field of ['initialFunctionModule', 'fields', 'technicalSettings', 'tablesAndStructures', 'errorMessage', 'rowType', 'primaryKey', 'secondaryKeys']) {
+      if (argumentsValue[field] !== undefined) assertBoundedJson(argumentsValue[field], field);
+    }
+    assertNoRepositoryControlFields(argumentsValue);
+  }
+  if (toolName === 'previewRepositoryObjectCleanup') assertNoRepositoryControlFields(argumentsValue);
+}
+
+function assertNoRepositoryControlFields(value: unknown): void {
+  const forbidden = new Set([
+    'url', 'uri', 'xml', 'mediatype', 'contenttype', 'headers', 'lockhandle', 'annotations',
+    'confirmed', 'confirmation', 'csrf', 'cookie', 'authorization'
+  ]);
+  const visit = (current: unknown): void => {
+    if (Array.isArray(current)) return current.forEach(visit);
+    if (!isRecord(current)) return;
+    for (const [key, nested] of Object.entries(current)) {
+      if (forbidden.has(key.toLowerCase())) {
+        throw new McpError(400, `previewRepositoryObjectCreation does not accept control field: ${key}.`);
+      }
+      visit(nested);
+    }
+  };
+  visit(value);
 }
 
 function assertBoundedIdentifier(value: unknown, field: string, maximum: number): void {
