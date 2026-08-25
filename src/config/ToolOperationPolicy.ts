@@ -25,9 +25,21 @@ export const CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'previewRapOperation', 'applyRapOperation'
 ]);
 
+export const CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES = new Set([
+  'listRepositoryObjectCreationCapabilities',
+  'describeRepositoryObjectCreation',
+  'previewRepositoryObjectCreation',
+  'applyRepositoryObjectCreation',
+  'getRepositoryObjectCreationStatus',
+  'previewRepositoryObjectCleanup',
+  'applyRepositoryObjectCleanup',
+  'getRepositoryObjectCleanupStatus'
+]);
+
 const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
-  'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus'
+  'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus',
+  'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -53,7 +65,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'getDataElementProperties', 'getTextElements', 'atcDocumentation', 'changePackagePreview',
   'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent', 'rapGenGetUiConfig',
   'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
-  'readRuntimeDumps', 'describeClassicTable', 'inspectSapSystem', 'getAbapMemberSource'
+  'readRuntimeDumps', 'describeClassicTable', 'inspectSapSystem', 'getAbapMemberSource',
+  'listRepositoryObjectCreationCapabilities', 'describeRepositoryObjectCreation', 'previewRepositoryObjectCreation',
+  'previewRepositoryObjectCleanup'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([
@@ -81,7 +95,8 @@ const OTHER_MUTATION_TOOL_NAMES = new Set([
 
 const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   ...RAW_ADVANCED_MUTATION_TOOL_NAMES,
-  ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES
+  ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES,
+  'applyRepositoryObjectCreation', 'applyRepositoryObjectCleanup'
 ]);
 
 const QUALITY_EXECUTION_TOOL_NAMES = new Set([
@@ -110,6 +125,7 @@ export function isRawAdvancedMutationTool(toolName: string): boolean {
 
 export function isToolAllowedForSystemRole(toolName: string, systemRole: string): boolean {
   const operationClass = toolOperationClass(toolName);
+  if (CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
@@ -149,6 +165,14 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled DDIC, package, and RAP operations require DEV development or development-workbench profile.'
+    );
+  }
+  if (CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled repository creation capabilities require DEV development or development-workbench profile.'
     );
   }
   if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)

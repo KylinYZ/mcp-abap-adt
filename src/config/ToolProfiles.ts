@@ -47,7 +47,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'tracesHitList', 'tracesDbAccess', 'tracesStatements', 'changePackagePreview', 'revisions',
   'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent', 'rapGenGetUiConfig',
   'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
-  'previewQualityCheck', 'runQualityCheck', 'getQualityCheckStatus'
+  'previewQualityCheck', 'runQualityCheck', 'getQualityCheckStatus',
+  'listRepositoryObjectCreationCapabilities', 'describeRepositoryObjectCreation',
+  'previewRepositoryObjectCreation', 'applyRepositoryObjectCreation', 'getRepositoryObjectCreationStatus'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([
@@ -108,6 +110,13 @@ export function selectProfileTools(
         ? BUSINESS_READONLY_TOOL_NAMES
         : OPERATIONS_READONLY_TOOL_NAMES;
     selected = explicitlyNamedTools(profile, completeTools, names);
+    if (profile === 'development-workbench') {
+      selected.push(...controlledAdvancedTools.filter(tool => (
+        tool.name === 'previewRepositoryObjectCleanup'
+        || tool.name === 'applyRepositoryObjectCleanup'
+        || tool.name === 'getRepositoryObjectCleanupStatus'
+      )));
+    }
   }
   return systemRole === 'DEV'
     ? selected

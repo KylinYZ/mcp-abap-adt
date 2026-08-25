@@ -10,7 +10,7 @@ import type {
   SourceMatchType
 } from './types.js';
 
-export type CreationObjectType = 'PROGRAM' | 'FUNCTION_GROUP' | 'FUNCTION_MODULE';
+export type CreationObjectType = 'PROGRAM' | 'FUNCTION_GROUP' | 'FUNCTION_MODULE' | 'FUNCTION_GROUP_INCLUDE';
 
 export interface CreationObjectInput {
   objectType: CreationObjectType | string;
@@ -19,6 +19,8 @@ export interface CreationObjectInput {
   packageName?: string;
   parentFunctionGroup?: string;
   source?: string;
+  /** Three-character suffix for a generated function-group include. */
+  creationName?: string;
 }
 
 export interface PreviewCreationInput {
@@ -36,7 +38,7 @@ export interface ResolvedCreationObject {
   objectType: CreationObjectType;
   objectName: string;
   description: string;
-  adtType: 'PROG/P' | 'FUGR/F' | 'FUGR/FF';
+  adtType: 'PROG/P' | 'FUGR/F' | 'FUGR/FF' | 'FUGR/I';
   packageName: string;
   parentName: string;
   parentPath: string;
@@ -46,6 +48,7 @@ export interface ResolvedCreationObject {
   activationParentUrl?: string;
   source?: string;
   sourceHash?: string;
+  creationName?: string;
 }
 
 export interface CreatedObjectRecord extends ResolvedCreationObject {

@@ -29,6 +29,26 @@ describe('SafetyPolicy', () => {
     expect(new SafetyPolicy({ ...validOptions, allowTextConfirmation: 'false' }).allowTextConfirmation).toBe(false);
   });
 
+  it('keeps REAL_DEV validation disabled by default and scopes enabled validation', () => {
+    const disabled = new SafetyPolicy(validOptions);
+    expect(disabled.realDevValidationEnabled).toBe(false);
+    expect(() => disabled.assertRealDevValidationAllowed('PROGRAM', 'ZZMCP_VT_TEST')).toThrow('validation mode is disabled');
+
+    const enabled = new SafetyPolicy({
+      ...validOptions,
+      toolProfile: 'development-workbench',
+      realDevValidation: 'true',
+      realDevValidationObjects: 'PROGRAM,DDIC_DOMAIN',
+      realDevValidationPrefix: 'ZZMCP_VT_',
+      realDevValidationPackage: 'Z001',
+      realDevValidationTransport: 'S4HK900009'
+    });
+    expect(() => enabled.assertRealDevValidationAllowed('PROGRAM', 'ZZMCP_VT_TEST', 'Z001', 'S4HK900009')).not.toThrow();
+    expect(() => enabled.assertRealDevValidationAllowed('DATA_ELEMENT', 'ZZMCP_VT_TEST', 'Z001', 'S4HK900009')).toThrow('not enabled');
+    expect(() => enabled.assertRealDevValidationAllowed('PROGRAM', 'ZOTHER', 'Z001', 'S4HK900009')).toThrow('name prefix');
+    expect(() => new SafetyPolicy({ ...validOptions, realDevValidation: 'true' })).toThrow('object allow-list, name prefix, package, and transport');
+  });
+
   it('allows guarded source reads without requiring an audit directory', () => {
     const policy = new SafetyPolicy({ ...validOptions, auditPath: undefined });
     expect(() => policy.assertReadAllowed('Z_TEST_PROGRAM')).not.toThrow();

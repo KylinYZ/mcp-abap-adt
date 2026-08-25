@@ -1,6 +1,7 @@
 import { SafeAbapError } from './errors.js';
 import type { ToolProfile } from './types.js';
 import { assertToolOperationAllowed as assertOperationAllowed } from '../config/ToolOperationPolicy.js';
+import { REPOSITORY_OBJECT_KINDS, type RepositoryObjectKind } from './repositoryCreationTypes.js';
 
 export interface SafetyPolicyOptions {
   sapUrl?: string;
@@ -16,6 +17,11 @@ export interface SafetyPolicyOptions {
   allowTextConfirmation?: string;
   allowedDebugUsers?: string;
   debugAuthTtlSeconds?: string;
+  realDevValidation?: string;
+  realDevValidationObjects?: string;
+  realDevValidationPrefix?: string;
+  realDevValidationPackage?: string;
+  realDevValidationTransport?: string;
 }
 
 export class SafetyPolicy {
@@ -32,6 +38,11 @@ export class SafetyPolicy {
   readonly allowTextConfirmation: boolean;
   readonly allowedDebugUsers: Set<string>;
   readonly debugAuthTtlMs: number;
+  readonly realDevValidationEnabled: boolean;
+  readonly realDevValidationObjects: Set<RepositoryObjectKind>;
+  readonly realDevValidationPrefix: string;
+  readonly realDevValidationPackage: string;
+  readonly realDevValidationTransport: string;
 
   constructor(options: SafetyPolicyOptions) {
     this.systemHost = parseHost(options.sapUrl);
@@ -51,6 +62,14 @@ export class SafetyPolicy {
       ? configuredDebugUsers
       : new Set(this.sapUser ? [this.sapUser] : []);
     this.debugAuthTtlMs = parseDebugAuthTtl(options.debugAuthTtlSeconds);
+    this.realDevValidationEnabled = parseBooleanFlag(options.realDevValidation);
+    this.realDevValidationObjects = parseRepositoryObjectKinds(options.realDevValidationObjects);
+    this.realDevValidationPrefix = normalizeValidationPrefix(options.realDevValidationPrefix);
+    this.realDevValidationPackage = String(options.realDevValidationPackage || '').trim().toUpperCase();
+    this.realDevValidationTransport = String(options.realDevValidationTransport || '').trim().toUpperCase();
+    if (this.realDevValidationEnabled && (this.realDevValidationObjects.size === 0 || !this.realDevValidationPrefix || !this.realDevValidationPackage || !this.realDevValidationTransport)) {
+      throw new Error('REAL_DEV validation requires an explicit object allow-list, name prefix, package, and transport.');
+    }
   }
 
   static fromEnvironment(environment: NodeJS.ProcessEnv = process.env): SafetyPolicy {
@@ -67,7 +86,12 @@ export class SafetyPolicy {
       toolProfile: environment.SAP_MCP_TOOL_PROFILE,
       allowTextConfirmation: environment.SAP_MCP_ALLOW_TEXT_CONFIRMATION,
       allowedDebugUsers: environment.SAP_MCP_ALLOWED_DEBUG_USERS,
-      debugAuthTtlSeconds: environment.SAP_MCP_DEBUG_AUTH_TTL_SECONDS
+      debugAuthTtlSeconds: environment.SAP_MCP_DEBUG_AUTH_TTL_SECONDS,
+      realDevValidation: environment.SAP_MCP_REAL_DEV_VALIDATION,
+      realDevValidationObjects: environment.SAP_MCP_REAL_DEV_VALIDATION_OBJECTS,
+      realDevValidationPrefix: environment.SAP_MCP_REAL_DEV_VALIDATION_PREFIX,
+      realDevValidationPackage: environment.SAP_MCP_REAL_DEV_VALIDATION_PACKAGE,
+      realDevValidationTransport: environment.SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT
     });
   }
 
@@ -166,6 +190,29 @@ export class SafetyPolicy {
     return normalized;
   }
 
+  assertRealDevValidationAllowed(objectKind: string, objectName: string, packageName?: string, transportRequest?: string): void {
+    if (!this.realDevValidationEnabled) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', 'REAL_DEV validation mode is disabled.');
+    }
+    if (this.systemRole !== 'DEV' || !['development', 'development-workbench'].includes(this.toolProfile)) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', 'REAL_DEV validation requires a DEV development profile.');
+    }
+    const normalizedKind = String(objectKind || '').trim().toUpperCase() as RepositoryObjectKind;
+    if (!REPOSITORY_OBJECT_KINDS.includes(normalizedKind) || !this.realDevValidationObjects.has(normalizedKind)) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', `REAL_DEV validation is not enabled for ${normalizedKind || '(empty)'}.`);
+    }
+    const normalizedName = normalizeObjectName(objectName);
+    if (!normalizedName.startsWith(this.realDevValidationPrefix)) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', `REAL_DEV validation requires the configured name prefix ${this.realDevValidationPrefix}.`);
+    }
+    if (String(packageName || '').trim().toUpperCase() !== this.realDevValidationPackage) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', `REAL_DEV validation requires package ${this.realDevValidationPackage}.`);
+    }
+    if (String(transportRequest || '').trim().toUpperCase() !== this.realDevValidationTransport) {
+      throw new SafeAbapError('POLICY_DENIED', 'validation', `REAL_DEV validation requires transport ${this.realDevValidationTransport}.`);
+    }
+  }
+
   assertToolOperationAllowed(toolName: string): void {
     assertOperationAllowed(toolName, this.toolProfile, this.systemRole);
   }
@@ -237,4 +284,22 @@ function normalizeSapUser(value?: string): string {
 
 function parseBooleanFlag(value?: string): boolean {
   return String(value || '').trim().toLowerCase() === 'true';
+}
+
+function parseRepositoryObjectKinds(value?: string): Set<RepositoryObjectKind> {
+  const values = String(value || '')
+    .split(',')
+    .map(item => item.trim().toUpperCase())
+    .filter(Boolean);
+  const unknown = values.filter(item => !REPOSITORY_OBJECT_KINDS.includes(item as RepositoryObjectKind));
+  if (unknown.length > 0) throw new Error(`SAP_MCP_REAL_DEV_VALIDATION_OBJECTS contains unsupported kinds: ${unknown.join(', ')}.`);
+  return new Set(values as RepositoryObjectKind[]);
+}
+
+function normalizeValidationPrefix(value?: string): string {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized && !/^(?:\/[A-Z0-9_]+\/)?[A-Z][A-Z0-9_]*$/.test(normalized)) {
+    throw new Error('SAP_MCP_REAL_DEV_VALIDATION_PREFIX must be an ABAP repository-name prefix.');
+  }
+  return normalized;
 }

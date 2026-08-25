@@ -116,4 +116,31 @@ describe('AbapCreationResolver', () => {
       source: 'FUNCTION z_fm.\nENDFUNCTION.'
     }])).rejects.toMatchObject({ code: 'PARENT_NOT_FOUND' });
   });
+
+  it('derives a function-group include name from its three-character suffix', async () => {
+    const adt = client();
+    adt.searchObject.mockImplementation(async query => query === 'ZFG' ? [{
+      'adtcore:name': 'ZFG', 'adtcore:type': 'FUGR/F',
+      'adtcore:uri': '/sap/bc/adt/functions/groups/zfg', 'adtcore:packageName': 'Z001'
+    }] as never : query === 'Z001' ? [{
+      'adtcore:name': 'Z001', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/z001'
+    }] as never : []);
+
+    await expect(new AbapCreationResolver(adt, policy).resolve([{
+      objectType: 'FUNCTION_GROUP_INCLUDE', objectName: 'TOP', description: 'Top include',
+      parentFunctionGroup: 'ZFG', source: 'FUNCTION-POOL zfg.'
+    }])).resolves.toEqual([expect.objectContaining({
+      objectType: 'FUNCTION_GROUP_INCLUDE', objectName: 'LZFGTOP', creationName: 'TOP', adtType: 'FUGR/I',
+      objectUrl: '/sap/bc/adt/functions/groups/zfg/includes/lzfgtop', sourceUrl: '/sap/bc/adt/functions/groups/zfg/includes/lzfgtop/source/main',
+      packageName: 'Z001'
+    })]);
+    expect(adt.mainPrograms).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid function-group include suffix', async () => {
+    await expect(new AbapCreationResolver(client(), policy).resolve([{
+      objectType: 'FUNCTION_GROUP_INCLUDE', objectName: 'TOOLONG', description: 'Include',
+      parentFunctionGroup: 'ZFG', source: 'FUNCTION-POOL zfg.'
+    }])).rejects.toThrow('three-character suffix');
+  });
 });

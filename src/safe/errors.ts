@@ -71,7 +71,7 @@ function nextStepFor(code: SafeErrorCode): string {
     case 'SESSION_EXPLICITLY_LOGGED_OUT':
       return 'Call login explicitly before issuing another SAP operation.';
     case 'CONFIRMATION_UNSUPPORTED':
-      return 'Use an MCP client with form elicitation support or explicitly enable SAP_MCP_ALLOW_TEXT_CONFIRMATION.';
+      return 'Use a supported native confirmation provider; enable text fallback only for workflows that explicitly permit it.';
     case 'OBJECT_RESOLUTION_FAILED':
       return 'Verify the exact object type and name in ADT, then create a new preview.';
     case 'INVALID_CREATION_GRAPH':

@@ -475,8 +475,13 @@ export class AbapObjectCreationWorkflow {
 }
 
 function validateOptions(object: ResolvedCreationObject): ValidateOptions {
-  if (object.objectType === 'FUNCTION_MODULE') {
-    return { objtype: 'FUGR/FF', objname: object.objectName, description: object.description, fugrname: object.parentName };
+  if (object.objectType === 'FUNCTION_MODULE' || object.objectType === 'FUNCTION_GROUP_INCLUDE') {
+    return {
+      objtype: object.objectType === 'FUNCTION_GROUP_INCLUDE' ? 'FUGR/I' : 'FUGR/FF',
+      objname: object.objectName,
+      description: object.description,
+      fugrname: object.parentName
+    };
   }
   if (object.objectType === 'FUNCTION_GROUP') {
     return { objtype: 'FUGR/F', objname: object.objectName, description: object.description, packagename: object.packageName };
@@ -487,11 +492,12 @@ function validateOptions(object: ResolvedCreationObject): ValidateOptions {
 function newObjectOptions(object: ResolvedCreationObject, transport: string): NewObjectOptions {
   return {
     objtype: object.adtType,
-    name: object.objectName,
+    name: object.creationName || object.objectName,
     parentName: object.parentName,
     description: object.description,
     parentPath: object.parentPath,
-    transport
+    transport,
+    contentType: object.adtType === 'FUGR/I' ? 'application/vnd.sap.adt.functions.fincludes.v2+xml' : undefined
   };
 }
 

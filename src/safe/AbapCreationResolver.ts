@@ -9,7 +9,7 @@ import type {
   ResolvedCreationObject
 } from './creationTypes.js';
 
-const CREATION_TYPES = new Set<CreationObjectType>(['PROGRAM', 'FUNCTION_GROUP', 'FUNCTION_MODULE']);
+const CREATION_TYPES = new Set<CreationObjectType>(['PROGRAM', 'FUNCTION_GROUP', 'FUNCTION_MODULE', 'FUNCTION_GROUP_INCLUDE']);
 
 export class AbapCreationResolver {
   constructor(
@@ -27,7 +27,7 @@ export class AbapCreationResolver {
         && newFunctionGroup
         && object.parentFunctionGroup === newFunctionGroup.objectName) {
         object.packageName = newFunctionGroup.packageName;
-      } else if (object.objectType === 'FUNCTION_MODULE') {
+      } else if (object.objectType === 'FUNCTION_MODULE' || object.objectType === 'FUNCTION_GROUP_INCLUDE') {
         const parent = await this.requireExactObject('FUNCTION_GROUP', object.parentFunctionGroup as string);
         object.packageName = String(parent['adtcore:packageName'] || '').trim().toUpperCase();
         this.policy.assertTransportablePackage(object.packageName);
@@ -131,7 +131,7 @@ function normalizeGraph(inputs: CreationObjectInput[], policy: SafetyPolicy): Re
 
   const normalized = inputs.map(input => normalizeInput(input, policy));
   const graph = normalized.map(object => object.objectType).join(',');
-  if (!['PROGRAM', 'FUNCTION_GROUP', 'FUNCTION_MODULE', 'FUNCTION_GROUP,FUNCTION_MODULE'].includes(graph)) {
+  if (!['PROGRAM', 'FUNCTION_GROUP', 'FUNCTION_MODULE', 'FUNCTION_GROUP_INCLUDE', 'FUNCTION_GROUP,FUNCTION_MODULE'].includes(graph)) {
     throw invalidGraph('Unsupported object creation graph.');
   }
   if (graph === 'FUNCTION_GROUP') {
@@ -152,28 +152,37 @@ function normalizeGraph(inputs: CreationObjectInput[], policy: SafetyPolicy): Re
 function normalizeInput(input: CreationObjectInput, policy: SafetyPolicy): ResolvedCreationObject {
   const objectType = normalizeCreationType(input?.objectType);
   const objectName = normalizeObjectName(input?.objectName);
-  policy.assertMutationAllowed(objectName);
+  if (objectType !== 'FUNCTION_GROUP_INCLUDE') policy.assertMutationAllowed(objectName);
   const description = String(input?.description || '').trim();
   if (!description) throw invalidGraph(`description is required for ${objectName}.`);
 
-  if (objectType === 'FUNCTION_MODULE') {
+  if (objectType === 'FUNCTION_MODULE' || objectType === 'FUNCTION_GROUP_INCLUDE') {
     const parentFunctionGroup = normalizeObjectName(input.parentFunctionGroup || '');
     policy.assertMutationAllowed(parentFunctionGroup);
     if (input.packageName) throw invalidGraph('FUNCTION_MODULE must not provide packageName.');
     const source = requireSource(input.source, objectType, objectName);
-    assertSourceFrame(objectType, objectName, source);
+    if (objectType === 'FUNCTION_MODULE') assertSourceFrame(objectType, objectName, source);
     const parentPath = functionGroupUrl(parentFunctionGroup);
-    const objectUrl = `${parentPath}/fmodules/${encodeSegment(objectName)}`;
+    const creationName = objectType === 'FUNCTION_GROUP_INCLUDE' ? validateIncludeSuffix(objectName) : undefined;
+    const fullName = objectType === 'FUNCTION_GROUP_INCLUDE'
+      ? deriveFunctionGroupIncludeName(parentFunctionGroup, creationName as string)
+      : objectName;
+    // Generated include names begin with SAP's `L` prefix (for example LZFGTOP),
+    // so the parent function-group namespace is the authoritative policy boundary.
+    const objectUrl = objectType === 'FUNCTION_GROUP_INCLUDE'
+      ? `${parentPath}/includes/${encodeSegment(fullName)}`
+      : `${parentPath}/fmodules/${encodeSegment(objectName)}`;
     return {
       objectType,
-      objectName,
+      objectName: fullName,
       description,
-      adtType: 'FUGR/FF',
+      adtType: objectType === 'FUNCTION_GROUP_INCLUDE' ? 'FUGR/I' : 'FUGR/FF',
       packageName: '',
       parentName: parentFunctionGroup,
       parentPath,
       parentFunctionGroup,
       objectUrl,
+      creationName,
       sourceUrl: `${objectUrl}/source/main`,
       activationParentUrl: parentPath,
       source,
@@ -219,7 +228,7 @@ function normalizeInput(input: CreationObjectInput, policy: SafetyPolicy): Resol
 function normalizeCreationType(value: string): CreationObjectType {
   const normalized = String(value || '').trim().toUpperCase() as CreationObjectType;
   if (!CREATION_TYPES.has(normalized)) {
-    throw invalidGraph('objectType must be PROGRAM, FUNCTION_GROUP, or FUNCTION_MODULE.');
+    throw invalidGraph('objectType must be PROGRAM, FUNCTION_GROUP, FUNCTION_MODULE, or FUNCTION_GROUP_INCLUDE.');
   }
   return normalized;
 }
@@ -257,8 +266,21 @@ function matchesObject(
     case 'PROGRAM': return type.startsWith('PROG/P') || uri.includes('/PROGRAMS/PROGRAMS/');
     case 'FUNCTION_GROUP': return type === 'FUGR/F' || /\/FUNCTIONS\/GROUPS\/[^/]+$/.test(uri);
     case 'FUNCTION_MODULE': return type.startsWith('FUGR/FF') || uri.includes('/FMODULES/');
+    case 'FUNCTION_GROUP_INCLUDE': return type === 'FUGR/I' || uri.includes('/FUNCTIONS/GROUPS/') && uri.includes('/INCLUDES/');
     case 'PACKAGE': return type === 'DEVC/K' || uri.includes('/PACKAGES/');
   }
+}
+
+function validateIncludeSuffix(value: string): string {
+  if (!/^[A-Z][A-Z0-9_]{2}$/.test(value)) {
+    throw invalidGraph('FUNCTION_GROUP_INCLUDE name must be a three-character suffix starting with a letter.');
+  }
+  return value;
+}
+
+function deriveFunctionGroupIncludeName(functionGroup: string, suffix: string): string {
+  const parts = functionGroup.split('/');
+  return parts.length < 3 ? `L${functionGroup}${suffix}` : `/${parts[1]}/L${parts[2]}${suffix}`;
 }
 
 function packageUrl(packageName: string): string {
