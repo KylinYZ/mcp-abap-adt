@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+- Fix a reentrant `ToolExecutionGate` deadlock by keeping repository-object confirmation and local status reads outside the outer SAP gate while retaining the confirmed workflow inside the single SAP slot.
+- Add a Windows interactive confirmation provider with a Chinese SAP-style dialog, Explorer broker launch, one-time named-pipe response, bounded challenge binding, and no TCP listener or SAP credentials in the helper.
+- Normalize SAP's empty default DDIC domain `valueInformation` during active verification without ignoring non-empty value tables, fixed values, or append flags.
+- Add one-time campaign configuration for the explicit current 31 repository kinds, freeze package identity separately from business parents, and validate function-group Includes by their prefixed parent plus three-character suffix.
+- Align repository preview validation with target discovery: SAP ASX for source/package/DESD validation, separate package constraint media types, bounded message-class `messages`, and successful empty validation acknowledgements.
+- Verify the Windows cancel and apply confirmation paths in Codex Desktop. A scoped DEV run created and activated `DDIC_DOMAIN` `ZZMCP_VT_DOM`; active properties matched the plan, but cleanup and maturity promotion remain pending.
+
 ## [0.5.0] - 2026-08-18
 - Resolve exact `FUGR/I` function-group includes through the guarded inspect/preview/apply workflow without adding an invalid main-program context.
 - Expose read-only `getObjectSource` in `development`, `diagnostic-readonly`, and `development-workbench` while keeping it out of `safe`, business, and operations profiles.

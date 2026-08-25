@@ -16,21 +16,49 @@
 
 ## 功能
 
-当前代码按 profile 注册四套工具面：
+当前代码按 profile 注册七套工具面：
 
 | Profile | 工具数 | 功能范围 | 建议用途 |
 | --- | ---: | --- | --- |
 | `safe`（默认） | 7 | 受控读取/修改 `PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE`，以及受控创建 `PROGRAM`、`FUNCTION_GROUP`、`FUNCTION_MODULE` | 日常 AI 辅助 ABAP 开发 |
-| `development` | 119 | 向后兼容的宽开发与诊断工具面 | 现有开发客户端 |
+| `development` | 124 | 向后兼容的宽开发与诊断工具面，并提供受控仓库对象创建平台五工具 | 现有开发客户端 |
 | `diagnostic-readonly` | 99 | 向后兼容的宽只读诊断工具面 | 现有诊断客户端 |
 | `legacy-full` | 161 | 7 个安全工具 + 6 个高层运行工具 + 148 个原始低层 ADT 工具 | 仅 DEV 的兼容与专家直接控制 |
-| `development-workbench` | 82 | 聚焦开发、安全调试、受控高级操作和质量检查 | ABAP 开发 Skill |
+| `development-workbench` | 87 | 聚焦开发、安全调试、受控高级操作、质量检查和仓库对象创建能力目录 | ABAP 开发 Skill |
 | `business-readonly` | 17 | 先取 schema、再做有界业务数据读取 | 业务数据 Skill |
 | `operations-readonly` | 40 | 运行、版本、trace 和已有调试现场证据 | 运维 Skill |
 
 `0.4.0` 新增 `readRuntimeDumps`、`describeClassicTable`、`inspectSapSystem`、`getAbapMemberSource` 四个高层只读工具，以及仅 DEV `development-workbench` 可见的 `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus`。按 SAP 返回的精确 ADT URL 读取源码的 `getObjectSource` 在 `development`、`diagnostic-readonly`、`legacy-full` 和 `development-workbench` 中开放，但不进入 `safe`、业务和运维 Profile。成员级或 URL 级源码只用于聚焦阅读；任何源码写入仍必须先用 `inspectAbapObject` 读取完整对象作为基线。大型源码可使用可选 `startLine`/`maxLines` 分页，每页都返回完整源码哈希和行覆盖信息，调用方必须拒绝缺页或哈希漂移。
 
+`development` 与 `development-workbench` 在 DEV 额外提供 `list/describe/preview/apply/status` 五个受控仓库对象创建工具。当前切片已完成能力目录、计划状态机、原生确认、未知结果停止和 Profile 双重门控；首批五类对象都已接入自动化适配器：程序/函数对象复用现有受控创建工作流，包/数据库表使用类型化 Eclipse ADT 契约。即使 `writable=false`，preview 也会返回完整源码、对象图或属性供审阅；apply 仍必须等对应适配器经过独立确认的真实 DEV 全链路验证后才开放。
+
+仓库对象创建的确认 provider 由 `SAP_MCP_CONFIRMATION_PROVIDER` 固定选择，默认 `auto`。`auto` 会在实际确认时优先使用客户端支持的 MCP form；Windows 客户端不支持 form 时，才通过 Explorer broker 在当前交互桌面显示系统原生 Apply/Cancel 弹窗，并用一次性 named pipe 回传结果。确认框的有效期按北京时间（UTC+08:00）显示，等待时间最长 15 分钟且不会超过计划剩余有效期。该流程不开放 TCP 端口，也不向 helper 提供 SAP 凭据。可显式选择 `windows-native` 或 `mcp-form`。`mcp-app` 在 App-only 隔离未验证前会安全拒绝，不会回退为文字确认或调用方布尔值。
+
+2026-08-24 已在 Codex Desktop 完成 Windows 路径端到端复核：取消能返回原始 `tools/call`，同一 session 随后仍可查询状态；确认创建也不会再发生自锁。原自锁由 `applyRepositoryObjectCreation` 先占用唯一外层 SAP gate、确认后又等待同一 gate 执行 workflow 引起。当前仓库 apply/status 不占外层 gate，只有确认后的完整 SAP workflow 在 gate 内串行执行一次。
+
+同日经单独授权的精确 DEV 验证在包 `Z001`、传输 `S4HK900009` 中创建并激活了 `DDIC_DOMAIN` `ZZMCP_VT_DOM`，独立 active 复读确认 `CHAR(10)` 和输出标志与计划一致。历史计划仍保留 `OUTCOME_UNKNOWN`：旧验证器把 SAP 自动补出的空 `valueInformation` 与调用方省略该可选块误判为不同；当前比较只规范化这个空默认值，非空值表、固定值和 append 标志仍严格比较。31 类创建侧活动现已全部形成明确结果；由于清理和传输收尾尚未完成，能力仍保持 `writable=false`。后续按产品化计划逐类晋级，每次真实操作仍需独立确认。
+
+Phase 2 已把类、接口、Include、四类 CDS 源对象、Service Definition、Behavior Definition、CDS Type、CDS Aspect、CDS Entity Buffer 和 Service Binding 共十三类对象纳入同一能力目录，十三类均已完成类型化 ADT 契约、受控 preview/apply 生命周期和失败路径自动化验证，当前为 `AUTOMATION_VERIFIED`、`available=true`、`writable=false`。另已接入 `DDIC_STRUCTURE`、`DDIC_TYPE_GROUP` 和 `DDIC_LOCK_OBJECT` 的受控生命周期；其创建媒体类型严格来自 ADT discovery，因此当前为 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false`。Type Group 固定为 `TYPE/DG`，名称最多五个字符，源码必须声明匹配的 `TYPE-POOL`。Lock Object 使用结构化 XML，不走源码写入或单独激活，固定 `allowRFC=false` 和空锁模式，并要求已存在的主表。CDS Type 使用 `DRTY/STY`、名称最多 40 个字符；CDS Aspect 使用 `DRAS/RAS`、名称最多 30 个字符；Entity Buffer 使用 `DTEB/DF`，必须绑定现有 active CDS 实体，源码声明 `layer` 与 `type`。DCL、Metadata Extension、Service Definition、Behavior Definition 与 Entity Buffer 计划会绑定现有 active CDS 引用并在 apply 时复核；Service Binding 会绑定现有 active Service Definition，并复核 OData V2/V4 与 UI/Web API 配置。Service Definition 固定为定义变体；Behavior Extension 暂不开放，Behavior Definition 的仓库名必须与根 CDS 实体同名。Eclipse ADT 3.60.2 的类创建默认值固定为 public/final。本阶段尚未执行真实 SAP 写入。
+
+完整覆盖口径已改为 Eclipse ADT 3.60.2 的已安装 New Wizard，而不是只统计显式 `creationAdapter`。本机 JAR 审计得到 142 个 ABAP 创建向导候选、28 个显式 adapter；当前能力目录覆盖其中 31 个，尚有 111 个待逐类提取协议，且 0 个达到 `REAL_DEV_VERIFIED`。`FUGR/I` 已注册为受控的三字符 suffix 函数组 include 能力，`DTEL/DE`、`DOMA/DD` 与 `MSAG/N` 已接入受控的壳创建、属性/源码写入、激活和复读适配器；`TTYP/DA` 也已接入结构化 XML 受控生命周期，预定义行类型及长度/小数位规则来自目标系统 `/sap/bc/adt/ddic/codecompletion?type=abapType`，包括 `CURR` 与 `QUAN`。所有能力在真实 DEV 验证前仍不可写；`VIEW/DV` 仍处于协议提取阶段。静态证据见 [ADT 3.60.2 创建向导清单](docs/evidence/eclipse-adt-3.60.2-creation-wizard-manifest.json)，可用 `npm run check:repository-creation-coverage` 检查代码映射，并通过 `SAP_ADT_ECLIPSE_PLUGINS` + `npm run audit:eclipse-adt-creation` 复核本机插件。
+
 内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
+
+`LOGICAL_EXTERNAL_SCHEMA`（`DESD/TYP`）已完成 server-driven 受控切片，当前为 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false`。流程会冻结目标 `$schema`，创建 Blue v1 壳，通过对象 source link 写入受控 objectTypes.v1 JSON，激活并复读；SAP 管理的 `usesRouting=true` 会被拒绝。本切片未执行真实 SAP 写入。
+
+`NUMBER_RANGE_OBJECT`（`NROB/NRO`）也已完成同等级的 server-driven 受控生命周期，当前为 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false`。preview 会冻结目标 objectTypes.v1 `$schema`、Blue v1 壳媒体类型、包/传输身份，以及 active Domain、Data Element、Transaction 依赖；apply 只能写入评审后的 `application/json` 区间与缓冲字段，并复读 workingArea 和 active 内容。调用方不能提供 URL、JSON、媒体类型或 lock handle。`ZVNRO1` 已完成真实 DEV 创建、激活和 active JSON 复读；清理与传输收尾仍待完成。
+
+`SAP_OBJECT_TYPE`（`RONT/ROT`）是当前能力目录注册的第 24 类对象，已达到 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false`。preview 会冻结目标 Blue v2 discovery 和三份 `newObjectTypes.v1` `$new` 契约，把六类受控类别映射为 Eclipse 使用的 `bo`/`to`/`ao`/`co`/`do`/`ho`，并在内部派生大写仓库名、metadata、base64 JSON、XML、URL 和媒体类型。apply 只执行一次壳 POST，复核 inactive JSON，激活一次，再复读 active metadata、内容及 SAP 生成的 `objectTypeCode`；调用方不能提交这些协议字段或生成码。Eclipse ADT 3.60.2 JAR 行为与目标 DEV discovery、schema、configuration、content、validation 已完成只读核验，但没有执行真实 RONT 创建、激活、删除或清理，因此仍不开放写入。
+
+`SAP_OBJECT_NODE_TYPE`（`NONT/NOT`）是能力目录注册的第 26 类对象，同样为 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false`。公开输入只允许 PascalCase 节点名、描述、包、传输、大写的现有 RONT 仓库名和显式 `rootNode` 选择。preview 会冻结 active RONT 的 URI、CamelCase 语义名、Blue v2 discovery 及三份 `newObjectTypes.v1` 契约；apply 重新核验引用与契约后只执行一次壳 POST 和一次激活，并复读 inactive/active JSON。active `sapObjectType` 必须等于冻结的 RONT 语义名，一个 RONT 只能有一个 root node 的约束仍由 SAP 判定。Eclipse ADT 3.60.2 JAR 行为与目标 DEV discovery、契约、validation 和 active 示例已完成只读核验，但没有执行真实 NONT 创建、激活、删除或清理。
+
+`MESSAGE_CLASS`（`MSAG/N`）是能力目录注册的第 29 类对象，已完成 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false` 的受控源码切片。公开输入仅包含消息类名称、描述、包/传输，以及可选的 `001`–`999` 三位消息号和最多 72 个可打印字符的消息文本；长文本和消息文档暂不开放。preview 冻结 ADT 源码契约，apply 只创建一次壳、锁定、写入受控 `mc:messages` 源码、解锁、激活一次，并复核 inactive/active 源码及对象身份；激活或后续复核不明确即进入不可重试的 `OUTCOME_UNKNOWN`，绝不自动删除。当前未执行真实 MSAG 创建、激活、删除或清理。
+
+`DDIC_TABLE_TYPE`（`TTYP/DA`）已接入结构化 XML 受控生命周期，公开输入只允许行类型、目标系统公布的预定义类型、长度/小数位范围、表访问类型及已确认的主键/二级键默认值。`CURR`、`QUAN` 不再被静态拒绝，其边界来自目标系统 `abapType` 能力响应。adapter 会保留服务器返回的 value-help 模板，只替换受控属性，随后执行工作区复读、解锁、激活和 active 复读；任意 XML、URL、媒体类型、链接和 lock handle 均不开放。高级 key-components 请求体仍需独立 Eclipse 抓包后再接入。
+
+`CHANGE_DOCUMENT_OBJECT`（`CHDO/CHD`）是能力目录注册的第 31 类对象之一，已完成 `CONTROLLED_IMPLEMENTED`、`available=true`、`writable=false` 的 server-driven 受控切片。公开输入仅包含最多 15 字符的对象名、类别、包/传输、评审后的表或结构、可选 CURR/QUAN 引用表、日志选项，以及现有消息类与三位消息号；`generatedObject`、JSON、XML、URL、媒体类型和 lock handle 均不对调用方开放。preview 会冻结 Blue v1/objectTypes.v1 契约及全部 active 引用，并把公开的 `behaviorDefinition` 映射成 SAP ADT 3.60.2 schema 中的 `behaviorDefiniton` 拼写。apply 只创建一次壳、写入一次受控 JSON、复读 workingArea、解锁并激活一次；`standard` 必须复核出 active `FUGR/FF`，`behaviorDefinition` 必须复核出 active `CLAS/OC`。由于激活会生成额外仓库对象，激活或其后复核一旦不明确即进入不可重试的 `OUTCOME_UNKNOWN`，绝不自动删除。JAR 行为、目标 DEV discovery/schema/configuration 及 20 个 active 示例已只读核验，但未执行真实 CHDO 创建、激活、生成对象删除或清理。
+
+31 类创建侧验证已于 2026-08-25 完成并全部形成明确结果；当前目标已转为逐类产品化，完成清理与传输证据后晋级 `REAL_DEV_VERIFIED`，使其在关闭临时验证开关后正式可用。当前状态与新会话接手说明见 [产品化交接](docs/evidence/repository-creation-productionization-handoff.md)，实施顺序见 [产品化计划](docs/superpowers/plans/2026-08-25-repository-creation-productionization-plan.md)。
 
 ### 默认 `safe` 模式
 
@@ -159,12 +187,12 @@ stateful ADT HTTP 会话与 SAP GUI 登录彼此独立。只读调用收到明�
 
 ### 当前验证状态
 
-截至 2026-08-14，当前自动化基线已经覆盖内置 ADT 客户端、全部注册工具、Profile/角色策略和受控工作流：
+截至 2026-08-20，当前自动化基线已经覆盖内置 ADT 客户端、全部注册工具、Profile/角色策略和受控工作流：
 
-- **自动化验证**：61 个 Jest 测试套件、430 项测试全部通过，覆盖内置客户端表面、四个高层只读工具、受控质量检查、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
+- **自动化验证**：106 个 Jest 测试套件、719 项测试全部通过，覆盖 202 个方法的内置 ADTClient 表面、四个高层只读工具、受控质量检查与仓库对象创建平台、Windows 确认、gate 自锁回归、冻结包身份、函数组 Include 活动校验、DDIC 默认值、validation ASX 和 Package discovery constraints、类/接口/Include/CDS/Service Binding/DESD/NROB/RONT/NONT/CHDO 类型化 ADT 契约、21 个原始工具、6 个受控高级工具、安全源码/创建/调试流程、Profile/角色 dispatch、请求/响应限制、有界状态、源码换行规范化、SM21、日志和审计串行写入。
 - **动态目录验证**：2026-08-17 使用真实 `dist/index.js` 完成 35 个 profile/role runtime session 和 14 个隐藏工具直调拒绝检查，未调用 SAP。
 - **真实 SAP 只读验证**：四个新高层读取已在配置的 DEV/QAS/PRD 系统通过；证据未保存业务行、dump 文本或源码。
-- **仍未验证**：真实 ATC/ABAP Unit 执行、SAP 写入和安全调试控制。
+- **仍未验证**：`ZZMCP_VT_DOM` 的独立清理与 `DDIC_DOMAIN` 成熟度晋级、其余仓库对象真实创建、真实 ATC/ABAP Unit 执行、受控 DDIC 属性/包迁移/RAP 写入，以及安全调试控制。
 - **真实 SAP DEV 成功流程**：`PROGRAM`、`INCLUDE`、`CLASS`、`FUNCTION_MODULE` 均完成真实读取、预览、锁定、写入、语法检查、解锁、激活、复读哈希和审计验证。
 - **真实保护流程**：已验证预览语法错误、用户持锁、源码漂移、MCP 重启后计划失效、计划自然过期、成功计划不可重复消费、原生弹框应用/取消/关闭和确认超时。
 - **真实回滚流程**：在源码写入后可控地模拟第一次激活失败，工作流成功重新获取恢复锁、写回原源码、解锁、真实激活原版本、复核原始哈希，并进入 `ROLLED_BACK`；最终无残留锁或目标非活动版本。
@@ -243,6 +271,7 @@ SAP_MCP_ALLOWED_DEBUG_USERS=
 SAP_MCP_DEBUG_AUTH_TTL_SECONDS=900
 SAP_MCP_AUDIT_PATH=C:\sap-mcp-audit
 SAP_MCP_ALLOW_TEXT_CONFIRMATION=false
+SAP_MCP_CONFIRMATION_PROVIDER=auto
 SAP_MCP_ADT_TIMEOUT_MS=60000
 SAP_MCP_MAX_CONCURRENT_TOOLS=1
 SAP_MCP_MAX_QUEUED_TOOLS=50
