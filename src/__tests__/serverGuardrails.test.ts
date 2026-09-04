@@ -287,6 +287,8 @@ describe('server guardrail integration helpers', () => {
     ['runQualityCheck', false],
     ['getQualityCheckStatus', false],
     ['healthcheck', false],
+    ['sap', false],
+    ['sapDoctor', false],
     ['inspectAbapObject', true],
     ['previewAbapChange', true],
     ['previewAbapObjectCreation', true],

@@ -2,13 +2,17 @@
 
 ## 项目定位
 
-本项目内置完整 ADT 客户端，生产运行不依赖外部 `abap-adt-api` 包；上游来源和许可证记录在 `third-party/abap-adt-api/`。默认 `safe` 模式只开放七个受控 ABAP 源码变更与对象创建工具，`development` 增加安全调试、只读诊断和三组受控高级操作，`legacy-full` 在 DEV 上开放原始低层 ADT 能力和可选 SM21/ST22 运行日志分析。
+本项目是带内置 ADT 客户端的 SAP ABAP MCP 服务。生产运行不依赖外部
+`abap-adt-api` 包；上游来源和许可证见 `third-party/abap-adt-api/`。
+默认 `focused` profile（别名 `developer`）面向开发人员，提供开发工作台能力；`business` 与 `operations` 分别是业务顾问和运维只读入口；`expert` 保留 DEV 专家兼容面。`safe`、`development` 等旧 profile 继续兼容。
+新用户入口与能力分层见 `docs/产品定位.md`；不要把兼容 profile 名称重新写成产品入口。
+## 当前发布与事实基线
 
-## 当前分发状态
-
-- `0.5.0` 已于 2026-08-18 以 `@kylinyz/mcp-abap-abap-adt-api` 发布到 npm；远程仓库为 `KylinYZ/mcp-abap-adt`，上游为 `mario-andreschak/mcp-abap-abap-adt-api`。
-- 常规安装使用 `npx -y @kylinyz/mcp-abap-abap-adt-api@0.5.0`；本地开发、契约验证或未发布修改仍使用 `node` 启动当前源码构建的 `dist/index.js`。
-- 不要给出不带作用域的 `npx mcp-abap-abap-adt-api`，那会解析到原作者的独立旧包；Marketplace/MCP Registry 状态仍需单独核验。
+- 当前版本：`0.6.0`；npm 包：`@kylinyz/mcp-abap-abap-adt-api@0.6.0`。
+- 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
+- profile 目录：`safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=90`、`business-readonly=18`、`operations-readonly=41`。
+- 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
+- 自动化基线：109 个 Jest suites、793 个 tests（2026-09-04）。
 
 ## 开发与验证
 
@@ -16,32 +20,40 @@
 npm install
 npm test -- --runInBand
 npm run build
-npm run test:repository-productionization-runtime -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env"
-npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env" ZVPV001
+npm run check:repository-creation-coverage
 git diff --check
 ```
 
-当前 runtime catalog 常规基线为 `safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=87`、`business-readonly=17`、`operations-readonly=40`；仅当 `SAP_MCP_REAL_DEV_VALIDATION=true` 时，DEV `development` / `development-workbench` 额外开放 3 个独立确认的 cleanup 工具，分别为 127 / 90。仓库对象创建目录注册 31 类对象；当前成熟度为 `REAL_DEV_VERIFIED=28`、`AUTOMATION_VERIFIED=2`、`CONTROLLED_IMPLEMENTED=1`，自动化基线为 109 suites / 793 tests。修改源码、`.env` 或构建输出后，必须硬重启 MCP 客户端，并用 healthcheck session 重置与旧 plan `PLAN_NOT_FOUND` 验收。
+真实 SAP smoke 仅在明确授权且使用专用 DEV 配置时运行：
 
-## 目录与约定
+```powershell
+npm run test:repository-productionization-runtime -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env"
+npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env" ZVPV001
+```
 
-- `src/safe/`：安全策略、计划、确认、审计与变更工作流。
-- `src/adt/`：内置 ADT 客户端；`src/adt/index.ts` 是 MCP 内部唯一稳定导入入口。
-- `src/config/`、`src/lib/`：运行时配置、执行门控、限流、缓存和日志。
-- `src/handlers/`：MCP 工具处理器；不要让低层写入绕过 profile 边界。
-- `README.md`、`README.zh-CN.md`：项目概览和现役状态。
-- `docs/使用指南.md`：中文安装、接入与操作权威指南。
-- `.env.example`：配置字段和推荐默认值；不得提交真实 `.env` 或凭据。
+修改源码、`.env` 或 `dist` 后必须硬重启 MCP 客户端，并确认新 healthcheck session 与旧 plan `PLAN_NOT_FOUND`。
+
+## 目录约定
+
+- `src/adt/`：内置 ADT 客户端；`src/adt/index.ts` 是稳定内部入口。
+- `src/safe/`：安全策略、计划、确认、成熟度证据和受控工作流。
+- `src/config/`、`src/lib/`：配置、profile、执行门控、限流、缓存和日志。
+- `src/handlers/`：MCP 工具处理器；低层写入不得绕过 profile 边界。
+- `docs/使用指南.md`：中文安装、接入、工具和运维权威指南。
+- `docs/evidence/`：真实 DEV 证据、成熟度 manifest 和当前创建矩阵。
+- `PROGRESS.md`、`BLOCKED.md`：精简状态与阻塞索引；历史细节留在证据/CHANGELOG。
+- `.env.example`：配置字段示例；不得提交真实 `.env` 或凭据。
 
 ## 安全边界
 
-- 优先 CodeGraph 定位，再用 `rg` 做完整性确认。
-- 对真实 SAP 调用保持串行；默认 `SAP_MCP_MAX_CONCURRENT_TOOLS=1`。
-- QAS、PRD、缺失或非法系统角色对所有 Profile 都只能执行本地/只读工具；目录隐藏和 dispatch 拒绝必须同时保留。
-- 源码变更/创建按既有确认策略执行。仓库对象创建只允许 Server 固定的可信 provider：Windows 默认使用 Explorer broker、中文原生窗口和一次性 named pipe，其他平台使用 MCP form；DDIC 属性、包迁移和 RAP apply 仍只允许 MCP form。上述高风险路径均不接受文字或调用方布尔降级。
-- `DDIC_DOMAIN` 的旧身份 `ZZMCP_VT_DOM` 仍保留 `OUTCOME_UNKNOWN`，不得重放；该类型已通过全新身份 `ZVPD02` 的完整证据独立晋级。
-- 31 类创建侧活动已结束且每类都有明确结果；当前 23 类已达到 `REAL_DEV_VERIFIED`。cleanup 证据采用双模式：既有/已下传对象必须保留唯一 `OBJFUNC=D`；创建前不存在且在同一未释放传输中创建、验证、删除的对象，可用唯一精确 neutral CTS 条目证明本地移除。缺少 create/readback/transport/cleanup/absence 任一证据、neutral 条目重复、跨传输、已释放传输或复用历史失败身份时，Registry 与 coverage 都必须失败关闭。禁止修改 E071/E071K 或删除/释放传输。接手入口为 `docs/evidence/repository-creation-productionization-handoff.md`。每次创建和删除均需各自独立原生确认，任一未知结果不得重放。
-- 原始 `legacy-full` 写工具绕过受控 workflow，只用于明确的专家兼容场景；启用工具不等于获得真实写入授权。
-- 远端写入、迁移、生成或发布结果未知时先只读核验，禁止盲目重试。
-- 不创建或释放传输，不连接生产系统，不在未确认时执行真实写入。
-- 汇报时区分自动化、真实 SAP 已验证和仍待运行环境确认的内容。
+- 先用 CodeGraph 定位，再用 `rg` 做完整性确认。
+- 真实 SAP 调用保持串行，默认 `SAP_MCP_MAX_CONCURRENT_TOOLS=1`。
+- QAS、PRD、缺失或未知系统角色只允许本地/只读工具；隐藏和 dispatch 拒绝必须同时保留。
+- 所有受控写入必须经过 server 生成的 preview plan、一次原生确认和 apply；不得接受调用方确认布尔值、任意 URL、XML、JSON、媒体类型或 lock handle。
+- `REAL_DEV_VERIFIED` 只能由完整 create/readback/transport/cleanup/absence 证据启用；未知结果不得重放或自动删除。
+- 不连接生产，不创建或释放传输，不修改 E071/E071K，不执行数据库写操作。
+- 报告时明确区分自动化、真实 SAP 已验证、部署状态和仍待环境确认的内容。
+
+## 证据与历史
+
+当前创建状态以 `docs/evidence/repository-validation-campaign-matrix.md` 为准；交接入口为 `docs/evidence/repository-creation-productionization-handoff.md`。`PROGRESS.md` 与 `BLOCKED.md` 只保留当前结论和历史 issue 索引，不再复制逐次会话流水账。

@@ -109,6 +109,7 @@ import { AbapMemberSourceReader } from './read/AbapMemberSourceReader.js';
 import { SessionSupervisor } from './lib/SessionSupervisor.js';
 import { sessionResilienceConfigFromEnvironment, type SessionResilienceConfig } from './config/SessionResilienceConfig.js';
 import { resolveSapPassword } from './config/CredentialProvider.js';
+import { FocusedTaskHandlers } from './handlers/FocusedTaskHandlers.js';
 
 const environmentFile = selectEnvironmentFile(
   process.env.SAP_MCP_ENV_FILE,
@@ -134,6 +135,7 @@ export class AbapAdtServer extends Server {
   private safeQualityHandlers: SafeQualityHandlers;
   private repositoryObjectCreationHandlers: RepositoryObjectCreationHandlers;
   private highLevelReadHandlers: HighLevelReadHandlers;
+  private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
   private objectHandlers: ObjectHandlers;
@@ -497,6 +499,11 @@ export class AbapAdtServer extends Server {
       runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
     });
 
+    this.focusedTaskHandlers = new FocusedTaskHandlers(
+      (toolName, argumentsValue) => this.executionGate.run(() => this.dispatchTool(toolName, argumentsValue)),
+      () => this.healthcheckResult()
+    );
+
 
         // Setup tool handlers
     this.toolCatalog = this.createToolCatalog();
@@ -604,6 +611,7 @@ export class AbapAdtServer extends Server {
     const qualityTools = this.safeQualityHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
     const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools];
+    const focusedTools = this.focusedTaskHandlers.getTools();
     const legacyTools = [
         ...this.authHandlers.getTools(),
         ...this.transportHandlers.getTools(),
@@ -646,6 +654,7 @@ export class AbapAdtServer extends Server {
       ...completeControlledAdvancedTools,
       ...qualityTools,
       ...runtimeTools,
+      ...focusedTools,
       ...legacyTools
     ];
     assertToolCatalogClassified(completeCatalog.map(tool => tool.name));
@@ -657,7 +666,8 @@ export class AbapAdtServer extends Server {
       safeDebugTools,
       this.safetyPolicy.systemRole,
       controlledAdvancedTools,
-      qualityTools
+      qualityTools,
+      focusedTools
     ).map(withCanonicalToolMetadata);
   }
 
@@ -671,6 +681,9 @@ export class AbapAdtServer extends Server {
         this.safetyPolicy.assertToolOperationAllowed(toolName);
         if (!this.toolCatalog.some(tool => tool.name === toolName)) {
           throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the ${this.safetyPolicy.toolProfile} tool profile.`);
+        }
+        if (this.focusedTaskHandlers.supports(toolName)) {
+          return this.focusedTaskHandlers.handle(toolName, limitedArguments);
         }
         if ((this.safetyPolicy.toolProfile === 'legacy-full'
           || this.safetyPolicy.toolProfile === 'development'
@@ -922,27 +935,31 @@ export class AbapAdtServer extends Server {
                 result = await this.revisionHandlers.handle(toolName, limitedArguments);
                 break;
             case 'healthcheck':
-                result = {
-                  status: 'healthy',
-                  scope: 'mcp-process',
-                  sapConnectionVerified: false,
-                  configuredTarget: {
-                    host: this.safetyPolicy.systemHost,
-                    client: this.safetyPolicy.client,
-                    toolProfile: this.safetyPolicy.toolProfile,
-                    systemRole: this.safetyPolicy.systemRole
-                  },
-                  session: this.sessionSupervisor?.snapshot(),
-                  sessionRecovery: this.sessionResilience.sessionRecovery,
-                  statelessReads: this.sessionResilience.statelessReads,
-                  timestamp: new Date().toISOString()
-                };
+                result = this.healthcheckResult();
                 break;
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
         }
 
         return result;
+  }
+
+  private healthcheckResult(): Record<string, unknown> {
+    return {
+      status: 'healthy',
+      scope: 'mcp-process',
+      sapConnectionVerified: false,
+      configuredTarget: {
+        host: this.safetyPolicy.systemHost,
+        client: this.safetyPolicy.client,
+        toolProfile: this.safetyPolicy.toolProfile,
+        systemRole: this.safetyPolicy.systemRole
+      },
+      session: this.sessionSupervisor?.snapshot(),
+      sessionRecovery: this.sessionResilience.sessionRecovery,
+      statelessReads: this.sessionResilience.statelessReads,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async run() {

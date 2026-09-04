@@ -33,14 +33,21 @@ describe('tool catalog integrity and raw advanced role policy', () => {
     ['development', 124],
     ['diagnostic-readonly', 99],
     ['legacy-full', 161],
-    ['development-workbench', 87],
-    ['business-readonly', 17],
-    ['operations-readonly', 40]
+    ['development-workbench', 90],
+    ['business-readonly', 18],
+    ['operations-readonly', 41]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;
     expect(catalog).toHaveLength(expected);
     expect(new Set(catalog.map(tool => tool.name))).toHaveProperty('size', expected);
+  });
+
+  it('maps the developer-first focused entry point to the workbench catalog', () => {
+    const focused = configureServer('DEV', 'focused');
+    const workbench = configureServer('DEV', 'development-workbench');
+    expect((focused as any).toolCatalog.map((tool: { name: string }) => tool.name))
+      .toEqual((workbench as any).toolCatalog.map((tool: { name: string }) => tool.name));
   });
 
   it.each([

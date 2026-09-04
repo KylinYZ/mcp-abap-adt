@@ -28,6 +28,7 @@ export const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
 export const READ_ONLY_LEGACY_TOOL_COUNT = READ_ONLY_LEGACY_TOOL_NAMES.size;
 
 export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
+  'sap', 'sapDoctor',
   'inspectAbapObject', 'previewAbapChange', 'applyAbapChange', 'getAbapChangeStatus',
   'previewAbapObjectCreation', 'applyAbapObjectCreation', 'getAbapObjectCreationStatus',
   'previewDebugOperation', 'applyDebugOperation', 'authorizeDebugSession', 'executeDebugCommand',
@@ -39,6 +40,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'transportInfo', 'objectStructure', 'objectStructureElements', 'searchObject', 'findObjectPath',
   'objectTypes', 'classIncludes', 'classComponents', 'syntaxCheckCode', 'syntaxCheckCdsUrl',
   'findDefinition', 'usageReferences', 'usageReferenceSnippets', 'fragmentMappings', 'typeHierarchy',
+  'unitTestEvaluation',
   'objectEnhancements', 'getObjectSource', 'inactiveObjects', 'mainPrograms', 'annotationDefinitions', 'ddicElement',
   'ddicRepositoryAccess', 'packageSearchHelp', 'getDomainProperties', 'getDataElementProperties',
   'getTextElements', 'bindingDetails', 'tableContents', 'runQuery', 'debuggerListeners',
@@ -53,6 +55,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([
+  'sapDoctor',
   'healthcheck', 'inspectSapSystem', 'describeClassicTable',
   'searchObject', 'findObjectPath', 'objectTypes', 'objectStructure', 'objectStructureElements',
   'annotationDefinitions', 'ddicElement', 'ddicRepositoryAccess', 'getDomainProperties',
@@ -60,6 +63,7 @@ export const BUSINESS_READONLY_TOOL_NAMES = new Set([
 ]);
 
 export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
+  'sapDoctor',
   'healthcheck', 'inspectSapSystem', 'readRuntimeDumps', 'sm21Read', 'analyzeRuntimeErrors',
   'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
   'userTransports', 'transportsByConfig', 'systemUsers', 'transportReference',
@@ -79,7 +83,8 @@ export function selectProfileTools(
   safeDebugTools: ToolDefinition[] = [],
   systemRole = 'DEV',
   controlledAdvancedTools: ToolDefinition[] = [],
-  qualityTools: ToolDefinition[] = []
+  qualityTools: ToolDefinition[] = [],
+  focusedTools: ToolDefinition[] = []
 ): ToolDefinition[] {
   let selected: ToolDefinition[];
   if (profile === 'safe') selected = safeTools;
@@ -101,6 +106,7 @@ export function selectProfileTools(
       ...safeDebugTools,
       ...controlledAdvancedTools,
       ...qualityTools,
+      ...focusedTools,
       ...runtimeTools,
       ...legacyTools
     ];

@@ -219,18 +219,24 @@ export class SafetyPolicy {
 }
 
 export function parseToolProfile(value?: string): ToolProfile {
-  const normalized = String(value || 'safe').trim().toLowerCase();
+  const normalized = String(value || 'focused').trim().toLowerCase();
+  const aliases: Record<string, ToolProfile> = {
+    focused: 'development-workbench',
+    developer: 'development-workbench',
+    business: 'business-readonly',
+    operations: 'operations-readonly',
+    expert: 'legacy-full'
+  };
+  if (aliases[normalized]) return aliases[normalized];
   if (normalized === 'safe'
     || normalized === 'development'
     || normalized === 'diagnostic-readonly'
     || normalized === 'legacy-full'
     || normalized === 'development-workbench'
     || normalized === 'business-readonly'
-    || normalized === 'operations-readonly') {
-    return normalized;
-  }
+    || normalized === 'operations-readonly') return normalized;
   throw new Error(
-    `Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use safe, development, diagnostic-readonly, legacy-full, development-workbench, business-readonly, or operations-readonly.`
+    `Unsupported SAP_MCP_TOOL_PROFILE '${normalized}'. Use focused (developer), business, operations, expert, or a legacy profile: safe, development, diagnostic-readonly, legacy-full, development-workbench, business-readonly, operations-readonly.`
   );
 }
 

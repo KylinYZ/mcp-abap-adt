@@ -33,6 +33,9 @@
     "test:repository-productionization-runtime": "node ./scripts/repository-productionization-runtime-smoke.mjs",
     "test:repository-verified-domain-preview": "node ./scripts/repository-verified-domain-preview.mjs",
     "test:adt-timeout": "node ./scripts/adt-timeout-smoke.mjs",
+    "test:focused-entrypoint": "node ./scripts/focused-entrypoint-smoke.mjs",
+    "test:focused-real-dev:readonly": "node ./scripts/focused-real-dev-readonly-smoke.mjs",
+    "test:focused-real-dev:preview": "node ./scripts/focused-real-dev-preview-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
     "check:repository-creation-coverage": "npm run build --silent && node ./scripts/check-repository-creation-coverage.mjs",
     "audit:eclipse-adt-creation": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/audit-eclipse-adt-creation.ps1",
@@ -53,7 +56,7 @@
   "contributors": [
     "mario-andreschak (original upstream mcp-abap-abap-adt-api)"
   ],
-  "description": "MCP server with an embedded ABAP ADT client, guarded development workflows, and read-only diagnostics for SAP systems",
+  "description": "AI-native ABAP workbench for developers, business consultants, and operations, with an embedded SAP ADT client",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

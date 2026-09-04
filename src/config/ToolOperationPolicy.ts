@@ -43,6 +43,7 @@ const LOCAL_TOOL_NAMES = new Set([
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
+  'sap', 'sapDoctor',
   'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
   'userTransports', 'transportsByConfig', 'systemUsers', 'transportReference',
   'objectStructure', 'searchObject', 'findObjectPath', 'objectTypes', 'classIncludes', 'classComponents',

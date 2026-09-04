@@ -95,7 +95,12 @@ describe('SafetyPolicy', () => {
   });
 
   it('rejects unknown tool profiles', () => {
-    expect(parseToolProfile()).toBe('safe');
+    expect(parseToolProfile()).toBe('development-workbench');
+    expect(parseToolProfile('focused')).toBe('development-workbench');
+    expect(parseToolProfile('developer')).toBe('development-workbench');
+    expect(parseToolProfile('business')).toBe('business-readonly');
+    expect(parseToolProfile('operations')).toBe('operations-readonly');
+    expect(parseToolProfile('expert')).toBe('legacy-full');
     expect(parseToolProfile('legacy-full')).toBe('legacy-full');
     expect(parseToolProfile('development')).toBe('development');
     expect(parseToolProfile('diagnostic-readonly')).toBe('diagnostic-readonly');

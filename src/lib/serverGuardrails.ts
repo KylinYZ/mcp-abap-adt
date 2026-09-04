@@ -7,7 +7,9 @@ export function adtClientOptions(guardrails: RuntimeGuardrailValues): { timeout:
 }
 
 export function usesSapExecutionGate(toolName: string): boolean {
-  return toolName !== 'applyAbapChange'
+  return toolName !== 'sap'
+    && toolName !== 'sapDoctor'
+    && toolName !== 'applyAbapChange'
     && toolName !== 'getAbapChangeStatus'
     && toolName !== 'applyAbapObjectCreation'
     && toolName !== 'getAbapObjectCreationStatus'

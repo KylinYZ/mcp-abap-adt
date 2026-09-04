@@ -62,7 +62,7 @@ Server 随后把计划标记为 `OUTCOME_UNKNOWN`，错误为 active DDIC 属性
 
 验证器已修复为只把“省略该块”和上述空默认值视为等价；非空值表、固定值或 append 标志仍严格比较。历史计划保持原始 `OUTCOME_UNKNOWN`，不回写为成功。
 
-当前结论是“真实创建和 active 属性复读已确认，清理未完成”。`ZZMCP_VT_DOM` 仍存在于 DEV，尚未核验独立清理和清理后的传输状态，因此 `DDIC_DOMAIN` 仍为 `CONTROLLED_IMPLEMENTED`、目录仍为 `writable=false`、`REAL_DEV_VERIFIED` 仍为 0。31 类活动最终分布和产品化入口见本文件后续章节及 `repository-creation-productionization-handoff.md`。最新自动化基线为 106 个 Jest suites / 719 tests。
+当前结论是“真实创建和 active 属性复读已确认，清理未完成”。`ZZMCP_VT_DOM` 仍存在于 DEV，尚未核验独立清理和清理后的传输状态。以上是 Phase 0 历史快照；当前成熟度和自动化基线以根目录 `PROGRESS.md` 与 maturity manifest 为准。
 
 ## 31 类活动首批结果（2026-08-24）
 
@@ -83,7 +83,7 @@ Server 随后把计划标记为 `OUTCOME_UNKNOWN`，错误为 active DDIC 属性
 
 此前发现并修复三类协议差异：Blue additional content 属性必须使用 `adtcore:encoding`/`adtcore:type`；HTTP 201 + canonical Location 可伴随空响应体；`objectTypeCode` 在 inactive/active 均为 optional，但存在时必须受限且不能从 inactive 漂移。历史失败/补偿计划全部保留且从未重放。
 
-本证据只证明创建侧、激活和复读成功。`ZVOBJECTTYPE7` 尚未清理，传输未释放，因此能力仍保持 `CONTROLLED_IMPLEMENTED`、`writable=false`、`REAL_DEV_VERIFIED=0`。
+本段是 2026-08-25 的历史创建侧证据；后续清理与成熟度结果以当前 maturity manifest 为准。
 
 ## SAP Object Node Type 创建侧真实证据（2026-08-25）
 
@@ -101,7 +101,7 @@ Server 随后把计划标记为 `OUTCOME_UNKNOWN`，错误为 active DDIC 属性
 - `COMPENSATED`：2 类，独立 search 确认无目标残留。
 - target/local unavailable：2 类。
 - `DEPENDENCY_MISSING`：11 类；主要由 Database Table 和 Function Group 未保留 active 父对象引起。
-- 自动化门禁：106 suites / 719 tests；创建覆盖清单为 controlled 31、pending 111、`REAL_DEV_VERIFIED=0`。
+- 历史自动化门禁：106 suites / 719 tests；当前覆盖与成熟度见根目录 `PROGRESS.md` 和 maturity manifest。
 
 `LOGICAL_EXTERNAL_SCHEMA ZVSCHEMA4`、`CDS_TYPE ZVCDSTYPE2`、`MESSAGE_CLASS ZVMSG3`、`SAP_OBJECT_TYPE ZVOBJECTTYPE7` 和 `SAP_OBJECT_NODE_TYPE ZVOBJECTTYPE7` 均已在本轮完成创建、激活和独立 active 复读。Database Table 连续三次在 active DDL 复核失败并全部补偿，按活动规则停止；其下游统一记录依赖缺失。
 

@@ -11,6 +11,8 @@ export interface RequestLimitGuardrails {
 type ArgumentsValue = Record<string, unknown>;
 
 const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
+  sap: ['action', 'params'],
+  sapDoctor: [],
   inspectAbapObject: ['objectType', 'objectName', 'startLine', 'maxLines'],
   readRuntimeDumps: ['from', 'to', 'limit', 'user', 'objectName', 'runtimeError', 'exception'],
   describeClassicTable: ['tableName'],
@@ -89,6 +91,7 @@ export function applyToolArgumentLimits(
       result.maxLines = validatedLimit('maxLines', result.maxLines, 300, 1_000);
     }
   }
+  if (toolName === 'sap' && result.params !== undefined) assertBoundedJson(result.params, 'params');
   assertAdvancedToolArgumentShape(toolName, result);
   assertSafeDebugArgumentShape(toolName, result);
   return result;
