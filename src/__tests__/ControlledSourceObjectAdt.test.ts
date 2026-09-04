@@ -1,11 +1,11 @@
 import {
   type AdtHTTP,
+  type ResponseHeaders,
   buildControlledSourceObjectXml,
   createControlledSourceObjectShell,
   type ControlledSourceObjectInput,
   validateControlledSourceObject
 } from '../adt/index.js'
-import type { ResponseHeaders } from '../adt/AdtHTTP.js'
 
 const validationResponse = '<asx:abap><asx:values><DATA><SEVERITY>S</SEVERITY><CHECK_RESULT>X</CHECK_RESULT></DATA></asx:values></asx:abap>'
 

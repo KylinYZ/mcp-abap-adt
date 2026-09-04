@@ -7,6 +7,7 @@ export {
   HttpClient,
   HttpClientException,
   HttpClientOptions,
+  ResponseHeaders,
   REQUEST_CANCELLED_CODE
 } from "./AdtHTTP"
 export { AxiosHttpClient } from "./AxiosHttpClient"
