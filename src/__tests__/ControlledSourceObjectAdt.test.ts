@@ -198,12 +198,15 @@ describe('controlled source-object ADT contract', () => {
     expect(body).toContain('<adtcore:packageRef adtcore:name="Z001"/>')
   })
 
-  it('locks the Eclipse class defaults to public and final without applying them to other kinds', () => {
+  it('uses the complete Eclipse class shell without applying class children to other kinds', () => {
     const classXml = responseXml(contracts[0])
     expect(classXml).toContain('class:visibility="public"')
     expect(classXml).toContain('class:final="true"')
+    expect(classXml).toContain('<class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>')
+    expect(classXml).toContain('<class:superClassRef/>')
     expect(responseXml(contracts[1])).not.toContain('class:visibility')
     expect(responseXml(contracts[2])).not.toContain('class:final')
+    expect(responseXml(contracts[1])).not.toContain('class:superClassRef')
   })
 
   it('uses the ADT 3.60.2 DDLX model for metadata-extension shell creation', () => {

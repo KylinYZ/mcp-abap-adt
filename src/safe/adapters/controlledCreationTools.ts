@@ -70,6 +70,7 @@ export interface ControlledCreationAdtClient {
   createControlledPackage(input: ControlledPackageInput): Promise<ControlledPackageCreationResult>
   validateControlledSourceObject(input: ControlledSourceObjectInput): Promise<ValidationResult>
   createControlledSourceObjectShell(input: ControlledSourceObjectInput): Promise<ControlledSourceObjectCreationResult>
+  getStatelessControlledCreationClient?(): ControlledCreationAdtClient
   validateControlledServiceBinding?(input: ControlledServiceBindingInput): Promise<ValidationResult>
   createControlledServiceBinding?(input: ControlledServiceBindingInput): Promise<{ location: string; name: string; adtType: 'SRVB/SVB' }>
   objectStructure(objectUrl: string, version?: 'active' | 'inactive' | 'workingArea'): Promise<AbapObjectStructure>

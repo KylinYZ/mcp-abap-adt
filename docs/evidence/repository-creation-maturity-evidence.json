@@ -423,6 +423,32 @@
       "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-cleanup" },
       "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-03T01:46:12.551Z" },
       "normalizations": ["SAP omitted the default standard category, materialized hidden errorMessage CD/600, generated active CLAS/OC ZCL_ZVPCHDO05_CHDO, and retained one neutral CHDO key plus one neutral CLAS companion key after verified cascade removal."]
+    },
+    {
+      "evidenceId": "ABAP_CLASS-ZVPCL06-20260904",
+      "objectKind": "ABAP_CLASS",
+      "adtType": "CLAS/OC",
+      "objectName": "ZVPCL06",
+      "create": { "planId": "e72e3a9b-1de0-48df-ac96-d87f44d85a32", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl06" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl06" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl06-cleanup" },
+      "cleanup": { "planId": "19c3db56-17d7-4022-bd1d-d47d95a86fbc", "status": "COMPLETED_LOCAL_ABSENCE", "objectDeleted": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl06-cleanup" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl06-cleanup" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-04T03:29:36.164Z" },
+      "normalizations": ["Eclipse ADT class shell children and the stateless shell/readback plus stateful lock/write/check/activation boundary were matched; active source differed only by line-ending normalization."]
+    },
+    {
+      "evidenceId": "DDIC_STRUCTURE-ZVPSTR06-20260904",
+      "objectKind": "DDIC_STRUCTURE",
+      "adtType": "TABL/DS",
+      "objectName": "ZVPSTR06",
+      "create": { "planId": "34145add-1255-4341-9719-085c52b77491", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#ddic-structure-zvpstr06" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#ddic-structure-zvpstr06" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#ddic-structure-zvpstr06-cleanup" },
+      "cleanup": { "planId": "5233084b-c021-46fe-b26e-95365d8729a3", "status": "COMPLETED", "objectDeleted": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#ddic-structure-zvpstr06-cleanup" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#ddic-structure-zvpstr06-cleanup" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-04T06:54:28.745Z" },
+      "normalizations": ["SAP inserted one whitespace-only line immediately before the final structure closing brace; the strict DDIC structure comparer accepts only this format normalization."]
     }
   ],
   "unresolvedValidationIdentities": [
@@ -656,6 +682,41 @@
       "planId": "6437088c-11a0-4ba5-a2dc-47594e1c7082",
       "status": "CLEANUP_VERIFICATION_FAILED",
       "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cts-阻塞"
+    },
+    {
+      "objectKind": "ABAP_CLASS",
+      "objectName": "ZVPCL02",
+      "planId": "2fc38902-3912-4ae8-8a1c-9785eaf4e5e0",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class"
+    },
+    {
+      "objectKind": "ABAP_CLASS",
+      "objectName": "ZVPCL03",
+      "planId": "7bbc09d9-1580-4417-8e68-ce7e4d2e6602",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl03-zvpcl04"
+    },
+    {
+      "objectKind": "ABAP_CLASS",
+      "objectName": "ZVPCL04",
+      "planId": "e28089d2-6ca3-478f-af4f-8bffde74ff89",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#abap-class-zvpcl03-zvpcl04"
+    },
+    {
+      "objectKind": "CDS_ANNOTATION_DEFINITION",
+      "objectName": "ZVPANNO02",
+      "planId": "e3e52ce9-ef32-4ec5-a628-02ae1288cd5c",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#annotation-definition"
+    },
+    {
+      "objectKind": "CDS_ANNOTATION_DEFINITION",
+      "objectName": "ZVPANNO03",
+      "planId": "5924a0ed-1136-46c9-b7b9-7a7a380b9021",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md#annotation-trace"
     }
   ]
 }

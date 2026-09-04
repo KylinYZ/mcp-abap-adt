@@ -80,6 +80,7 @@
   "getDataElementProperties",
   "getDomainProperties",
   "getObjectSource",
+  "getStatelessControlledCreationClient",
   "getTextElements",
   "getTransportConfiguration",
   "gitCreateRepo",

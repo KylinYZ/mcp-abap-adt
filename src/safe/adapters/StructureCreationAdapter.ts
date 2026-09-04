@@ -23,7 +23,8 @@ import {
   repositoryName,
   requiredString
 } from './creationAdapterTools.js'
-import { compareSources } from '../sourceTools.js'
+import { SafeAbapError } from '../errors.js'
+import { compareDdicStructureSources, safeSourceMismatchSummary } from '../sourceTools.js'
 
 interface StructureCreationPayload {
   input: ControlledStructureShellInput
@@ -150,8 +151,15 @@ export class StructureCreationAdapter implements RepositoryObjectCreationAdapter
     const active = await this.client.objectStructure(payload.objectUrl, 'active')
     assertStructureIdentity(active.metaData as unknown as Record<string, unknown>, payload.input)
     const activeSource = await this.client.getObjectSource(sourceUrlFromStructure(active.metaData as unknown as Record<string, unknown>, payload.sourceUrl), { version: 'active' })
-    const comparison = compareSources(payload.source, activeSource)
-    if (!comparison.matches) throw new Error(`Activated source for ${payload.input.name} does not match the confirmed plan.`)
+    const comparison = compareDdicStructureSources(payload.source, activeSource)
+    if (!comparison.matches) {
+      throw new SafeAbapError(
+        'SOURCE_VERIFY_FAILED',
+        'verify',
+        `Activated source for ${payload.input.name} does not match the confirmed plan.`,
+        { sourceMatchType: comparison.matchType, mismatch: safeSourceMismatchSummary(payload.source, activeSource) }
+      )
+    }
     recordStage('VERIFY_ACTIVE_OBJECT', true)
     recordStage('VERIFY_SOURCE', true, comparison.matchType)
     return {

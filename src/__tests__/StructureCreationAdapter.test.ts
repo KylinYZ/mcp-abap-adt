@@ -79,4 +79,26 @@ describe('StructureCreationAdapter', () => {
     ;(value.findCollectionByUrl as jest.Mock).mockResolvedValue(undefined)
     await expect(new StructureCreationAdapter(value, policy).prepare(request())).rejects.toThrow('accepted content type')
   })
+
+  it('returns only bounded mismatch diagnostics when active source differs', async () => {
+    const value = configured()
+    value.setObjectSource.mockResolvedValue(undefined)
+    value.getObjectSource.mockResolvedValue('define structure zzif_mcp_struct { broken : abap.char(1); }')
+    const adapter = new StructureCreationAdapter(value, policy)
+
+    await expect(adapter.execute(plan(await adapter.prepare(request())), jest.fn())).rejects.toMatchObject({
+      code: 'SOURCE_VERIFY_FAILED',
+      stage: 'verify',
+      details: {
+        sourceMatchType: 'DIFFERENT',
+        mismatch: {
+          expectedHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+          actualHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+          firstMismatchLine: expect.any(Number),
+          expectedLineHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+          actualLineHash: expect.stringMatching(/^[a-f0-9]{64}$/)
+        }
+      }
+    })
+  })
 })

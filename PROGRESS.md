@@ -7,16 +7,16 @@
 > - 已实现，待真实 DEV 验证：创建链路及自动化验证已完成，但尚未具备完整的真实 DEV 证据，因此保持不可写
 > - 已实现，受目标阻塞：创建链路及自动化验证已完成，但目标 SAP 权限或能力未满足，保持不可写
 >
-> 2026-09-04 已按 maturity evidence 校正：PACKAGE/ABAP_INTERFACE/FUNCTION_GROUP_INCLUDE/DDIC_TYPE_GROUP/PROGRAM_INCLUDE/DATABASE_TABLE 已是 REAL_DEV_VERIFIED。历史身份 ZVPKG、ZVCL_CAMPAIGN、ZVPCL01 不得重放。当前下一个日常 P1 晋级对象是 ABAP_CLASS。
+> 2026-09-04 已按 maturity evidence 校正：PACKAGE/ABAP_CLASS/ABAP_INTERFACE/DDIC_STRUCTURE/FUNCTION_GROUP_INCLUDE/DDIC_TYPE_GROUP/PROGRAM_INCLUDE/DATABASE_TABLE 已是 REAL_DEV_VERIFIED。历史身份 ZVPKG、ZVCL_CAMPAIGN、ZVPCL01 不得重放。当前下一个日常 P3 处理对象是 CDS_ANNOTATION_DEFINITION。
 
 | 优先级 | 对象 | 状态 |
 | --- | --- | --- |
 | P1 | PACKAGE | 已实现 |
 | P1 | PROGRAM | 已实现 |
 | P1 | DDIC_DOMAIN / DATA_ELEMENT / DDIC_TABLE_TYPE | 已实现 |
-| P1 | ABAP_CLASS | 已实现，待真实 DEV 验证 |
+| P1 | ABAP_CLASS | 已实现 |
 | P1 | ABAP_INTERFACE | 已实现 |
-| P1 | DDIC_STRUCTURE | 已实现，待真实 DEV 验证 |
+| P1 | DDIC_STRUCTURE | 已实现 |
 | P2 | FUNCTION_GROUP | 已实现 |
 | P2 | FUNCTION_MODULE | 已实现 |
 | P2 | FUNCTION_GROUP_INCLUDE | 已实现 |
@@ -430,3 +430,18 @@
 - 重启后 include cleanup plan `438c4ce4-fc81-41e9-8de5-c410af87f217` 单独锁定并删除 `LZVPFGI13001`，include absence 成功；该计划仅在 `cleanup-transport` 失败。父组 cleanup plan `365e0bdc-2ef0-43e1-b3de-5be5e0649b14` 随后删除 `ZVPFGI13` 并取得 `TRANSPORT_NEUTRAL_ENTRY_VERIFIED`，终态 `COMPLETED_LOCAL_ABSENCE`。
 - 最终重启后只读复查：healthcheck 为 DEV/client `300`、generation `0`；旧 include creation plan 返回 `PLAN_NOT_FOUND`；`LZVPFGI13001`、`ZVPFGI13`、`ZVPFGI13A` 和 `FUGR/F ZVPFGI13` search 均为空。未修改 E071/E071K，未执行数据库操作。
 - maturity evidence 现显式记录 `FUNCTION_GROUP_INCLUDE` 的 created include、直接 include cleanup 和父组 cleanup transport scope；`UXX` 保持 SAP 生成对象排除在证据链之外。`FUNCTION_GROUP_INCLUDE` 晋级后总数为 `REAL_DEV_VERIFIED=26`、`AUTOMATION_VERIFIED=3`、`CONTROLLED_IMPLEMENTED=2`。
+
+## 2026-09-04 P1/P3 剩余对象真实验证
+
+- `ABAP_CLASS ZVPCL02` 的 creation plan `2fc38902-3912-4ae8-8a1c-9785eaf4e5e0` 经原生确认后完成 absence、transport 和 shell creation，但 post-create ownership proof 对 inactive structure/source 均收到 SAP `wrong input data for processing`。独立 search 证实 `CLAS/OC ZVPCL02` 存在于 `Z001`；计划终态 `OUTCOME_UNKNOWN`，不得重放、删除或复用该身份，未写源码、未激活、未晋级。
+- 用户提供 Eclipse ADT 3.60.2 的 Class v4 POST，证实外层属性和 media type 均已对齐；缺失的是 packageRef 后的 `class:include(CLAS/OC,testclasses)` 与空 `class:superClassRef`。目标会接受缺失子节点的 POST，却生成无法读取的 class shell，和 `ZVCL_CAMPAIGN`、`ZVPCL01`、`ZVPCL02` 完全一致。builder 与回归测试已最小修复，需硬重启 MCP 后以全新身份真实验证；历史 class 身份均不得重放或删除。
+- XML 修复后的 `ZVPCL03` 仍在 ownership proof 阶段变为 `OUTCOME_UNKNOWN`，独立 search 证实壳存在且不得清理。Eclipse 记录同时明确该 POST 为 stateless，而旧 source-object shell 使用主 stateful ADT session；现已仅将 `ABAP_CLASS` shell 改为 stateless clone，后续 lock/write/activate/readback 保持 stateful。定向 3 suites / 60 tests、build、coverage 与 diff check 通过；需再次硬重启后以全新身份复测。
+- Eclipse 完整生命周期抓包标记：只有 Class 的 LOCK/UNLOCK 为 stateful enqueue；shell、object structure、source PUT、checkrun、activation 与 workingArea source readback 显示为 stateless。内置 client 在本地拒绝 stateless clone 的 `setObjectSource`，因此 Class adapter 采用 stateless shell/readback、主 stateful lock/write/check/activate/unlock 的最小边界，并新增双 client 回归；定向 2 suites / 28 tests、build、coverage 与 diff check 通过。需硬重启后使用全新身份验证。
+- `ZVPCL04` 验证确认 XML 与 stateless shell/readback 修复已生效：shell、ownership proof、`source/main` resolution 和主 stateful lock 均成功；但旧边界把 PUT 发给 stateless clone，被本地 `ValidateStateful` 拒绝，unlock 成功且未写入源码。独立 inactive structure 已返回完整五类 include。现已修正为 stateless shell/readback + 主 stateful lock/write/check/activate/unlock；定向 3 suites / 61 tests、build、coverage 与 diff check 通过。`ZVPCL03/04` 计划均终态未知且对象存在，不得重放或删除；需硬重启后使用 `ZVPCL05` 复测。
+- `ZVPCL06` 经过最终硬重启后的真实生命周期验证：creation plan `e72e3a9b-1de0-48df-ac96-d87f44d85a32` 完成 shell、ownership proof、`source/main`、stateful lock、源码 PUT、syntax check、unlock、activation 和 active source verify，终态 `APPLIED`；仅行尾规范化。独立 cleanup plan `19c3db56-17d7-4022-bd1d-d47d95a86fbc` 完成删除、absence 与唯一 neutral CTS entry，终态 `COMPLETED_LOCAL_ABSENCE`。`ABAP_CLASS` 正式晋级 `REAL_DEV_VERIFIED`，总数变为 27；`ZVPCL02/03/04` 历史未知身份保持不可重放/删除。
+- `DDIC_STRUCTURE ZVPSTR03` 的 creation plan `fae5b16e-3782-4c1d-b13b-4ba8363c7e17` 经原生确认后已完成 shell、source write、syntax check、unlock 和 activation；仅 active source compare 不匹配。受控补偿已删除对象，独立 `TABL/DS` search 为空；不得重放该计划或身份，未取得 cleanup/CTS evidence，未晋级。
+- 全新 `DDIC_STRUCTURE ZVPSTR04` plan `689febfc-90d2-41ed-84e3-91c5fe4231fc` 再次完成 shell、source write、syntax check、unlock 和 activation，仍仅在 active source compare 失败；受控补偿成功且独立 search 为空。适配器现以 `SOURCE_VERIFY_FAILED` 输出脱敏 hash、行数、首差异行与行 hash，不输出源码；需硬重启后以新身份获得真实诊断，再基于 Eclipse active DDL 抓包修复，`ZVPSTR04` 不得重放。
+- `DDIC_STRUCTURE ZVPSTR05` plan `f9fd30ed-2118-40cf-8335-f6506e7ebce6` 使用新诊断确认 SAP 只在最终 `}` 前增加一行空白：expected 7 行、active 8 行，首差异第 7 行。已新增仅针对此精确形态的 `DDIC_STRUCTURE_FORMAT_NORMALIZED`，字段/注解/类型与其它空白变化仍失败关闭；计划已补偿且 search 为空，需硬重启后使用全新 `ZVPSTR06` 复测。
+- `CDS_ANNOTATION_DEFINITION ZVPANNO02` 的 creation plan `e3e52ce9-ef32-4ec5-a628-02ae1288cd5c` preview 成功，但原生确认后的 shell create 被 SAP 拒绝：`You are not authorized to create Annotation Definitions`。独立 `DDLA/ADF` search 为空；计划终态 `OUTCOME_UNKNOWN`，不得重放或复用，仍需目标权限后使用全新身份验证。
+- 为获取精确授权对象，用户对 `068157` 开启 `STAUTHTRACE` 后使用全新 `ZVPANNO03` 重现；plan `5924a0ed-1136-46c9-b7b9-7a7a380b9021` 同样仅在 shell create 被拒绝，absence/transport 均成功且独立 `DDLA/ADF` search 为空。该 plan 与身份均已消费，等待 trace 的失败授权对象和字段值后再配置最小角色。
+- 本轮未修改 E071/E071K、未执行数据库操作；完整证据见 `docs/evidence/repository-creation-wave4-abap-class-structure-annotation-validation.md`。`ABAP_CLASS` 与 `DDIC_STRUCTURE` 已分别晋级 `REAL_DEV_VERIFIED`，总数变为 28；`CDS_ANNOTATION_DEFINITION` 仍为 `AUTOMATION_VERIFIED` 并受目标应用级限制。

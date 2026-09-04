@@ -11,6 +11,7 @@ const commonObjectProperties = {
 };
 
 const REAL_DEV_SOURCE_OBJECTS = new Set<RepositoryObjectKind>([
+  'ABAP_CLASS',
   'ABAP_INTERFACE',
   'PROGRAM_INCLUDE',
   'CDS_DATA_DEFINITION',
@@ -328,8 +329,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'DDIC_STRUCTURE', adtType: 'TABL/DS', displayName: 'DDIC Structure', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one DDIC structure from controlled component fields in an existing transportable package.',
     inputSchema: {

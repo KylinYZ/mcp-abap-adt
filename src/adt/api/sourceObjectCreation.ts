@@ -243,9 +243,9 @@ export function controlledSourceObjectUrl(kind: ControlledSourceObjectKind, name
 export function buildControlledSourceObjectXml(input: ControlledSourceObjectInput): string {
   const contract = contractFor(input)
   const attr = (value: string) => encodeEntity(value)
-  // Eclipse ADT 3.60.2 creates a new class as a public final class by default.
-  // Keep wizard-only variants out of the public contract: SRVD is a definition
-  // and BDEF uses the plain Blue shell without extension template properties.
+  // Eclipse ADT 3.60.2 creates a new class as a public final class with an
+  // explicit test-class include and empty superclass reference. Without these
+  // child nodes, this target persists an unreadable CLAS/OC shell.
   const controlledAttributes = input.objectKind === 'ABAP_CLASS'
     ? ' class:visibility="public" class:final="true"'
     : input.objectKind === 'SERVICE_DEFINITION'
@@ -253,9 +253,12 @@ export function buildControlledSourceObjectXml(input: ControlledSourceObjectInpu
     : input.objectKind === 'CDS_METADATA_EXTENSION'
       ? ' adtcore:version="active"'
       : ''
+  const controlledChildren = input.objectKind === 'ABAP_CLASS'
+    ? '\n  <class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>\n  <class:superClassRef/>'
+    : ''
   return `<?xml version="1.0" encoding="UTF-8"?>
 <${contract.rootName} xmlns:adtcore="http://www.sap.com/adt/core" ${contract.namespace}${controlledAttributes} adtcore:description="${attr(input.description)}" adtcore:language="${attr(input.language)}" adtcore:name="${attr(input.name)}" adtcore:type="${attr(input.adtType)}" adtcore:masterLanguage="${attr(input.masterLanguage)}" adtcore:masterSystem="${attr(input.masterSystem)}" adtcore:responsible="${attr(input.responsible)}">
-  <adtcore:packageRef adtcore:name="${attr(input.packageName)}"/>
+  <adtcore:packageRef adtcore:name="${attr(input.packageName)}"/>${controlledChildren}
 </${contract.rootName}>`
 }
 

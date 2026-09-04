@@ -95,9 +95,10 @@ describe('RepositoryObjectCreationRegistry', () => {
 
     expect(capabilities).toHaveLength(31);
     expect(capabilities.filter(capability => capability.writable).map(capability => capability.objectKind)).toEqual([
+      'ABAP_CLASS',
       'ABAP_INTERFACE',
       'BEHAVIOR_DEFINITION', 'CDS_ACCESS_CONTROL', 'CDS_ASPECT', 'CDS_DATA_DEFINITION',
-      'CDS_METADATA_EXTENSION', 'CDS_TYPE', 'CHANGE_DOCUMENT_OBJECT', 'DATA_ELEMENT', 'DATABASE_TABLE', 'DDIC_DOMAIN', 'DDIC_TABLE_TYPE',
+      'CDS_METADATA_EXTENSION', 'CDS_TYPE', 'CHANGE_DOCUMENT_OBJECT', 'DATA_ELEMENT', 'DATABASE_TABLE', 'DDIC_DOMAIN', 'DDIC_STRUCTURE', 'DDIC_TABLE_TYPE',
       'DDIC_TYPE_GROUP', 'FUNCTION_GROUP', 'FUNCTION_GROUP_INCLUDE', 'FUNCTION_MODULE', 'LOGICAL_EXTERNAL_SCHEMA', 'MESSAGE_CLASS', 'NUMBER_RANGE_OBJECT', 'PACKAGE', 'PROGRAM',
       'PROGRAM_INCLUDE', 'SAP_OBJECT_NODE_TYPE', 'SAP_OBJECT_TYPE', 'SERVICE_BINDING', 'SERVICE_DEFINITION'
     ]);
@@ -114,8 +115,7 @@ describe('RepositoryObjectCreationRegistry', () => {
       adtType: 'TABL/DT', maturity: 'REAL_DEV_VERIFIED', available: true, writable: true
     });
     expect(capabilities.find(capability => capability.objectKind === 'DDIC_STRUCTURE')).toMatchObject({
-      adtType: 'TABL/DS', maturity: 'CONTROLLED_IMPLEMENTED', available: true, writable: false,
-      unavailableReason: expect.stringContaining('REAL_DEV_VERIFIED')
+      adtType: 'TABL/DS', maturity: 'REAL_DEV_VERIFIED', available: true, writable: true
     });
     expect(capabilities.find(capability => capability.objectKind === 'CDS_METADATA_EXTENSION')).toMatchObject({
       adtType: 'DDLX/EX', maturity: 'REAL_DEV_VERIFIED', available: true, writable: true

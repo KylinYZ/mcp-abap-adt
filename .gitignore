@@ -7,3 +7,4 @@ package-lock.json
 *.code-workspace
 .codegraph/
 .claude/settings.local.json
+.tmp-audit-final/

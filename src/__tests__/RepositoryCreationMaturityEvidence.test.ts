@@ -18,7 +18,13 @@ describe('Repository creation maturity evidence gate', () => {
       REPOSITORY_CREATION_MATURITY_EVIDENCE
     );
 
-    expect(evidence.size).toBe(26);
+    expect(evidence.size).toBe(28);
+    expect(evidence.get('DDIC_STRUCTURE')).toMatchObject({
+      objectName: 'ZVPSTR06', adtType: 'TABL/DS',
+      create: { status: 'APPLIED' }, cleanup: { status: 'COMPLETED' },
+      transport: { objectEntryVerified: true, deletionEntryVerified: true },
+      absence: { searchAbsent: true }
+    });
     expect(evidence.get('DDIC_DOMAIN')).toMatchObject({
       objectName: 'ZVPD02', adtType: 'DOMA/DD',
       create: { status: 'APPLIED' }, cleanup: { status: 'COMPLETED' },

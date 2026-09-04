@@ -159,8 +159,11 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     recordStage('VALIDATE_TRANSPORT', true)
 
     let creation
+    const artifactClient = input.objectKind === 'ABAP_CLASS'
+      ? this.requireStatelessClassClient()
+      : this.client
     try {
-      creation = await this.client.createControlledSourceObjectShell(input)
+      creation = await artifactClient.createControlledSourceObjectShell(input)
     } catch (error) {
       throw unknownWrite('Source object shell create', error)
     }
@@ -169,13 +172,13 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     let createdStructure: AbapObjectStructure
     if (creation.ownershipEvidence === 'POST_CREATE_READBACK_REQUIRED') {
       try {
-        createdStructure = await provePostCreateSourceOwnership(this.client, input, objectUrl)
+        createdStructure = await provePostCreateSourceOwnership(artifactClient, input, objectUrl)
       } catch (error) {
         throw unknownWrite('Source object shell ownership proof', error)
       }
       recordStage('PROVE_SHELL_OWNERSHIP', true, objectUrl)
     } else {
-      createdStructure = await this.client.objectStructure(objectUrl, 'inactive')
+      createdStructure = await artifactClient.objectStructure(objectUrl, 'inactive')
       assertStructureIdentity(createdStructure, input)
     }
     plan.actualResources = [{ type: input.adtType, name: input.name }]
@@ -218,10 +221,10 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     }
     assertActivation(activation, 'ACTIVATE_OBJECT')
     recordStage('ACTIVATE_OBJECT', true)
-    const active = await this.client.objectStructure(objectUrl, 'active')
+    const active = await artifactClient.objectStructure(objectUrl, 'workingArea')
     assertStructureIdentity(active, input)
     const activeSourceUrl = sourceUrlFromStructure(active, objectUrl)
-    const actualSource = await this.client.getObjectSource(activeSourceUrl, { version: 'active' })
+    const actualSource = await artifactClient.getObjectSource(activeSourceUrl, { version: 'workingArea' })
     const comparison = input.objectKind === 'ABAP_CLASS'
       ? compareAbapClassSources(source, actualSource)
       : compareSources(source, actualSource)
@@ -247,6 +250,12 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     assertTargetAbsent(await this.client.searchObject(input.name, input.adtType, 10), input.name, input.adtType)
     recordStage('COMPENSATE_CREATED_OBJECT', true)
     return true
+  }
+
+  private requireStatelessClassClient(): ControlledCreationAdtClient {
+    const stateless = this.client.getStatelessControlledCreationClient?.()
+    if (!stateless) throw new Error('Controlled stateless ABAP class creation is unavailable in this ADT client.')
+    return stateless
   }
 }
 

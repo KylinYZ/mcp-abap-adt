@@ -132,13 +132,13 @@ describe('RepositoryObjectCreationHandlers', () => {
     expect(capability.inputSchema.properties).not.toHaveProperty('mediaType');
   });
 
-  it('describes automation-verified Phase 2 source objects without enabling writes', async () => {
+  it('describes a real-DEV-verified Phase 2 class without exposing protocol inputs', async () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'ABAP_CLASS' });
     const capability = (result.structuredContent as any).capability;
 
     expect(capability).toMatchObject({
-      objectKind: 'ABAP_CLASS', adtType: 'CLAS/OC', maturity: 'AUTOMATION_VERIFIED',
-      available: true, writable: false, fixedDefaults: { visibility: 'public', final: true }
+      objectKind: 'ABAP_CLASS', adtType: 'CLAS/OC', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true, fixedDefaults: { visibility: 'public', final: true }
     });
     expect(capability.inputSchema.required).toEqual([
       'name', 'description', 'packageName', 'transportRequest', 'source'
@@ -148,11 +148,11 @@ describe('RepositoryObjectCreationHandlers', () => {
     expect(capability.executionStages).toContain('VERIFY_SOURCE');
   });
 
-  it('describes discovery-backed DDIC structure creation without exposing protocol inputs', async () => {
+  it('describes real-DEV-verified DDIC structure creation without exposing protocol inputs', async () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'DDIC_STRUCTURE' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'DDIC_STRUCTURE', adtType: 'TABL/DS', maturity: 'CONTROLLED_IMPLEMENTED', available: true, writable: false,
+      objectKind: 'DDIC_STRUCTURE', adtType: 'TABL/DS', maturity: 'REAL_DEV_VERIFIED', available: true, writable: true,
       fixedDefaults: { creationContentType: 'ADT_DISCOVERY' }
     });
     expect(capability.inputSchema.required).toEqual(['name', 'description', 'packageName', 'transportRequest', 'fields']);

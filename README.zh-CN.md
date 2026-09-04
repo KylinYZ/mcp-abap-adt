@@ -42,9 +42,9 @@
 
 同日经单独授权的精确 DEV 验证在包 `Z001`、传输 `S4HK900009` 中创建并激活了 `DDIC_DOMAIN` `ZZMCP_VT_DOM`，独立 active 复读确认 `CHAR(10)` 和输出标志与计划一致。历史计划仍保留 `OUTCOME_UNKNOWN`：旧验证器把 SAP 自动补出的空 `valueInformation` 与调用方省略该可选块误判为不同；当前比较只规范化这个空默认值，非空值表、固定值和 append 标志仍严格比较。31 类创建侧活动现已全部形成明确结果；由于清理和传输收尾尚未完成，能力仍保持 `writable=false`。后续按产品化计划逐类晋级，每次真实操作仍需独立确认。
 
-Phase 2 纳入的十三类源码/服务对象中，接口、Include、CDS Data Definition、DCL、Metadata Extension、Service Definition、Behavior Definition、CDS Type、CDS Aspect、Service Binding 十类现已完成真实 DEV 生命周期并达到 `REAL_DEV_VERIFIED`。Class、Annotation Definition、CDS Entity Buffer 仍未晋级。DCL、MDE、SRVD、BDEF 与 Entity Buffer 会冻结 active CDS 引用；Service Binding 会冻结 active Service Definition，执行独立 activation，并复核 OData 配置与未发布状态。
+Phase 2 纳入的十三类源码/服务对象中，Class、接口、Include、CDS Data Definition、DCL、Metadata Extension、Service Definition、Behavior Definition、CDS Type、CDS Aspect、Service Binding 十一类现已完成真实 DEV 生命周期并达到 `REAL_DEV_VERIFIED`。Annotation Definition、CDS Entity Buffer 仍未晋级。DCL、MDE、SRVD、BDEF 与 Entity Buffer 会冻结 active CDS 引用；Service Binding 会冻结 active Service Definition，执行独立 activation，并复核 OData 配置与未发布状态。
 
-完整覆盖口径以 Eclipse ADT 3.60.2 的已安装 New Wizard 为准。当前能力目录覆盖 31 个，尚有 111 个待提取协议；当前 `REAL_DEV_VERIFIED=26`，其余 5 类仍不可写。证据见 `docs/evidence/`，静态映射见 [ADT 创建向导清单](docs/evidence/eclipse-adt-3.60.2-creation-wizard-manifest.json)。
+完整覆盖口径以 Eclipse ADT 3.60.2 的已安装 New Wizard 为准。当前能力目录覆盖 31 个，尚有 111 个待提取协议；当前 `REAL_DEV_VERIFIED=28`，其余 3 类仍不可写。证据见 `docs/evidence/`，静态映射见 [ADT 创建向导清单](docs/evidence/eclipse-adt-3.60.2-creation-wizard-manifest.json)。
 
 内置能力新增 21 个显式原始工具，覆盖对象结构元素、类型层次、增强、DDIC 属性与文本、ATC 文档、开发包迁移及 RAP 生成/发布。`development` 使用其中 15 个只读/校验/预览工具，并额外提供 DDIC、包迁移、RAP 三组共 6 个受控 `preview`/`apply` 工具。完整名称、分组和风险边界见[使用指南的功能清单](docs/使用指南.md#4-mcp-功能与工具清单)。
 

@@ -862,6 +862,10 @@ export class ADTClient {
     return createControlledSourceObjectShell(this.h, input)
   }
 
+  public getStatelessControlledCreationClient(): ADTClient {
+    return this.statelessClone
+  }
+
   public validateControlledTableShell(input: Pick<ControlledTableShellInput, 'name' | 'description'>) {
     return validateControlledTableShell(this.h, input)
   }

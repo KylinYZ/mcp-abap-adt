@@ -40,7 +40,7 @@ function baseClient(): jest.Mocked<ControlledCreationAdtClient> {
     searchObject: jest.fn(), transportInfo: jest.fn(), transportDetails: jest.fn(),
     validateControlledPackage: jest.fn(), getControlledPackageConstraints: jest.fn(),
     readControlledPackage: jest.fn(), createControlledPackage: jest.fn(),
-    validateControlledSourceObject: jest.fn(), createControlledSourceObjectShell: jest.fn(),
+    validateControlledSourceObject: jest.fn(), createControlledSourceObjectShell: jest.fn(), getStatelessControlledCreationClient: jest.fn(),
     objectStructure: jest.fn(), getObjectSource: jest.fn(), setObjectSource: jest.fn(),
     syntaxCheck: jest.fn(), activate: jest.fn(),
     validateControlledTableShell: jest.fn(), createControlledTableShell: jest.fn(),
@@ -62,9 +62,11 @@ function clientFor(testCase: typeof cases[number]): jest.Mocked<ControlledCreati
   client.validateControlledSourceObject.mockResolvedValue({ success: true })
   client.transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'S4HK900009' }] } as never)
   client.transportDetails.mockResolvedValue({ 'tm:status': 'D' } as never)
-  client.createControlledSourceObjectShell.mockResolvedValue({
+  const shell = {
     location: objectUrl(testCase), name: testCase.name, adtType: testCase.type
-  })
+  }
+  client.createControlledSourceObjectShell.mockResolvedValue(shell)
+  jest.mocked(client.getStatelessControlledCreationClient!).mockReturnValue(client)
   client.objectStructure.mockImplementation(async (_url, version) => structure(testCase, version || 'inactive'))
   client.lock.mockResolvedValue({ LOCK_HANDLE: 'LOCK-1' } as never)
   client.unLock.mockResolvedValue('')
@@ -174,6 +176,38 @@ describe('SourceObjectCreationAdapter', () => {
     ])
   })
 
+  it('uses a stateless client for class shell and reads while retaining stateful mutations', async () => {
+    const testCase = cases[0]
+    const client = clientFor(testCase)
+    const stateless = {
+      ...client,
+      createControlledSourceObjectShell: jest.fn().mockResolvedValue({
+        location: objectUrl(testCase), name: testCase.name, adtType: testCase.type
+      }),
+      objectStructure: jest.fn().mockImplementation(async (_url, version) => structure(testCase, version || 'inactive')),
+      getObjectSource: jest.fn().mockResolvedValue(testCase.source.replace(/\n/g, '\r\n')),
+      setObjectSource: jest.fn().mockResolvedValue(undefined),
+      syntaxCheck: jest.fn().mockResolvedValue([]),
+      activate: jest.fn().mockResolvedValue({ success: true, messages: [], inactive: [] })
+    } as jest.Mocked<ControlledCreationAdtClient>
+    jest.mocked(client.getStatelessControlledCreationClient!).mockReturnValue(stateless)
+    const adapter = new SourceObjectCreationAdapter(testCase.kind, client, policy)
+
+    await expect(adapter.execute(plan(await adapter.prepare(request(testCase))), jest.fn())).resolves.toBeDefined()
+
+    expect(stateless.createControlledSourceObjectShell).toHaveBeenCalledTimes(1)
+    expect(stateless.objectStructure).toHaveBeenLastCalledWith(objectUrl(testCase), 'workingArea')
+    expect(client.createControlledSourceObjectShell).not.toHaveBeenCalled()
+    expect(stateless.setObjectSource).not.toHaveBeenCalled()
+    expect(stateless.syntaxCheck).not.toHaveBeenCalled()
+    expect(stateless.activate).not.toHaveBeenCalled()
+    expect(client.lock).toHaveBeenCalledWith(objectUrl(testCase), 'MODIFY')
+    expect(client.setObjectSource).toHaveBeenCalledTimes(1)
+    expect(client.syntaxCheck).toHaveBeenCalledTimes(1)
+    expect(client.activate).toHaveBeenCalledTimes(1)
+    expect(client.unLock).toHaveBeenCalledWith(objectUrl(testCase), 'LOCK-1')
+  })
+
   it('proves exact ownership before writing after HTTP 200 without Location', async () => {
     const testCase = cases[1]
     const client = clientFor(testCase)
@@ -219,6 +253,12 @@ describe('SourceObjectCreationAdapter', () => {
     await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({
       actualResources: [{ type: testCase.type, name: testCase.name }]
     })
+    if (testCase.kind === 'ABAP_CLASS') {
+      expect(client.getStatelessControlledCreationClient).toHaveBeenCalledTimes(1)
+    } else {
+      expect(client.getStatelessControlledCreationClient).not.toHaveBeenCalled()
+    }
+    expect(client.createControlledSourceObjectShell).toHaveBeenCalledWith(expect.objectContaining({ name: testCase.name }))
     expect(stages).toContain('PROVE_SHELL_OWNERSHIP')
     expect(client.setObjectSource).toHaveBeenCalledTimes(1)
   })

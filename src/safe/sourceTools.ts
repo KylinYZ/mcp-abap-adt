@@ -78,6 +78,27 @@ export function compareAbapClassSources(
   return strictComparison;
 }
 
+export function compareDdicStructureSources(
+  expectedSource: string,
+  actualSource: string
+): SourceComparison {
+  const strictComparison = compareSources(expectedSource, actualSource);
+  if (strictComparison.matches) return strictComparison;
+
+  const normalizedExpected = normalizeDdicStructureClosingBlank(expectedSource);
+  const normalizedActual = normalizeDdicStructureClosingBlank(actualSource);
+  if (normalizedExpected !== undefined
+    && normalizedActual !== undefined
+    && normalizedExpected === normalizedActual) {
+    return {
+      ...strictComparison,
+      matches: true,
+      matchType: 'DDIC_STRUCTURE_FORMAT_NORMALIZED'
+    };
+  }
+  return strictComparison;
+}
+
 export function safeSourceMismatchSummary(
   expectedSource: string,
   actualSource: string
@@ -181,6 +202,14 @@ function normalizeEmptyAbapClassFormatting(source: string): string | undefined {
     'CLASS ' + className + ' IMPLEMENTATION.',
     'ENDCLASS.'
   ].join('\n');
+}
+
+function normalizeDdicStructureClosingBlank(source: string): string | undefined {
+  const lines = normalizeLineEndings(source).split('\n');
+  if (lines.length < 2 || lines.at(-1)?.trim() !== '}') return undefined;
+  if (!/\bdefine\s+structure\s+[A-Za-z0-9_\/]+\s*\{/i.test(lines.join('\n'))) return undefined;
+  if (lines.at(-2)?.trim() === '') lines.splice(-2, 1);
+  return lines.join('\n');
 }
 
 function normalizeFunctionModuleSignatureSeparator(source: string): string | undefined {

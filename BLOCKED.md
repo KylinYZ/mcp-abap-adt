@@ -60,6 +60,7 @@
 - Plan `70063115-053d-4f81-862e-ef74581eef4e` created and resolved `ZVSTR1`, locked it, then SAP rejected the planned source with `Can't save due to errors in source; execute check for details`.
 - `UNLOCK_RESOURCE` succeeded. Independent active/inactive/workingArea reads all return the SAP placeholder source with `component_to_be_changed : abap.string(0)`; the planned `ZVDE1` component was not written.
 - State is bounded to an unlocked shell object; no retry or deletion is authorized. Independent types may continue, but `ZVSTR1` must not be reused.
+- RESOLVED LOCALLY AND BY REAL DEV VERIFICATION: the structure comparer now accepts only SAP's observed single blank line before the final `}`. Fresh `ZVPSTR06` completed create, source write, check, activation, active readback, deletion, absence, and CTS deletion-entry verification; `DDIC_STRUCTURE` is now `REAL_DEV_VERIFIED`. Historical `ZVSTR1` and failed validation identities remain untouched.
 
 ## REMOTE_UNKNOWN-010 — DDIC_TYPE_GROUP shell response unknown
 
@@ -85,6 +86,11 @@
 - Plan `4ec1b86d-2f75-48d5-a7a7-8c793bb84749` passed absence and transport validation, then shell creation did not return canonical HTTP 201/Location.
 - Independent search proves `ZVCL_CAMPAIGN` exists in `Z001`; active structure import returns a sanitized wrong-input error. No source/lock/activation stage was recorded.
 - Do not replay or delete. Continue independent types only.
+- 2026-09-04 Eclipse ADT 3.60.2 capture identifies the missing class-shell contract: alongside the package reference, the v4 request must contain `class:include` for `CLAS/OC` with `class:includeType="testclasses"` and an empty `class:superClassRef`. The controlled builder had matched the outer attributes but omitted both children, reproducing the same unreadable shell for `ZVPCL02`.
+- RESOLVED LOCALLY: the builder now emits exactly those two class-only children and a regression test freezes the captured shape. Build and targeted creation tests pass. A hard MCP restart and a fresh class identity are required before any new real DEV apply; all historical class identities remain untouched.
+- Retest `ZVPCL03` after the XML-only fix reproduced the unreadable shell. The same Eclipse capture marks the class POST as `stateless`, while the controlled source-object shell used the primary stateful ADT client. Class shell creation now uses the existing stateless clone; lock, source write, activation, and verification remain on the primary stateful client. Targeted tests, build, and coverage pass; another hard restart is required before the fresh final retest.
+- Full Eclipse lifecycle capture labels only LOCK/UNLOCK as stateful enqueue. The embedded client independently requires a stateful local session for `setObjectSource`, so the Class adapter uses a stateless clone only for shell creation and readback, retaining the primary stateful client for lock/write/check/activate/unlock. Dual-client regression, build, coverage, and diff checks pass. A hard restart and a fresh identity are still required for real DEV evidence.
+- RESOLVED BY REAL DEV VERIFICATION: after a hard restart, fresh `ZVPCL06` completed create, ownership proof, source write, syntax check, activation, active readback, cleanup, absence, and unique neutral CTS verification. `ABAP_CLASS` is now `REAL_DEV_VERIFIED`; historical class identities remain consumed and untouched.
 
 ## REMOTE_UNKNOWN-014 — MESSAGE_CLASS compensation blocked by active editor
 

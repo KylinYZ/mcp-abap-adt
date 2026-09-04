@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-09-04
 - Add validation-only repository cleanup preview/apply/status with a separately confirmed destructive action, frozen parent identity, child-first cleanup, and no replay after uncertain deletion.
 - Enforce checked-in per-kind maturity evidence for creation, readback, transport, cleanup, and absence; block historical unknown identities and ship the evidence manifest with the npm package.
 - Classify cleanup CTS evidence as either an exact propagated deletion entry or an exact neutral entry for objects created and removed in the same open transport; duplicates, released transports, and unknown creation outcomes still fail closed.
@@ -14,6 +16,10 @@
 - Add one-time campaign configuration for the explicit current 31 repository kinds, freeze package identity separately from business parents, and validate function-group Includes by their prefixed parent plus three-character suffix.
 - Align repository preview validation with target discovery: SAP ASX for source/package/DESD validation, separate package constraint media types, bounded message-class `messages`, and successful empty validation acknowledgements.
 - Verify the Windows cancel and apply confirmation paths in Codex Desktop. A scoped DEV run created and activated `DDIC_DOMAIN` `ZZMCP_VT_DOM`; active properties matched the plan, but cleanup and maturity promotion remain pending.
+- Promote `ABAP_CLASS` to `REAL_DEV_VERIFIED` after Eclipse-contract correction (mandatory `class:include`/`class:superClassRef` children, stateless shell creation and readback with a frozen stateful lock/write/check/activate boundary) and the full `ZVPCL06` create, activate, and cleanup lifecycle.
+- Promote `DDIC_STRUCTURE` to `REAL_DEV_VERIFIED` with a bounded `DDIC_STRUCTURE_FORMAT_NORMALIZED` rule that accepts exactly one whitespace-only line before the final `}` of a `define structure` source, proven by the full `ZVPSTR06` create, activate, and cleanup lifecycle.
+- Capture `STAUTHTRACE` failed authorization checks for CDS Annotation Definition creation; the kind stays blocked on target authorization instead of reporting a generic failure.
+- Raise the evidence-backed maturity to `REAL_DEV_VERIFIED=28` with an automation baseline of 109 suites / 793 tests.
 
 ## [0.5.0] - 2026-08-18
 - Resolve exact `FUGR/I` function-group includes through the guarded inspect/preview/apply workflow without adding an invalid main-program context.

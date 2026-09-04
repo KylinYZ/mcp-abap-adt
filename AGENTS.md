@@ -21,7 +21,7 @@ npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-a
 git diff --check
 ```
 
-当前 runtime catalog 常规基线为 `safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=87`、`business-readonly=17`、`operations-readonly=40`；仅当 `SAP_MCP_REAL_DEV_VALIDATION=true` 时，DEV `development` / `development-workbench` 额外开放 3 个独立确认的 cleanup 工具，分别为 127 / 90。仓库对象创建目录注册 31 类对象；当前成熟度为 `REAL_DEV_VERIFIED=25`、`AUTOMATION_VERIFIED=3`、`CONTROLLED_IMPLEMENTED=3`，自动化基线为 109 suites / 774 tests。修改源码、`.env` 或构建输出后，必须硬重启 MCP 客户端，并用 healthcheck session 重置与旧 plan `PLAN_NOT_FOUND` 验收。
+当前 runtime catalog 常规基线为 `safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=87`、`business-readonly=17`、`operations-readonly=40`；仅当 `SAP_MCP_REAL_DEV_VALIDATION=true` 时，DEV `development` / `development-workbench` 额外开放 3 个独立确认的 cleanup 工具，分别为 127 / 90。仓库对象创建目录注册 31 类对象；当前成熟度为 `REAL_DEV_VERIFIED=28`、`AUTOMATION_VERIFIED=2`、`CONTROLLED_IMPLEMENTED=1`，自动化基线为 109 suites / 793 tests。修改源码、`.env` 或构建输出后，必须硬重启 MCP 客户端，并用 healthcheck session 重置与旧 plan `PLAN_NOT_FOUND` 验收。
 
 ## 目录与约定
 

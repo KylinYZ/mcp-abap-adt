@@ -14,7 +14,7 @@
 | 6 | `FUNCTION_GROUP` | `ZVFG1` + 首模块 `ZVFM0`；产品化新身份 `ZVPFG9 + ZVPFM9` | 完整 FUNCTION 源码 | 历史 `ZVFG1/ZVFM0` 已补偿；`ZVPFG9` 已 `REAL_DEV_VERIFIED`，create/active、DELETE、absence、父函数池 neutral CTS 完整 |
 | 7 | `FUNCTION_GROUP_INCLUDE` | 历史父组 `ZVFG1`，suffix `Z01`；产品化新身份 `ZVPFGI13` + `LZVPFGI13001` | active 父函数组；完整 include 源码 | 历史父组已补偿；`LZVPFGI13001` 已 `REAL_DEV_VERIFIED`，created include `workingArea` source、直接 delete/absence、父函数组 transport scope 完整 |
 | 8 | `FUNCTION_MODULE` | 历史 `ZVFM1`；产品化新身份 `ZVPFG11` + `ZVPFM11C` | active 父函数组；完整 FUNCTION 源码 | 历史父组已补偿；`ZVPFM11C` 已 `REAL_DEV_VERIFIED`，模块独立 create/active/delete/absence，CTS 使用父函数池共享作用域 |
-| 9 | `DDIC_STRUCTURE` | `ZVSTR1` | 字段使用 `ZVDE1` | shell-only readback；`REMOTE_UNKNOWN-009` |
+| 9 | `DDIC_STRUCTURE` | `ZVPSTR06` | 单字段 `TEST_TEXT CHAR(40)` | `REAL_DEV_VERIFIED`：APPLIED、active source、DELETE、absence、CTS deletion entry 完整 |
 | 10 | `DATABASE_TABLE` | `ZVTAB2` | `MANDT` + `ZVDE1` 键字段 | `COMPENSATED`；checks/write/activation succeeded, DDL formatting verifier mismatch；search absent；`VERIFIER_MISMATCH-031` |
 | 11 | `DDIC_LOCK_OBJECT` | `ZVLOCK1` | active 主表 | `DEPENDENCY_MISSING`：Database Table 未保留 active 对象 |
 | 12 | `DDIC_TYPE_GROUP` | `ZVTG1`、复测 `ZVTG2` | TYPE-POOL 源码 | 两次均 active shell-only；Location 未确认，计划源码未写；`REMOTE_UNKNOWN-010/027` |

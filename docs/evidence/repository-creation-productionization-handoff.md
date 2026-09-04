@@ -40,9 +40,9 @@
 ## 自动化基线
 
 - 109 Jest suites
-- 771 tests
-- controlled 31 / pending 111 / `REAL_DEV_VERIFIED=26`
-- maturity `REAL_DEV_VERIFIED=26` / `AUTOMATION_VERIFIED=3` / `CONTROLLED_IMPLEMENTED=2`；完整 evidence records 为 26
+- 793 tests
+- controlled 31 / pending 111 / `REAL_DEV_VERIFIED=28`
+- maturity `REAL_DEV_VERIFIED=28` / `AUTOMATION_VERIFIED=2` / `CONTROLLED_IMPLEMENTED=2`；完整 evidence records 为 28
 
 命令：
 
@@ -113,7 +113,7 @@ git diff --check
 
 ### DDIC Structure
 
-`ZVSTR1` 为 active placeholder shell，计划 source 未写。需要目标 source check 协议。
+`ZVSTR1` 为历史 active placeholder shell，不能重用或删除。`DDIC_STRUCTURE ZVPSTR06` 已完成真实 create、active readback、cleanup、absence 和 CTS deletion-entry verification，当前已晋级 `REAL_DEV_VERIFIED`。
 
 ### Package
 
@@ -133,7 +133,7 @@ git diff --check
 
 ## 新会话推荐起点
 
-阶段 1 已实现 validation-only cleanup，阶段 2 已实现 maturity manifest 与 Registry/coverage 双重证据门禁。cleanup 现采用删除传播与同一未释放传输 neutral 条目双模式；当前已有 26 类 `REAL_DEV_VERIFIED`。
+阶段 1 已实现 validation-only cleanup，阶段 2 已实现 maturity manifest 与 Registry/coverage 双重证据门禁。cleanup 现采用删除传播与同一未释放传输 neutral 条目双模式；当前已有 28 类 `REAL_DEV_VERIFIED`。
 
 当前权威状态（2026-09-03）：上述 6 类已用真实 `APPLIED` 创建、active readback、同一未释放传输、DELETE、absence 和唯一 neutral CTS 证据晋级；`CHANGE_DOCUMENT_OBJECT ZVPCHDO05` 也已用全新 `APPLIED` 创建计划、active CHDO/Class、父对象单次 DELETE、生成类级联 absence 与唯一 neutral `CHDO/CLAS` 条目完成晋级。旧 `ZVPCHDO04` unknown 计划保持不变。完整证据见 `docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md`。
 
@@ -141,7 +141,7 @@ git diff --check
 
 2026-09-03：`ZVPCHDO05` creation plan `bea2ab37-22a2-47e0-86cf-53dc7c0897ae` 终态 `APPLIED`；cleanup plan `f4e796e8-05a9-4410-8b7c-79d47abd2d89` 终态 `COMPLETED_LOCAL_ABSENCE`，仅 DELETE CHDO 并验证生成 Class 级联缺失，`CHDO/CLAS` 均为唯一 neutral CTS 条目。`CHANGE_DOCUMENT_OBJECT` 晋级后总数为 23；下一步仅评估剩余 8 类，不自动扩大真实写入范围。
 
-2026-09-03 剩余 8 类复评：`ABAP_CLASS` 的历史 unknown `ZVCL_CAMPAIGN` 仍 active；`DDIC_STRUCTURE ZVSTR1` 与 `DDIC_LOCK_OBJECT EZVLOCK4` 也实际存在，后两者 active object-structure 读取均 60 秒超时，按未知远端状态停止且不得删除/重放。`CDS_ANNOTATION_DEFINITION` 仍为目标授权阻塞，`CDS_ENTITY_BUFFER` 仍缺可 buffer 的 active CDS 实体，`FUNCTION_GROUP` / `FUNCTION_MODULE` 仍需先解决 active source comparer mismatch，`FUNCTION_GROUP_INCLUDE` 仍缺可验证的既有父函数组。其余历史测试身份的 exact search 为空。本轮未执行任何真实写入；后续须先限定一个阻塞工作流。
+2026-09-03 剩余 8 类复评：`ABAP_CLASS` 的历史 unknown `ZVCL_CAMPAIGN` 仍 active；`DDIC_STRUCTURE ZVSTR1` 与 `DDIC_LOCK_OBJECT EZVLOCK4` 也实际存在，后者 active object-structure 读取超时，按未知远端状态停止且不得删除/重放。`DDIC_STRUCTURE` 后续已使用全新 `ZVPSTR06` 完成真实生命周期并晋级；`CDS_ANNOTATION_DEFINITION` 仍为目标授权阻塞，`CDS_ENTITY_BUFFER` 仍缺可 buffer 的 active CDS 实体，`FUNCTION_GROUP` / `FUNCTION_MODULE` 仍需先解决 active source comparer mismatch，`FUNCTION_GROUP_INCLUDE` 仍缺可验证的既有父函数组。
 
 同日 Function Group comparer 取证：脱敏 mismatch 诊断已编译进 `dist`，无需修改代码或重启；但 stateful SAP session 已降级为 `request-failed`。对新身份 `ZVPFG3` / `ZVPFM3` 的只读 absence 搜索一项 60 秒超时、一项 HTTP 400。未创建 preview、未触发确认、未写入或删除 SAP；必须先恢复 SAP 连接后再做全新身份验证。
 

@@ -1,5 +1,6 @@
 import {
   compareAbapClassSources,
+  compareDdicStructureSources,
   compareFunctionModuleSources,
   compareSources,
   createUnifiedDiff,
@@ -195,6 +196,34 @@ describe('source tools', () => {
       actualHash: sourceHash(actual)
     });
     expect(compareSources(expected, actual)).toMatchObject({ matchType: 'DIFFERENT', matches: false });
+  });
+
+  it('accepts one SAP-inserted blank line immediately before a DDIC structure closing brace', () => {
+    const expected = [
+      '@EndUserText.label : \'MCP\'',
+      'define structure zvpstr05 {',
+      '  test_text : abap.char(40);',
+      '}'
+    ].join('\n');
+    const actual = [
+      '@EndUserText.label : \'MCP\'',
+      'define structure zvpstr05 {',
+      '  test_text : abap.char(40);',
+      '',
+      '}'
+    ].join('\r\n');
+
+    expect(compareDdicStructureSources(expected, actual)).toMatchObject({
+      matchType: 'DDIC_STRUCTURE_FORMAT_NORMALIZED',
+      matches: true
+    });
+    expect(compareSources(expected, actual)).toMatchObject({ matchType: 'DIFFERENT', matches: false });
+  });
+
+  it('rejects DDIC structure differences beyond the closing-brace blank line', () => {
+    const expected = 'define structure zvpstr05 {\n  test_text : abap.char(40);\n}';
+    const actual = 'define structure zvpstr05 {\n  test_text : abap.char(41);\n\n}';
+    expect(compareDdicStructureSources(expected, actual)).toMatchObject({ matchType: 'DIFFERENT', matches: false });
   });
 
   it.each([
