@@ -1,9 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-09-04
 - Verify the real DEV focused source-preview path end to end using a temporary local audit directory; `sap(edit)` now returns the delegated preview's `status`, `plan`, and `diff` without an extra MCP-result wrapper.
 - Add a real DEV read-only focused-entrypoint smoke test covering MCP stdio startup, `sapDoctor`, `sap(read)`, `sap(search)`, and automatic table diagnosis routing without emitting source or business rows.
 - Reposition the server as a developer-first AI-native ABAP workbench. Add `focused`/`developer`, `business`, `operations`, and `expert` role aliases, make `focused` the default profile, and retain all legacy profile names for compatibility.
+- Derive the expected writable repository kinds in the verified domain-preview smoke test from the maturity evidence manifest instead of a hardcoded list.
 
 ## [0.6.0] - 2026-09-04
 - Add validation-only repository cleanup preview/apply/status with a separately confirmed destructive action, frozen parent identity, child-first cleanup, and no replay after uncertain deletion.
