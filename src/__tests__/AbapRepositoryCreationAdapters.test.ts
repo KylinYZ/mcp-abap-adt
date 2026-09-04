@@ -1,6 +1,7 @@
 import { AbapSourceCreationAdapter, FunctionGroupIncludeCreationAdapter, type LegacyAbapCreationWorkflow } from '../safe/adapters/AbapSourceCreationAdapter'
 import { FunctionGroupCreationAdapter } from '../safe/adapters/FunctionGroupCreationAdapter'
 import { RepositoryCreationOutcomeUnknownError } from '../safe/RepositoryObjectCreationWorkflow'
+import { SafeAbapError } from '../safe/errors'
 import type { CreationPlanView } from '../safe/creationTypes'
 import type { PreparedRepositoryCreation, RepositoryCreationPlan } from '../safe/repositoryCreationTypes'
 
@@ -160,6 +161,42 @@ describe('ABAP compatibility repository creation adapters', () => {
     await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toThrow('compensated')
     await expect(adapter.compensate!(plan(prepared))).resolves.toBe(true)
     expect(workflow.apply).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards only validated source mismatch diagnostics from a compensated legacy plan', async () => {
+    const workflow = legacy({
+      status: 'COMPENSATED',
+      primaryError: {
+        code: 'SOURCE_VERIFY_FAILED', stage: 'verify', message: 'Source mismatch',
+        details: {
+          sourceMatchType: 'DIFFERENT',
+          source: 'must not leave the legacy plan',
+          mismatch: {
+            expectedHash: 'a'.repeat(64), actualHash: 'b'.repeat(64),
+            expectedLineCount: 2, actualLineCount: 3, firstMismatchLine: 2,
+            expectedLineBytes: 12, actualLineBytes: 0,
+            expectedLineHash: 'c'.repeat(64), actualLineHash: 'd'.repeat(64),
+            source: 'must not leave the mismatch payload'
+          }
+        }
+      }
+    })
+    workflow.apply.mockRejectedValue(new Error('Source mismatch'))
+    const adapter = new AbapSourceCreationAdapter('PROGRAM', workflow)
+    const prepared = await adapter.prepare({
+      name: 'ZNEW', description: 'New program', packageName: 'Z001', source: programSource,
+      transportRequest: 'DEVK900001'
+    })
+
+    await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toMatchObject({
+      code: 'SOURCE_VERIFY_FAILED', details: {
+        sourceMatchType: 'DIFFERENT', mismatch: { firstMismatchLine: 2, actualLineBytes: 0 }
+      }
+    })
+    await adapter.execute(plan(prepared), jest.fn()).catch(error => {
+      expect(error).toBeInstanceOf(SafeAbapError)
+      expect(JSON.stringify(error)).not.toContain('must not leave')
+    })
   })
 
   it('preserves a known legacy compensation failure without retrying it', async () => {

@@ -26,6 +26,7 @@ export type SourceMatchType =
   | 'EXACT'
   | 'LINE_ENDING_NORMALIZED'
   | 'FUNCTION_MODULE_FORMAT_NORMALIZED'
+  | 'ABAP_CLASS_FORMAT_NORMALIZED'
   | 'DIFFERENT';
 
 export interface SafeAdtClient {
@@ -34,7 +35,7 @@ export interface SafeAdtClient {
   mainPrograms(includeUrl: string): Promise<MainInclude[]>;
   transportInfo(objectUrl: string, devClass?: string, operation?: string): Promise<TransportInfo>;
   transportDetails(transportNumber: string): Promise<TransportRequest>;
-  getObjectSource(objectSourceUrl: string): Promise<string>;
+  getObjectSource(objectSourceUrl: string, options?: { version?: 'active' | 'inactive' | 'workingArea' }): Promise<string>;
   setObjectSource(objectSourceUrl: string, source: string, lockHandle: string, transport?: string): Promise<void>;
   syntaxCheck(
     artifactUrl: string,

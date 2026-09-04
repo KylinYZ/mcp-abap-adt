@@ -51,12 +51,18 @@ export class PackageCreationAdapter implements RepositoryObjectCreationAdapter {
     const language = metadata.language || metadata.masterLanguage
     const masterLanguage = metadata.masterLanguage || language
     const masterSystem = metadata.masterSystem
-    const responsible = metadata.responsible || this.policy.sapUser
+    const parentResponsible = String(metadata.responsible || '').trim()
+    // Parent packages can expose the technical system value SAP. Eclipse uses
+    // the authenticated development user for the new package and lets SAP's
+    // basic/full validation endpoints decide whether that user is accepted.
+    const responsible = !parentResponsible || isInvalidResponsible(parentResponsible)
+      ? this.policy.sapUser
+      : parentResponsible
     if (!language || !masterLanguage || !masterSystem || !responsible) {
       throw new Error(`Parent package ${parentPackageName} did not expose the identity metadata required for controlled creation.`)
     }
-    if (isInvalidResponsible(responsible)) {
-      throw new Error(`Parent package ${parentPackageName} exposes invalid responsible user '${responsible}'. SAP requires a valid user, not the system value SAP.`)
+    if (!responsible || isInvalidResponsible(responsible)) {
+      throw new Error(`Current authenticated SAP user is unavailable for package responsibility validation.`)
     }
     const input: ControlledPackageInput = {
       name, description, parentPackageName, softwareComponent, transportLayer, transportRequest,
@@ -78,7 +84,9 @@ export class PackageCreationAdapter implements RepositoryObjectCreationAdapter {
       payload: { input, parentPackageUrl: parent['adtcore:uri'] } satisfies PackageCreationPayload,
       review: {
         objectKind: 'PACKAGE', name, description, parentPackageName, softwareComponent, transportLayer,
-        transportRequest, fixedAttributes: { packageType: 'development', isEncapsulated: true, recordChanges: true }
+        transportRequest, responsible,
+        responsibleSource: isInvalidResponsible(parentResponsible) ? 'CURRENT_AUTHENTICATED_USER' : 'PARENT_PACKAGE',
+        fixedAttributes: { packageType: 'development', isEncapsulated: true, recordChanges: true }
       },
       compensationLimits: ['Automatic deletion requires proven ownership and an empty package.']
     }

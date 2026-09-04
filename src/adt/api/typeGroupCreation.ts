@@ -30,6 +30,7 @@ export interface ControlledTypeGroupDocument {
 export interface ControlledTypeGroupCreationResult {
   location: string
   typeGroup: ControlledTypeGroupDocument
+  ownershipEvidence?: 'CANONICAL_LOCATION' | 'POST_CREATE_READBACK_REQUIRED'
 }
 
 export async function validateControlledTypeGroupShell(
@@ -67,15 +68,23 @@ export async function createControlledTypeGroupShell(
     body: buildControlledTypeGroupShellXml(input)
   })
   const expectedLocation = controlledTypeGroupUrl(input.name)
+  const responseLocation = String(response.headers.location || response.headers.Location || '').trim()
+  if (response.status === 200 && !responseLocation && !String(response.body || '').trim()) {
+    return {
+      location: expectedLocation,
+      typeGroup: { name: input.name.toUpperCase() },
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    }
+  }
   const location = requireCanonicalCreationLocation(response, expectedLocation, 'DDIC type group creation')
   if (!String(response.body || '').trim()) {
-    return { location, typeGroup: { name: input.name.toUpperCase() } }
+    return { location, typeGroup: { name: input.name.toUpperCase() }, ownershipEvidence: 'CANONICAL_LOCATION' }
   }
   const typeGroup = parseControlledTypeGroup(response.body)
   if (typeGroup.name !== input.name.toUpperCase()) {
     throw adtException('DDIC type group creation response identity does not match the requested type group.')
   }
-  return { location, typeGroup }
+  return { location, typeGroup, ownershipEvidence: 'CANONICAL_LOCATION' }
 }
 
 export function controlledTypeGroupUrl(name: string): string {

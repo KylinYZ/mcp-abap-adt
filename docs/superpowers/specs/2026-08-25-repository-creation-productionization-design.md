@@ -27,7 +27,7 @@
 - 2 类 target/local unavailable
 - 11 类 `DEPENDENCY_MISSING`
 
-自动化基线为 106 个 Jest suites、719 tests；覆盖清单为 controlled 31、pending 111、`REAL_DEV_VERIFIED=0`。
+自动化基线为 109 个 Jest suites、742 tests；覆盖清单为 controlled 31、pending 111、`REAL_DEV_VERIFIED=11`。Wave 1 的 11 类已全部证据化晋级，其余 20 类仍未晋级。
 
 ## 3. 正式可用的定义
 
@@ -60,7 +60,7 @@
 - apply 使用独立原生确认；创建确认不能授权删除。
 - 仅删除当前验证前缀、包和传输范围内的对象。
 - 依赖对象按逆序清理；未知删除结果停止，不自动重试。
-- 清理后必须 search 缺失，并复核传输中无残留对象条目。
+- 清理后必须 search 缺失，并复核固定传输/task 中恰好保留一条匹配 `PGMID + OBJECT + OBJ_NAME` 的 CTS 删除条目；该条目用于把删除同步到 QAS/PRD，禁止为了“零残留”删除 E071 或整个传输。
 - 正常生产使用不暴露这三个工具。
 
 ## 5. 成熟度证据
@@ -70,9 +70,9 @@
 - objectKind / ADT type
 - 创建计划证据 ID
 - active/final readback 证据
-- transport evidence
+- 创建时 transport evidence，以及清理后精确 CTS 删除条目仍保留的独立 evidence
 - cleanup plan/evidence ID
-- cleanup 后缺失证据
+- cleanup 后 search 缺失证据；不把合法 CTS 删除条目误判为仓库对象残留
 - DEV target fingerprint 与日期
 - 已解释的 SAP 默认值或规范化规则
 

@@ -272,8 +272,8 @@ function matchesObject(
 }
 
 function validateIncludeSuffix(value: string): string {
-  if (!/^[A-Z][A-Z0-9_]{2}$/.test(value)) {
-    throw invalidGraph('FUNCTION_GROUP_INCLUDE name must be a three-character suffix starting with a letter.');
+  if (!/^(?=.*[A-Z0-9])[A-Z0-9_]{3}$/.test(value)) {
+    throw invalidGraph('FUNCTION_GROUP_INCLUDE name must be a three-character include suffix.');
   }
   return value;
 }

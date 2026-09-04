@@ -39,7 +39,7 @@ describe('controlled service binding ADT contract', () => {
           objname: 'ZUI_MCP_BINDING', description: 'MCP service binding', objtype: 'SRVB/SVB',
           serviceBindingVersion: 'ODATA\\V4', serviceDefinition: 'ZUI_MCP_SERVICE', package: 'Z001'
         },
-        headers: { Accept: 'application/vnd.sap.adt.businessservices.servicebinding.v1+xml' }
+        headers: { Accept: 'application/vnd.sap.as+xml' }
       }
     ])
   })
@@ -64,8 +64,8 @@ describe('controlled service binding ADT contract', () => {
     const request = (client.request as jest.Mock).mock.calls[0]
     expect(request[0]).toBe('/sap/bc/adt/businessservices/bindings')
     expect(request[1]).toMatchObject({ method: 'POST', qs: { corrNr: 'S4HK900009' }, headers: {
-      'Content-Type': 'application/vnd.sap.adt.businessservices.servicebinding.v1+xml',
-      Accept: 'application/vnd.sap.adt.businessservices.servicebinding.v1+xml'
+      'Content-Type': 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
+      Accept: 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml'
     } })
     await expect(createControlledServiceBinding(http({
       body: bindingResponse().replace('ZUI_MCP_BINDING', 'ZOTHER'), status: 201,

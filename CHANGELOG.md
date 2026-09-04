@@ -1,6 +1,13 @@
 # Changelog
 
 ## [Unreleased]
+- Add validation-only repository cleanup preview/apply/status with a separately confirmed destructive action, frozen parent identity, child-first cleanup, and no replay after uncertain deletion.
+- Enforce checked-in per-kind maturity evidence for creation, readback, transport, cleanup, and absence; block historical unknown identities and ship the evidence manifest with the npm package.
+- Classify cleanup CTS evidence as either an exact propagated deletion entry or an exact neutral entry for objects created and removed in the same open transport; duplicates, released transports, and unknown creation outcomes still fail closed.
+- Promote CDS Data Definition, DCL, Metadata Extension, Service Definition, Behavior Definition, and Service Binding to `REAL_DEV_VERIFIED`, raising the evidence-backed total to 22 kinds.
+- Promote Change Document Object after fresh `ZVPCHDO05` `APPLIED` creation, active generated-Class verification, parent-only cleanup, cascade absence, and exact neutral `CHDO/CLAS` CTS evidence, raising the total to 23 kinds.
+- Complete real DEV lifecycle evidence and `REAL_DEV_VERIFIED` promotion for all 11 Wave 1 repository-object kinds.
+- Add bounded post-create ownership proof for source/type-group HTTP 200 responses, safe Table/Function mismatch metadata, authenticated-user package responsibility validation, and DDIC Structure prewrite checks.
 - Fix a reentrant `ToolExecutionGate` deadlock by keeping repository-object confirmation and local status reads outside the outer SAP gate while retaining the confirmed workflow inside the single SAP slot.
 - Add a Windows interactive confirmation provider with a Chinese SAP-style dialog, Explorer broker launch, one-time named-pipe response, bounded challenge binding, and no TCP listener or SAP credentials in the helper.
 - Normalize SAP's empty default DDIC domain `valueInformation` during active verification without ignoring non-empty value tables, fixed values, or append flags.

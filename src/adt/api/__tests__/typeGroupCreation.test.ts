@@ -50,7 +50,16 @@ describe('type group creation API', () => {
       })
     }
     await expect(createControlledTypeGroupShell(client as never, input, 'application/vnd.sap.adt.ddic.typegroups.v2+xml')).resolves.toEqual({
-      location: '/sap/bc/adt/ddic/typegroups/zztg1', typeGroup: { name: 'ZZTG1' }
+      location: '/sap/bc/adt/ddic/typegroups/zztg1', typeGroup: { name: 'ZZTG1' },
+      ownershipEvidence: 'CANONICAL_LOCATION'
+    })
+  })
+
+  it('defers ownership for the bounded HTTP 200 empty acknowledgement', async () => {
+    const client = { request: jest.fn().mockResolvedValue({ status: 200, headers: {}, body: '' }) }
+    await expect(createControlledTypeGroupShell(client as never, input, 'application/vnd.sap.adt.ddic.typegroups.v2+xml')).resolves.toEqual({
+      location: '/sap/bc/adt/ddic/typegroups/zztg1', typeGroup: { name: 'ZZTG1' },
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
     })
   })
 
@@ -60,7 +69,7 @@ describe('type group creation API', () => {
       request: jest.fn().mockResolvedValue({ status: 201, headers: { location }, body: '' })
     }
     await expect(createControlledTypeGroupShell(client as never, input, 'application/vnd.sap.adt.ddic.typegroups.v2+xml')).resolves.toEqual({
-      location, typeGroup: { name: 'ZZTG1' }
+      location, typeGroup: { name: 'ZZTG1' }, ownershipEvidence: 'CANONICAL_LOCATION'
     })
   })
 

@@ -32,7 +32,8 @@ export interface ControlledServiceBindingCreationResult {
 
 const COLLECTION_PATH = '/sap/bc/adt/businessservices/bindings'
 const VALIDATION_PATH = `${COLLECTION_PATH}/validation`
-const CONTENT_TYPE = 'application/vnd.sap.adt.businessservices.servicebinding.v1+xml'
+const CONTENT_TYPE = 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml'
+const VALIDATION_ACCEPT = 'application/vnd.sap.as+xml'
 
 export async function validateControlledServiceBinding(
   h: AdtHTTP,
@@ -48,7 +49,7 @@ export async function validateControlledServiceBinding(
       serviceDefinition: input.serviceDefinition,
       package: input.packageName
     },
-    headers: { Accept: CONTENT_TYPE }
+    headers: { Accept: VALIDATION_ACCEPT }
   })
   if (response.status >= 400) throw adtException('Service binding validation failed.')
   const raw = fullParse(response.body)

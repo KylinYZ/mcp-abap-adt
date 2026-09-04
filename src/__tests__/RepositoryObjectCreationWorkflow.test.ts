@@ -4,8 +4,10 @@ import {
   RepositoryCreationOutcomeUnknownError,
   RepositoryObjectCreationWorkflow
 } from '../safe/RepositoryObjectCreationWorkflow';
+import { SafeAbapError } from '../safe/errors';
 import { INITIAL_REPOSITORY_CREATION_CAPABILITIES } from '../safe/repositoryCreationCapabilities';
 import type { RepositoryObjectCreationAdapter } from '../safe/repositoryCreationTypes';
+import type { RepositoryCreationMaturityEvidenceManifest } from '../safe/RepositoryCreationMaturityEvidence';
 
 const context = {
   systemHost: 'dev.example.test', client: '100', sapUser: 'TEST_USER',
@@ -16,7 +18,34 @@ function registry(): RepositoryObjectCreationRegistry {
   return new RepositoryObjectCreationRegistry([{
     ...INITIAL_REPOSITORY_CREATION_CAPABILITIES.find(capability => capability.objectKind === 'PROGRAM')!,
     maturity: 'REAL_DEV_VERIFIED'
-  }]);
+  }], verifiedProgramEvidence());
+}
+
+function unverifiedProgramRegistry(): RepositoryObjectCreationRegistry {
+  return new RepositoryObjectCreationRegistry([{
+    ...INITIAL_REPOSITORY_CREATION_CAPABILITIES.find(capability => capability.objectKind === 'PROGRAM')!,
+    maturity: 'AUTOMATION_VERIFIED'
+  }], { schemaVersion: 2, records: [], unresolvedValidationIdentities: [] });
+}
+
+function verifiedProgramEvidence(): RepositoryCreationMaturityEvidenceManifest {
+  return {
+    schemaVersion: 2,
+    unresolvedValidationIdentities: [],
+    records: [{
+      evidenceId: 'program-evidence-1', objectKind: 'PROGRAM', adtType: 'PROG/P', objectName: 'ZVPROG_NEW',
+      create: { planId: 'create-plan', status: 'APPLIED', evidenceRef: 'docs/evidence/program-create.md' },
+      readback: { status: 'ACTIVE_VERIFIED', evidenceRef: 'docs/evidence/program-readback.md' },
+      transport: { request: 'S4HK900009', packageName: 'Z001', objectEntryVerified: true, deletionEntryVerified: true, evidenceRef: 'docs/evidence/program-transport.md' },
+      cleanup: { planId: 'cleanup-plan', status: 'COMPLETED', evidenceRef: 'docs/evidence/program-cleanup.md' },
+      absence: { searchAbsent: true, evidenceRef: 'docs/evidence/program-absence.md' },
+      target: {
+        host: 'dev.example.test', client: '300', systemRole: 'DEV',
+        fingerprint: 'a'.repeat(64), verifiedAt: '2026-08-25T00:00:00.000Z'
+      },
+      normalizations: []
+    }]
+  };
 }
 
 function adapter(execute: RepositoryObjectCreationAdapter['execute'], targetName = 'ZTEST'): RepositoryObjectCreationAdapter {
@@ -62,10 +91,38 @@ describe('RepositoryObjectCreationWorkflow', () => {
     expect(workflow.status('plan-1')).toMatchObject({ status: 'OUTCOME_UNKNOWN' });
   });
 
+  it('keeps only validated source mismatch metadata after compensation', async () => {
+    const controlledAdapter = adapter(jest.fn().mockRejectedValue(new SafeAbapError(
+      'SOURCE_VERIFY_FAILED', 'verify', 'Source mismatch', {
+        sourceMatchType: 'DIFFERENT', secret: 'not-safe',
+        mismatch: {
+          expectedHash: 'a'.repeat(64), actualHash: 'b'.repeat(64),
+          expectedLineCount: 2, actualLineCount: 3, firstMismatchLine: 2,
+          expectedLineBytes: 12, actualLineBytes: 0,
+          expectedLineHash: 'c'.repeat(64), actualLineHash: 'd'.repeat(64),
+          source: 'not-safe'
+        }
+      }
+    )));
+    controlledAdapter.compensate = jest.fn().mockResolvedValue(true);
+    const workflow = new RepositoryObjectCreationWorkflow(
+      registry(), context, new RepositoryObjectCreationPlanStore(60_000, () => 1_000, () => 'plan-1'), [controlledAdapter]
+    );
+    await workflow.preview({ objectKind: 'PROGRAM', name: 'ZTEST' });
+
+    await expect(workflow.apply('plan-1')).rejects.toMatchObject({ code: 'REMOTE_WRITE_FAILED' });
+    const status = workflow.status('plan-1');
+    expect(status).toMatchObject({
+      status: 'COMPENSATED',
+      primaryError: { details: { sourceMatchType: 'DIFFERENT', mismatch: { firstMismatchLine: 2, actualLineBytes: 0 } } }
+    });
+    expect(JSON.stringify(status)).not.toContain('not-safe');
+  });
+
   it('allows read-only preview but rejects apply until real DEV verification', async () => {
     const controlledAdapter = adapter(jest.fn());
     const workflow = new RepositoryObjectCreationWorkflow(
-      new RepositoryObjectCreationRegistry(INITIAL_REPOSITORY_CREATION_CAPABILITIES),
+      unverifiedProgramRegistry(),
       context,
       new RepositoryObjectCreationPlanStore(60_000, () => 1_000, () => 'plan-1'),
       [controlledAdapter]
@@ -89,7 +146,7 @@ describe('RepositoryObjectCreationWorkflow', () => {
       realDevValidationTransport: 'DEVK900001'
     };
     const workflow = new RepositoryObjectCreationWorkflow(
-      new RepositoryObjectCreationRegistry(INITIAL_REPOSITORY_CREATION_CAPABILITIES),
+      unverifiedProgramRegistry(),
       validationContext,
       new RepositoryObjectCreationPlanStore(60_000, () => 1_000, () => 'plan-1'),
       [adapter(execute, 'ZZMCP_VT_TEST')]
@@ -107,6 +164,39 @@ describe('RepositoryObjectCreationWorkflow', () => {
       [adapter(jest.fn())]
     );
     await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZOTHER', packageName: 'Z001', transportRequest: 'DEVK900001' })).rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'validation' });
+  });
+
+  it('accepts E plus the configured prefix for DDIC lock object validation', async () => {
+    const lockCapability = {
+      ...INITIAL_REPOSITORY_CREATION_CAPABILITIES.find(capability => capability.objectKind === 'DDIC_LOCK_OBJECT')!,
+      maturity: 'CONTROLLED_IMPLEMENTED' as const
+    };
+    const execute = jest.fn().mockResolvedValue({
+      resultSummary: 'Created lock object', actualResources: [{ type: 'ENQU/DL', name: 'EZVLOCK3' }]
+    });
+    const lockAdapter: RepositoryObjectCreationAdapter = {
+      objectKind: 'DDIC_LOCK_OBJECT',
+      prepare: jest.fn().mockResolvedValue({
+        target: { objectKind: 'DDIC_LOCK_OBJECT', objectName: 'EZVLOCK3', adtType: 'ENQU/DL', parentName: 'Z001' },
+        transportRequest: 'DEVK900001', summary: 'Create EZVLOCK3', payload: {}, review: {}, compensationLimits: []
+      }),
+      execute
+    };
+    const validationContext = {
+      ...context, realDevValidationEnabled: true, realDevValidationObjects: ['DDIC_LOCK_OBJECT'],
+      realDevValidationPrefix: 'ZV', realDevValidationPackage: 'Z001', realDevValidationTransport: 'DEVK900001'
+    };
+    const workflow = new RepositoryObjectCreationWorkflow(
+      new RepositoryObjectCreationRegistry([lockCapability], { schemaVersion: 2, records: [], unresolvedValidationIdentities: [] }),
+      validationContext,
+      new RepositoryObjectCreationPlanStore(60_000, () => 1_000, () => 'lock-plan'),
+      [lockAdapter]
+    );
+
+    await workflow.preview({ objectKind: 'DDIC_LOCK_OBJECT', name: 'EZVLOCK3', packageName: 'Z001', transportRequest: 'DEVK900001' });
+    await expect(workflow.apply('lock-plan')).resolves.toMatchObject({ status: 'success' });
+    await expect(workflow.preview({ objectKind: 'DDIC_LOCK_OBJECT', name: 'ZVLOCK3', packageName: 'Z001', transportRequest: 'DEVK900001' }))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'validation' });
   });
 
   it('validates a function-group include by prefixed parent and frozen package', async () => {
@@ -144,8 +234,8 @@ describe('RepositoryObjectCreationWorkflow', () => {
       objectKind: 'FUNCTION_GROUP_INCLUDE', name: 'Z01', parentFunctionGroup: 'ZVFG1',
       transportRequest: 'DEVK900001'
     })).resolves.toMatchObject({ plan: { target: { objectName: 'LZVFG1Z01', packageName: 'Z001' } } });
-    await expect(workflow.apply('include-plan')).resolves.toMatchObject({ status: 'success' });
-    expect(execute).toHaveBeenCalledTimes(1);
+    await expect(workflow.apply('include-plan')).rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'validation' });
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('rejects a function-group include outside the configured parent prefix', async () => {

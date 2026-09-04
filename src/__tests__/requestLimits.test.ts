@@ -214,8 +214,7 @@ describe('request limits', () => {
     expect(() => applyToolArgumentLimits('previewRepositoryObjectCreation', {
       objectKind: 'CHANGE_DOCUMENT_OBJECT', name: 'ZMCPCHDO', description: 'Change document', packageName: 'Z001',
       transportRequest: 'DEVK900001', category: 'standard',
-      tablesAndStructures: [{ name: 'ZTAB', multipleChanges: true }],
-      errorMessage: { id: 'CD', number: '600' }
+      tablesAndStructures: [{ name: 'ZTAB', multipleChanges: true }]
     }, roomy)).not.toThrow();
   });
 

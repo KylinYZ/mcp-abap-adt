@@ -205,6 +205,7 @@ export interface TransportObject {
   "tm:pgmid": string
   "tm:type": string
   "tm:name": string
+  "tm:obj_func"?: string
   "tm:dummy_uri": string
   "tm:obj_info": string
 }

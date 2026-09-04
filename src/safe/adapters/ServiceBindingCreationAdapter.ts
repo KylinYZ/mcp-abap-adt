@@ -18,6 +18,7 @@ import type {
 import type { SafetyPolicy } from '../SafetyPolicy.js'
 import type { ControlledCreationAdtClient } from './controlledCreationTools.js'
 import {
+  assertActivation,
   assertTargetAbsent,
   assertTransportAvailable,
   assertValidation,
@@ -136,11 +137,23 @@ export class ServiceBindingCreationAdapter implements RepositoryObjectCreationAd
     plan.actualResources = [{ type: 'SRVB/SVB', name: input.name }]
     recordStage('CREATE_OBJECT', true)
 
-    const canonical = await this.client.getObjectSource(payload.bindingUrl)
+    let activation
+    try {
+      activation = await this.client.activate(input.name, payload.bindingUrl, undefined, true)
+    } catch (error) {
+      throw unknownWrite('Service binding activation', error)
+    }
+    assertActivation(activation, 'ACTIVATE_OBJECT')
+    recordStage('ACTIVATE_OBJECT', true)
+
+    const active = await this.client.objectStructure(payload.bindingUrl, 'active')
+    assertActiveBinding(active.metaData as unknown as Record<string, unknown>, input)
+    recordStage('VERIFY_ACTIVE_OBJECT', true)
+    const canonical = await this.client.getObjectSource(payload.bindingUrl, { version: 'active' })
     assertBindingIdentity(parseServiceBinding(canonical), input)
-    recordStage('VERIFY_CREATED_OBJECT', true)
+    recordStage('VERIFY_CONFIGURATION', true)
     return {
-      resultSummary: `Created and verified service binding ${input.name}.`,
+      resultSummary: `Created, activated, and verified service binding ${input.name}.`,
       actualResources: [{ type: 'SRVB/SVB', name: input.name }]
     }
   }
@@ -217,6 +230,16 @@ function assertBindingIdentity(binding: ServiceBinding, input: ControlledService
     || String(binding.binding?.version || '').toUpperCase() !== expectedVersion
     || String(binding.binding?.category || '') !== expectedCategory) {
     throw new Error(`Created service binding ${input.name} does not match the confirmed service configuration.`)
+  }
+}
+
+function assertActiveBinding(metadata: Record<string, unknown>, input: ControlledServiceBindingInput): void {
+  if (String(metadata['adtcore:name'] || '').toUpperCase() !== input.name
+    || String(metadata['adtcore:type'] || '').toUpperCase() !== 'SRVB/SVB'
+    || String(metadata['adtcore:version'] || '').toLowerCase() !== 'active'
+    || metadata['srvb:bindingCreated'] !== true
+    || metadata['srvb:published'] !== false) {
+    throw new Error(`Created service binding ${input.name} is not active and unpublished.`)
   }
 }
 

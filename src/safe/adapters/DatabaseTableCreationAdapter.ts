@@ -157,7 +157,11 @@ export class DatabaseTableCreationAdapter implements RepositoryObjectCreationAda
     assertActivation(tableActivation, 'table-activation')
     recordStage('ACTIVATE_OBJECT', true)
     const activeSource = await this.client.readControlledTableSource(payload.name, 'active')
-    if (!databaseTableSourcesMatch(payload.source, activeSource)) throw new Error(`Active source for ${payload.name} does not match the confirmed plan.`)
+    const sourceComparison = compareDatabaseTableSources(payload.source, activeSource)
+    if (!sourceComparison.matches) {
+      recordStage('VERIFY_SOURCE', false, JSON.stringify(sourceComparison.diagnostics))
+      throw new Error(`Active source for ${payload.name} does not match the confirmed plan.`)
+    }
     recordStage('VERIFY_SOURCE', true)
 
     const currentSettings = await this.client.readControlledTableSettings(payload.name)
@@ -276,12 +280,40 @@ interface DatabaseTableDdlToken {
   value: string
 }
 
-function databaseTableSourcesMatch(expectedSource: string, actualSource: string): boolean {
-  if (compareSources(expectedSource, actualSource).matches) return true
+function compareDatabaseTableSources(
+  expectedSource: string,
+  actualSource: string
+): { matches: boolean; diagnostics?: Record<string, unknown> } {
+  const strict = compareSources(expectedSource, actualSource)
+  if (strict.matches) return { matches: true }
   const expectedTokens = tokenizeDatabaseTableDdl(expectedSource)
   const actualTokens = tokenizeDatabaseTableDdl(actualSource)
-  return expectedTokens.length === actualTokens.length
-    && expectedTokens.every((token, index) => token.kind === actualTokens[index].kind && token.value === actualTokens[index].value)
+  const firstMismatchIndex = firstDatabaseTableTokenMismatch(expectedTokens, actualTokens)
+  if (firstMismatchIndex === -1) return { matches: true }
+  return {
+    matches: false,
+    diagnostics: {
+      expectedHash: strict.expectedHash,
+      actualHash: strict.actualHash,
+      expectedTokenCount: expectedTokens.length,
+      actualTokenCount: actualTokens.length,
+      firstMismatchIndex,
+      expectedTokenKind: expectedTokens[firstMismatchIndex]?.kind || 'MISSING',
+      actualTokenKind: actualTokens[firstMismatchIndex]?.kind || 'MISSING'
+    }
+  }
+}
+
+function firstDatabaseTableTokenMismatch(
+  expectedTokens: DatabaseTableDdlToken[],
+  actualTokens: DatabaseTableDdlToken[]
+): number {
+  const maximum = Math.max(expectedTokens.length, actualTokens.length)
+  for (let index = 0; index < maximum; index += 1) {
+    if (expectedTokens[index]?.kind !== actualTokens[index]?.kind
+      || expectedTokens[index]?.value !== actualTokens[index]?.value) return index
+  }
+  return -1
 }
 
 function tokenizeDatabaseTableDdl(source: string): DatabaseTableDdlToken[] {

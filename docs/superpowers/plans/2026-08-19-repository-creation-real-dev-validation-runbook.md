@@ -95,7 +95,7 @@ SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT=S4HK900009
 ### 5.7 `SERVICE_BINDING`
 
 - 先准备一个已激活的 `SRVD/SRV`，分别覆盖 OData V2/V4 和 UI/Web API 类别；确认 preview 只读取、不创建。
-- apply 后核对 `SRVB/SVB` 的 canonical Location、active 读取、包归属、Service Definition、协议版本、类别和 `0001` 服务版本；该对象不执行单独 activation。
+- apply 后必须执行标准 ADT activation，再核对 `SRVB/SVB` 的 canonical Location、active 读取、包归属、Service Definition、协议版本、类别、`0001` 服务版本、`bindingCreated=true` 和 `published=false`。
 - 验证创建后配置复读和精确清理；创建或删除结果不明确时停止，不重试、不盲删。
 
 ### 5.8 `DDIC_STRUCTURE`

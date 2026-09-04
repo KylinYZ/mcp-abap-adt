@@ -174,6 +174,114 @@ describe('SourceObjectCreationAdapter', () => {
     ])
   })
 
+  it('proves exact ownership before writing after HTTP 200 without Location', async () => {
+    const testCase = cases[1]
+    const client = clientFor(testCase)
+    client.readControlledPackage.mockResolvedValue({
+      name: 'Z001', language: 'ZH', masterLanguage: 'ZH', masterSystem: 'SAP', responsible: 'SAP'
+    })
+    let shellCreated = false
+    client.createControlledSourceObjectShell.mockImplementation(async () => {
+      shellCreated = true
+      return {
+        location: objectUrl(testCase), name: testCase.name, adtType: testCase.type,
+        ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+      }
+    })
+    client.searchObject.mockImplementation(async name => {
+      if (name === 'Z001') return [{
+        'adtcore:name': 'Z001', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/z001'
+      }]
+      return shellCreated && name === testCase.name ? [{
+        'adtcore:name': testCase.name, 'adtcore:type': testCase.type,
+        'adtcore:uri': objectUrl(testCase), 'adtcore:packageName': 'Z001'
+      }] : []
+    })
+    client.objectStructure.mockImplementation(async () => {
+      const value = structure(testCase, 'active')
+      return {
+        ...value,
+        metaData: {
+          ...value.metaData,
+          'adtcore:description': '受控源码对象', 'adtcore:masterLanguage': 'ZH',
+          'adtcore:masterSystem': 'S4H', 'adtcore:responsible': '68157'
+        }
+      } as AbapObjectStructure
+    })
+    client.transportInfo.mockResolvedValue({
+      OBJECTNAME: testCase.name, URI: objectUrl(testCase),
+      TRANSPORTS: [{ TRKORR: 'S4HK900009' }]
+    } as never)
+    const adapter = new SourceObjectCreationAdapter(testCase.kind, client, policy)
+    const prepared = await adapter.prepare(request(testCase))
+    const stages: string[] = []
+
+    await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({
+      actualResources: [{ type: testCase.type, name: testCase.name }]
+    })
+    expect(stages).toContain('PROVE_SHELL_OWNERSHIP')
+    expect(client.setObjectSource).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the authenticated user when the parent package exposes SAP responsibility', async () => {
+    const testCase = cases[1]
+    const client = clientFor(testCase)
+    client.readControlledPackage.mockResolvedValue({
+      name: 'Z001', language: 'ZH', masterLanguage: 'ZH', masterSystem: 'S4H', responsible: 'SAP'
+    })
+    const prepared = await new SourceObjectCreationAdapter(testCase.kind, client, policy).prepare(request(testCase))
+    expect((prepared.payload as any).input.responsible).toBe('068157')
+  })
+
+  it('keeps HTTP 200 ownership unknown when exact readback evidence is missing', async () => {
+    const testCase = cases[1]
+    const client = clientFor(testCase)
+    client.createControlledSourceObjectShell.mockResolvedValue({
+      location: objectUrl(testCase), name: testCase.name, adtType: testCase.type,
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    })
+    const prepared = await new SourceObjectCreationAdapter(testCase.kind, client, policy).prepare(request(testCase))
+    const executionPlan = plan(prepared)
+
+    await expect(new SourceObjectCreationAdapter(testCase.kind, client, policy).execute(executionPlan, jest.fn()))
+      .rejects.toBeInstanceOf(RepositoryCreationOutcomeUnknownError)
+    expect(executionPlan.actualResources).toBeUndefined()
+    expect(client.lock).not.toHaveBeenCalled()
+    expect(client.deleteObject).not.toHaveBeenCalled()
+  })
+
+  it('accepts an include description proven by exact search when active metadata omits it', async () => {
+    const testCase = cases[2]
+    const client = clientFor(testCase)
+    let shellCreated = false
+    client.createControlledSourceObjectShell.mockResolvedValue({
+      location: objectUrl(testCase), name: testCase.name, adtType: testCase.type,
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    })
+    client.searchObject.mockImplementation(async name => name === 'Z001' ? [{
+      'adtcore:name': 'Z001', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/z001'
+    }] : shellCreated ? [{
+      'adtcore:name': testCase.name, 'adtcore:type': testCase.type,
+      'adtcore:uri': objectUrl(testCase), 'adtcore:packageName': 'Z001', 'adtcore:description': '受控源码对象'
+    }] : [])
+    client.createControlledSourceObjectShell.mockImplementation(async () => {
+      shellCreated = true
+      return { location: objectUrl(testCase), name: testCase.name, adtType: testCase.type, ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED' }
+    })
+    client.objectStructure.mockImplementation(async () => {
+      const value = structure(testCase, 'active')
+      return { ...value, metaData: {
+        ...value.metaData, 'adtcore:masterLanguage': 'ZH', 'adtcore:masterSystem': 'S4H'
+      } } as AbapObjectStructure
+    })
+    client.transportInfo.mockResolvedValue({
+      OBJECTNAME: testCase.name, URI: objectUrl(testCase), TRANSPORTS: [{ TRKORR: 'S4HK900009' }]
+    } as never)
+    const adapter = new SourceObjectCreationAdapter(testCase.kind, client, policy)
+    const prepared = await adapter.prepare(request(testCase))
+    await expect(adapter.execute(plan(prepared), jest.fn())).resolves.toBeDefined()
+  })
+
   it('preserves a source-write unknown outcome when unlock also fails', async () => {
     const testCase = cases[0]
     const client = clientFor(testCase)

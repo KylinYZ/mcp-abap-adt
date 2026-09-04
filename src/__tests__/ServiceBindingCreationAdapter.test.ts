@@ -10,7 +10,7 @@ const policy = new SafetyPolicy({
   auditPath: './audit', toolProfile: 'development'
 })
 
-const bindingXml = '<srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZUI_MCP_BINDING" adtcore:type="SRVB/SVB"><atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="x"/><adtcore:packageRef adtcore:name="Z001"/><srvb:services srvb:name="ZUI_MCP_BINDING"><srvb:content srvb:version="0001"><srvb:serviceDefinition adtcore:name="ZUI_MCP_SERVICE"/></srvb:content></srvb:services><srvb:binding srvb:type="ODATA" srvb:version="V4" srvb:category="1"><srvb:implementation adtcore:name=""/></srvb:binding></srvb:serviceBinding>'
+const bindingXml = '<srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZUI_MCP_BINDING" adtcore:type="SRVB/SVB" adtcore:version="active" srvb:bindingCreated="true" srvb:published="false"><atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="x"/><adtcore:packageRef adtcore:name="Z001"/><srvb:services srvb:name="ZUI_MCP_BINDING"><srvb:content srvb:version="0001"><srvb:serviceDefinition adtcore:name="ZUI_MCP_SERVICE"/></srvb:content></srvb:services><srvb:binding srvb:type="ODATA" srvb:version="V4" srvb:category="1"><srvb:implementation adtcore:name=""/></srvb:binding></srvb:serviceBinding>'
 
 function baseClient(): jest.Mocked<ControlledCreationAdtClient> {
   return {
@@ -37,12 +37,18 @@ function configuredClient(): jest.Mocked<ControlledCreationAdtClient> {
     return []
   })
   client.readControlledPackage.mockResolvedValue({ name: 'Z001', language: 'ZH', masterLanguage: 'ZH', masterSystem: 'S4H', responsible: '068157' })
-  client.objectStructure.mockResolvedValue({ objectUrl: '/sap/bc/adt/ddic/srvd/sources/zui_mcp_service', metaData: {
-    'adtcore:name': 'ZUI_MCP_SERVICE', 'adtcore:type': 'SRVD/SRV', 'adtcore:version': 'active'
-  }, links: [] } as never)
+  client.objectStructure.mockImplementation(async objectUrl => objectUrl.includes('/businessservices/bindings/')
+    ? { objectUrl, metaData: {
+        'adtcore:name': 'ZUI_MCP_BINDING', 'adtcore:type': 'SRVB/SVB', 'adtcore:version': 'active',
+        'srvb:bindingCreated': true, 'srvb:published': false
+      }, links: [] } as never
+    : { objectUrl, metaData: {
+        'adtcore:name': 'ZUI_MCP_SERVICE', 'adtcore:type': 'SRVD/SRV', 'adtcore:version': 'active'
+      }, links: [] } as never)
   ;(client.validateControlledServiceBinding as jest.Mock).mockResolvedValue({ success: true })
   ;(client.createControlledServiceBinding as jest.Mock).mockResolvedValue({ location: '/sap/bc/adt/businessservices/bindings/zui_mcp_binding', name: 'ZUI_MCP_BINDING', adtType: 'SRVB/SVB' })
   client.getObjectSource.mockResolvedValue(bindingXml)
+  client.activate.mockResolvedValue({ success: true, messages: [], inactive: [] })
   client.transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'S4HK900009' }] } as never)
   client.transportDetails.mockResolvedValue({ 'tm:status': 'D' } as never)
   client.lock.mockResolvedValue({ LOCK_HANDLE: 'LOCK-1' } as never)
@@ -78,7 +84,16 @@ describe('ServiceBindingCreationAdapter', () => {
       actualResources: [{ type: 'SRVB/SVB', name: 'ZUI_MCP_BINDING' }]
     })
     expect(client.createControlledServiceBinding).toHaveBeenCalledTimes(1)
-    expect(stages).toEqual(['REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCE', 'VALIDATE_TRANSPORT', 'CREATE_OBJECT', 'VERIFY_CREATED_OBJECT'])
+    expect(stages).toEqual([
+      'REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCE', 'VALIDATE_TRANSPORT', 'CREATE_OBJECT',
+      'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_CONFIGURATION'
+    ])
+    expect(client.activate).toHaveBeenCalledWith(
+      'ZUI_MCP_BINDING', '/sap/bc/adt/businessservices/bindings/zui_mcp_binding', undefined, true
+    )
+    expect(client.getObjectSource).toHaveBeenCalledWith(
+      '/sap/bc/adt/businessservices/bindings/zui_mcp_binding', { version: 'active' }
+    )
   })
 
   it('rejects category mismatches and inactive or changed service definitions before creation', async () => {
@@ -104,6 +119,21 @@ describe('ServiceBindingCreationAdapter', () => {
     await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toBeInstanceOf(RepositoryCreationOutcomeUnknownError)
     expect(client.createControlledServiceBinding).toHaveBeenCalledTimes(1)
     expect(client.deleteObject).not.toHaveBeenCalled()
+  })
+
+  it('requires an active, created, and unpublished binding after activation', async () => {
+    const client = configuredClient()
+    client.objectStructure.mockImplementation(async objectUrl => objectUrl.includes('/businessservices/bindings/')
+      ? { objectUrl, metaData: {
+          'adtcore:name': 'ZUI_MCP_BINDING', 'adtcore:type': 'SRVB/SVB', 'adtcore:version': 'inactive',
+          'srvb:bindingCreated': false, 'srvb:published': false
+        }, links: [] } as never
+      : { objectUrl, metaData: {
+          'adtcore:name': 'ZUI_MCP_SERVICE', 'adtcore:type': 'SRVD/SRV', 'adtcore:version': 'active'
+        }, links: [] } as never)
+    const adapter = new ServiceBindingCreationAdapter(client, policy)
+    const prepared = await adapter.prepare(request())
+    await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toThrow('not active and unpublished')
   })
 
   it('compensates only a binding recorded as owned by the current plan', async () => {

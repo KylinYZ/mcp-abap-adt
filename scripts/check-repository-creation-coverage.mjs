@@ -7,9 +7,12 @@ const require = createRequire(import.meta.url);
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..');
 const manifestPath = resolve(repositoryRoot, 'docs/evidence/eclipse-adt-3.60.2-creation-wizard-manifest.json');
+const maturityEvidencePath = resolve(repositoryRoot, 'docs/evidence/repository-creation-maturity-evidence.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+const maturityEvidence = JSON.parse(readFileSync(maturityEvidencePath, 'utf8'));
 const { INITIAL_REPOSITORY_CREATION_CAPABILITIES } = require(resolve(repositoryRoot, 'dist/safe/repositoryCreationCapabilities.js'));
 const { REPOSITORY_OBJECT_KINDS } = require(resolve(repositoryRoot, 'dist/safe/repositoryCreationTypes.js'));
+const { validateRepositoryCreationMaturityEvidence } = require(resolve(repositoryRoot, 'dist/safe/RepositoryCreationMaturityEvidence.js'));
 
 // The JAR snapshot is the product target; the runtime registry is the implemented subset.
 assertSortedUnique(manifest.installedWizardCandidateTypes, 'installedWizardCandidateTypes');
@@ -47,6 +50,18 @@ const realDevVerified = INITIAL_REPOSITORY_CREATION_CAPABILITIES
   .filter(capability => capability.maturity === 'REAL_DEV_VERIFIED')
   .map(capability => capability.adtType)
   .sort();
+const maturityEvidenceByKind = validateRepositoryCreationMaturityEvidence(
+  INITIAL_REPOSITORY_CREATION_CAPABILITIES,
+  maturityEvidence
+);
+const maturityCounts = INITIAL_REPOSITORY_CREATION_CAPABILITIES.reduce((counts, capability) => {
+  counts[capability.maturity] = (counts[capability.maturity] || 0) + 1;
+  return counts;
+}, {});
+const missingMaturityEvidence = realDevVerified.filter(adtType => {
+  const capability = capabilitiesByAdtType.get(adtType);
+  return capability && !maturityEvidenceByKind.has(capability.objectKind);
+});
 const pendingTypes = manifest.installedWizardCandidateTypes.filter(adtType => !(adtType in manifest.controlledMappings));
 
 console.log(`Eclipse ADT ${manifest.eclipseAdtVersion} installed wizard candidates: ${candidateTypes.size}`);
@@ -54,6 +69,8 @@ console.log(`Explicit creationAdapter types: ${adapterTypes.size}`);
 console.log(`Controlled MCP types: ${controlledEntries.length} (${controlledWithExplicitAdapter.length} adapter-backed, ${wizardOnlyControlled.length} wizard-backed)`);
 console.log(`Pending wizard candidates: ${pendingTypes.length}`);
 console.log(`REAL_DEV_VERIFIED controlled types: ${realDevVerified.length}`);
+console.log(`Maturity counts: ${Object.entries(maturityCounts).sort(([left], [right]) => left.localeCompare(right)).map(([maturity, count]) => `${maturity}=${count}`).join(', ')}`);
+console.log(`Maturity evidence records: ${maturityEvidenceByKind.size}; missing required evidence: ${missingMaturityEvidence.length}`);
 
 function assertSortedUnique(values, label) {
   assert(Array.isArray(values), `${label} must be an array.`);

@@ -50,7 +50,7 @@ describe('Change Document Object creation API', () => {
       properties: {
         generalInformation: { properties: { generatedObject: { 'sap.adt.types': ['CLAS', 'FUNC'] } } },
         tablesAndStructures: { items: { properties: { name: { 'sap.adt.types': ['TABL'] }, referenceTable: { 'sap.adt.types': ['TABL'] } } } },
-        errorMessage: { properties: { id: { 'sap.adt.types': ['MSAG'] } } }
+        errorMessage: { 'sap.adt.hidden': true, properties: { id: { 'sap.adt.types': ['MSAG'] } } }
       }
     }
   }

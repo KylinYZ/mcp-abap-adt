@@ -38,7 +38,7 @@ export async function validateControlledLockObjectShell(
   const response = await h.request(LOCK_OBJECT_VALIDATION_PATH, {
     method: 'POST',
     qs: { objtype: 'ENQU/DL', objname: input.name, description: input.description, packagename: input.packageName },
-    headers: { Accept: 'application/vnd.sap.adt.lockobjects.v1+xml' }
+    headers: { Accept: 'application/vnd.sap.as+xml' }
   })
   return parseLockObjectValidation(response.body)
 }

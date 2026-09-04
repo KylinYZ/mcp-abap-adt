@@ -15,7 +15,7 @@ import type {
   RepositoryObjectKind
 } from '../repositoryCreationTypes.js'
 import type { SafetyPolicy } from '../SafetyPolicy.js'
-import { compareSources, sourceHash } from '../sourceTools.js'
+import { compareAbapClassSources, compareSources, sourceHash } from '../sourceTools.js'
 import type { ControlledCreationAdtClient } from './controlledCreationTools.js'
 import {
   assertActivation,
@@ -23,8 +23,10 @@ import {
   assertTargetAbsent,
   assertTransportAvailable,
   assertValidation,
+  controlledResponsible,
   repositoryName,
-  requiredString
+  requiredString,
+  sameControlledMasterSystem
 } from './creationAdapterTools.js'
 
 interface SourceObjectPayload {
@@ -94,7 +96,7 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     const language = packageMetadata.language || packageMetadata.masterLanguage
     const masterLanguage = packageMetadata.masterLanguage || language
     const masterSystem = packageMetadata.masterSystem
-    const responsible = packageMetadata.responsible || this.policy.sapUser
+    const responsible = controlledResponsible(packageMetadata.responsible, this.policy.sapUser)
     if (!language || !masterLanguage || !masterSystem || !responsible) {
       throw new Error(`Package ${packageName} did not expose the identity metadata required for controlled creation.`)
     }
@@ -162,12 +164,22 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     } catch (error) {
       throw unknownWrite('Source object shell create', error)
     }
-    plan.actualResources = [{ type: input.adtType, name: input.name }]
     recordStage('CREATE_SHELL', true, creation.location)
 
-    const inactive = await this.client.objectStructure(objectUrl, 'inactive')
-    assertStructureIdentity(inactive, input)
-    const sourceUrl = sourceUrlFromStructure(inactive, objectUrl)
+    let createdStructure: AbapObjectStructure
+    if (creation.ownershipEvidence === 'POST_CREATE_READBACK_REQUIRED') {
+      try {
+        createdStructure = await provePostCreateSourceOwnership(this.client, input, objectUrl)
+      } catch (error) {
+        throw unknownWrite('Source object shell ownership proof', error)
+      }
+      recordStage('PROVE_SHELL_OWNERSHIP', true, objectUrl)
+    } else {
+      createdStructure = await this.client.objectStructure(objectUrl, 'inactive')
+      assertStructureIdentity(createdStructure, input)
+    }
+    plan.actualResources = [{ type: input.adtType, name: input.name }]
+    const sourceUrl = sourceUrlFromStructure(createdStructure, objectUrl)
     recordStage('RESOLVE_CREATED_OBJECT', true, sourceUrl)
 
     const lock = await this.client.lock(objectUrl, 'MODIFY')
@@ -210,7 +222,9 @@ export class SourceObjectCreationAdapter implements RepositoryObjectCreationAdap
     assertStructureIdentity(active, input)
     const activeSourceUrl = sourceUrlFromStructure(active, objectUrl)
     const actualSource = await this.client.getObjectSource(activeSourceUrl, { version: 'active' })
-    const comparison = compareSources(source, actualSource)
+    const comparison = input.objectKind === 'ABAP_CLASS'
+      ? compareAbapClassSources(source, actualSource)
+      : compareSources(source, actualSource)
     if (!comparison.matches) throw new Error(`Activated source for ${input.name} does not match the confirmed plan.`)
     recordStage('VERIFY_ACTIVE_OBJECT', true)
     recordStage('VERIFY_SOURCE', true, comparison.matchType)
@@ -315,7 +329,7 @@ async function assertActiveReference(
   reference: SearchResult,
   kind: ControlledSourceObjectKind
 ): Promise<void> {
-  const active = await client.objectStructure(reference['adtcore:uri'], 'active')
+  const active = await client.objectStructure(activeReferenceUrl(reference), 'active')
   if (String(active.metaData['adtcore:version']).toLowerCase() !== 'active') {
     throw new Error(`Referenced object ${reference['adtcore:name']} is not active.`)
   }
@@ -350,6 +364,64 @@ function assertStructureIdentity(structure: AbapObjectStructure, input: Controll
       || structure.metaData['class:final'] !== true)) {
     throw new Error(`SAP class defaults for ${input.name} do not match the controlled public and final contract.`)
   }
+}
+
+function activeReferenceUrl(reference: SearchResult): string {
+  const uri = String(reference['adtcore:uri'] || '')
+  if (!String(reference['adtcore:type'] || '').toUpperCase().startsWith('STOB')) return uri
+  const objectUrl = uri.split('#')[0].split('?')[0].replace(/\/source\/main\/?$/i, '')
+  if (!/^\/sap\/bc\/adt\/ddic\/ddl\/sources\/[^/]+$/i.test(objectUrl)) {
+    throw new Error(`Referenced object ${reference['adtcore:name']} did not expose a controlled DDLS object URL.`)
+  }
+  return objectUrl
+}
+
+async function provePostCreateSourceOwnership(
+  client: ControlledCreationAdtClient,
+  input: ControlledSourceObjectInput,
+  objectUrl: string
+): Promise<AbapObjectStructure> {
+  const exact = (await client.searchObject(input.name, input.adtType, 10)).filter(item => (
+    item['adtcore:name'].toUpperCase() === input.name
+    && item['adtcore:type'].toUpperCase() === input.adtType
+  ))
+  if (exact.length !== 1
+    || exact[0]['adtcore:uri'] !== objectUrl
+    || String(exact[0]['adtcore:packageName'] || '').toUpperCase() !== input.packageName) {
+    throw new Error(`SAP did not return one exact owned shell for ${input.name}.`)
+  }
+  const active = await client.objectStructure(objectUrl, 'active')
+  assertStructureIdentity(active, input)
+  const metadata = active.metaData as unknown as Record<string, unknown>
+  const metadataChecks = {
+    version: String(metadata['adtcore:version'] || '').toLowerCase() === 'active',
+    description: String(metadata['adtcore:description'] || exact[0]['adtcore:description'] || '') === input.description,
+    responsible: sameSapIdentity(metadata['adtcore:responsible'], input.responsible),
+    masterLanguage: String(metadata['adtcore:masterLanguage'] || '').toUpperCase() === input.masterLanguage.toUpperCase(),
+    masterSystem: sameControlledMasterSystem(metadata['adtcore:masterSystem'], input.masterSystem)
+  }
+  if (!Object.values(metadataChecks).every(Boolean)) {
+    throw new Error(`SAP active shell metadata for ${input.name} does not prove ownership (${Object.entries(metadataChecks).filter(([, matched]) => !matched).map(([key]) => key).join(',')}).`)
+  }
+  const [transportInfo, transportDetails] = await Promise.all([
+    client.transportInfo(objectUrl, input.packageName, 'I'),
+    client.transportDetails(input.transportRequest)
+  ])
+  assertTransportAvailable(transportInfo, transportDetails, input.transportRequest)
+  if (String(transportInfo.OBJECTNAME || transportInfo.LOCKS?.OBJECT_KEY?.OBJ_NAME || '').toUpperCase() !== input.name
+    || String(transportInfo.URI || '') !== objectUrl) {
+    throw new Error(`SAP transport identity for ${input.name} does not prove ownership.`)
+  }
+  return active
+}
+
+function sameSapIdentity(actual: unknown, expected: string): boolean {
+  const left = String(actual ?? '').trim().toUpperCase()
+  const right = String(expected || '').trim().toUpperCase()
+  if (/^\d+$/.test(left) && /^\d+$/.test(right)) {
+    return left.replace(/^0+/, '') === right.replace(/^0+/, '')
+  }
+  return left === right
 }
 
 function sourceUrlFromStructure(structure: AbapObjectStructure, objectUrl: string): string {

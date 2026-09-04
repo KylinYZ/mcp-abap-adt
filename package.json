@@ -9,6 +9,18 @@
   "files": [
     "dist",
     "!dist/__tests__",
+    "docs/evidence/repository-creation-maturity-evidence.json",
+    "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md",
+    "docs/evidence/repository-creation-data-element-real-dev-verified.md",
+    "docs/evidence/repository-creation-table-type-real-dev-verified.md",
+    "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md",
+    "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md",
+    "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md",
+    "docs/evidence/repository-creation-database-table-real-dev-verified.md",
+    "docs/evidence/repository-creation-function-group-real-dev-verified.md",
+    "docs/evidence/repository-creation-function-group-include-real-dev-verified.md",
+    "docs/evidence/repository-creation-function-module-real-dev-verified.md",
+    "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md",
     "third-party"
   ],
   "scripts": {
@@ -18,6 +30,8 @@
     "test:sap-dev:readonly": "node ./scripts/sap-dev-readonly-smoke.mjs",
     "test:sap-dev:readonly:ttl": "node ./scripts/sap-dev-readonly-smoke.mjs --verify-ttl",
     "test:sap-dev:session-resilience": "node ./scripts/sap-session-resilience-smoke.mjs",
+    "test:repository-productionization-runtime": "node ./scripts/repository-productionization-runtime-smoke.mjs",
+    "test:repository-verified-domain-preview": "node ./scripts/repository-verified-domain-preview.mjs",
     "test:adt-timeout": "node ./scripts/adt-timeout-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
     "check:repository-creation-coverage": "npm run build --silent && node ./scripts/check-repository-creation-coverage.mjs",

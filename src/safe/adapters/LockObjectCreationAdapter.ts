@@ -38,11 +38,12 @@ export class LockObjectCreationAdapter implements RepositoryObjectCreationAdapte
 
   async prepare(request: Record<string, unknown>): Promise<PreparedRepositoryCreation> {
     const name = repositoryName(request, 'name', 16)
+    const policyName = lockObjectPolicyName(name)
     const description = requiredString(request, 'description', 120)
     const packageName = repositoryName(request, 'packageName', 30)
     const primaryTable = repositoryName(request, 'primaryTable', 30)
     const transportRequest = this.policy.assertTransportFormat(String(request.transportRequest || ''))
-    this.policy.assertMutationAllowed(name)
+    this.policy.assertMutationAllowed(policyName)
     this.policy.assertTransportablePackage(packageName)
     const [targetMatches, packageMatches, tableMatches] = await Promise.all([
       this.client.searchObject(name, 'ENQU/DL', 10),
@@ -175,6 +176,17 @@ function identityInput(
     throw new Error(`Package ${values.packageName} did not expose the identity metadata required for controlled creation.`)
   }
   return { ...values, language, masterLanguage, masterSystem: packageMetadata.masterSystem, responsible }
+}
+
+function lockObjectPolicyName(name: string): string {
+  if (name.startsWith('/')) {
+    const namespaceEnd = name.indexOf('/', 1)
+    const localName = namespaceEnd >= 0 ? name.slice(namespaceEnd + 1) : ''
+    if (!localName.startsWith('E')) throw new Error('DDIC lock object names must begin with E after the namespace.')
+    return name
+  }
+  if (!name.startsWith('E')) throw new Error('DDIC lock object names must begin with E.')
+  return name.slice(1)
 }
 
 function lockObjectPayload(plan: RepositoryCreationPlan): LockObjectCreationPayload {

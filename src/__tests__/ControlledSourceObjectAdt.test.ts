@@ -47,8 +47,8 @@ const contracts = [
     validationPath: '/sap/bc/adt/ddic/ddl/validation',
     collectionPath: '/sap/bc/adt/ddic/ddl/sources',
     rootName: 'ddl:ddlSource',
-    contentType: 'application/vnd.sap.adt.ddlSource.v2+xml',
-    accept: 'application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml'
+    contentType: 'application/*',
+    accept: 'application/*'
   },
   {
     objectKind: 'CDS_ACCESS_CONTROL' as const,
@@ -66,7 +66,7 @@ const contracts = [
     name: 'ZE_MCP_TEST',
     validationPath: '/sap/bc/adt/ddic/ddlx/sources/validation',
     collectionPath: '/sap/bc/adt/ddic/ddlx/sources',
-    rootName: 'blue:blueSource',
+    rootName: 'ddlx:ddlxSource',
     contentType: 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
     accept: 'application/vnd.sap.adt.ddic.ddlx.v1+xml'
   },
@@ -180,7 +180,8 @@ describe('controlled source-object ADT contract', () => {
     const location = `${contract.collectionPath}/${contract.name.toLowerCase()}`
     const client = http({ body: responseXml(contract), status: 201, headers: { location } })
     await expect(createControlledSourceObjectShell(client, input(contract))).resolves.toEqual({
-      location, name: contract.name, adtType: contract.adtType
+      location, name: contract.name, adtType: contract.adtType,
+      ownershipEvidence: 'CANONICAL_LOCATION'
     })
     expect((client.request as jest.Mock).mock.calls[0]).toEqual([
       contract.collectionPath,
@@ -205,12 +206,12 @@ describe('controlled source-object ADT contract', () => {
     expect(responseXml(contracts[2])).not.toContain('class:final')
   })
 
-  it('uses the ADT 3.60.2 Blue model for metadata-extension shell creation', () => {
+  it('uses the ADT 3.60.2 DDLX model for metadata-extension shell creation', () => {
     const xml = responseXml(contracts[5])
-    expect(xml).toContain('<blue:blueSource')
-    expect(xml).toContain('xmlns:blue="http://www.sap.com/wbobj/blue"')
+    expect(xml).toContain('<ddlx:ddlxSource')
+    expect(xml).toContain('xmlns:ddlx="http://www.sap.com/adt/ddic/ddlxsources"')
     expect(xml).toContain('adtcore:version="active"')
-    expect(xml).not.toContain('<ddlx:ddlxSource')
+    expect(xml).not.toContain('<blue:blueSource')
   })
 
   it('locks service definitions to source type definition and BDEF to the Blue model', () => {
@@ -243,8 +244,24 @@ describe('controlled source-object ADT contract', () => {
     }), input(contract))).resolves.toEqual({
       location: `${contract.collectionPath}/${contract.name.toLowerCase()}`,
       name: contract.name,
-      adtType: contract.adtType
+      adtType: contract.adtType,
+      ownershipEvidence: 'CANONICAL_LOCATION'
     })
+  })
+
+  it('defers ownership for the bounded HTTP 200 empty acknowledgement', async () => {
+    const contract = contracts[1]
+    await expect(createControlledSourceObjectShell(http({
+      body: '', status: 200, headers: {}
+    }), input(contract))).resolves.toEqual({
+      location: `${contract.collectionPath}/${contract.name.toLowerCase()}`,
+      name: contract.name,
+      adtType: contract.adtType,
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    })
+    await expect(createControlledSourceObjectShell(http({
+      body: responseXml(contract), status: 200, headers: {}
+    }), input(contract))).rejects.toThrow('HTTP 201')
   })
 
   it('accepts an absolute canonical Location and reports only the mismatched pathname', async () => {

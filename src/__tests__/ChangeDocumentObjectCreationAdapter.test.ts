@@ -32,7 +32,7 @@ const contract = {
     properties: {
       generalInformation: { properties: { generatedObject: { 'sap.adt.types': ['CLAS', 'FUNC'] } } },
       tablesAndStructures: { items: { properties: { name: { 'sap.adt.types': ['TABL'] }, referenceTable: { 'sap.adt.types': ['TABL'] } } } },
-      errorMessage: { properties: { id: { 'sap.adt.types': ['MSAG'] } } }
+      errorMessage: { 'sap.adt.hidden': true, properties: { id: { 'sap.adt.types': ['MSAG'] } } }
     }
   }
 }
@@ -81,8 +81,8 @@ function configured(category: 'standard' | 'behaviorDefinition' = 'standard'): j
     if (name === 'CD' && type === 'MSAG/N') {
       return [{ 'adtcore:name': name, 'adtcore:type': 'MSAG/N', 'adtcore:uri': '/sap/bc/adt/messageclass/cd' }]
     }
-    if (name === 'ZZMCPCHDO_WRITE_DOCUMENT' && type === 'FUGR/FF') {
-      return [{ 'adtcore:name': name, 'adtcore:type': 'FUGR/FF', 'adtcore:uri': '/sap/bc/adt/functions/groups/zzmcpchdo/fmodules/zzmcpchdo_write_document' }]
+    if (name === 'ZCL_ZZMCPCHDO_CHDO' && type === 'CLAS/OC') {
+      return [{ 'adtcore:name': name, 'adtcore:type': 'CLAS/OC', 'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_zzmcpchdo_chdo' }]
     }
     if (name === 'CL_ZZMCPCHDO_CHDO' && type === 'CLAS/OC') {
       return [{ 'adtcore:name': name, 'adtcore:type': 'CLAS/OC', 'adtcore:uri': '/sap/bc/adt/oo/classes/cl_zzmcpchdo_chdo' }]
@@ -95,7 +95,7 @@ function configured(category: 'standard' | 'behaviorDefinition' = 'standard'): j
   ) => {
     if (url.includes('/ddic/tables/')) return structure(url, 'ZZIF_MCP_TEST', 'TABL/DT', 'active')
     if (url.includes('/messageclass/')) return structure(url, 'CD', 'MSAG/N', 'active')
-    if (url.includes('/fmodules/')) return structure(url, 'ZZMCPCHDO_WRITE_DOCUMENT', 'FUGR/FF', 'active')
+    if (url.includes('/zcl_zzmcpchdo_chdo')) return structure(url, 'ZCL_ZZMCPCHDO_CHDO', 'CLAS/OC', 'active')
     if (url.includes('/oo/classes/')) return structure(url, 'CL_ZZMCPCHDO_CHDO', 'CLAS/OC', 'active')
     return {
       ...structure(url, 'ZZMCPCHDO', 'CHDO/CHD', version || 'inactive'),
@@ -131,12 +131,12 @@ function configured(category: 'standard' | 'behaviorDefinition' = 'standard'): j
       ? {
           ...workingContent,
           generalInformation: {
-            generatedObject: category === 'behaviorDefinition' ? 'CL_ZZMCPCHDO_CHDO' : 'ZZMCPCHDO_WRITE_DOCUMENT'
+            generatedObject: category === 'behaviorDefinition' ? 'CL_ZZMCPCHDO_CHDO' : 'ZCL_ZZMCPCHDO_CHDO'
           }
         }
       : {
           ...workingContent,
-          generalInformation: { category: category === 'behaviorDefinition' ? 'behaviorDefiniton' : 'standard' }
+          generalInformation: category === 'behaviorDefinition' ? { category: 'behaviorDefiniton' } : {}
         }
   )
   ;(value.writeControlledChangeDocumentObjectContent as jest.Mock).mockImplementation(async (_url, content) => content)
@@ -162,7 +162,6 @@ function request(category: 'standard' | 'behaviorDefinition' = 'standard'): Reco
     packageName: 'Z001',
     category,
     tablesAndStructures: [{ name: 'ZZIF_MCP_TEST', multipleChanges: true }],
-    errorMessage: { id: 'CD', number: '600' },
     transportRequest: 'S4HK900009'
   }
 }
@@ -186,7 +185,7 @@ function plan(prepared: PreparedRepositoryCreation): RepositoryCreationPlan {
 }
 
 describe('ChangeDocumentObjectCreationAdapter', () => {
-  it('freezes references, creates once, and verifies the generated Function Module', async () => {
+  it('freezes references, creates once, and verifies the generated Class', async () => {
     const value = configured()
     const adapter = new ChangeDocumentObjectCreationAdapter(value, policy)
     const prepared = await adapter.prepare(request())
@@ -194,7 +193,7 @@ describe('ChangeDocumentObjectCreationAdapter', () => {
     await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({
       actualResources: [
         { type: 'CHDO/CHD', name: 'ZZMCPCHDO' },
-        { type: 'FUGR/FF', name: 'ZZMCPCHDO_WRITE_DOCUMENT' }
+        { type: 'CLAS/OC', name: 'ZCL_ZZMCPCHDO_CHDO' }
       ]
     })
     expect(value.createControlledChangeDocumentObjectShell).toHaveBeenCalledTimes(1)
@@ -241,6 +240,12 @@ describe('ChangeDocumentObjectCreationAdapter', () => {
       }]
     })).rejects.toThrow('requires logValues=true')
     expect(loggingClient.searchObject).not.toHaveBeenCalled()
+
+    const hiddenDefaultClient = configured()
+    await expect(new ChangeDocumentObjectCreationAdapter(hiddenDefaultClient, policy).prepare({
+      ...request(), errorMessage: { id: 'CD', number: '600' }
+    })).rejects.toThrow('hidden server-owned')
+    expect(hiddenDefaultClient.searchObject).not.toHaveBeenCalled()
   })
 
   it('rejects reference or contract drift before shell creation', async () => {
@@ -264,6 +269,20 @@ describe('ChangeDocumentObjectCreationAdapter', () => {
     })
     await expect(contractAdapter.execute(plan(contractPrepared), () => undefined)).rejects.toThrow('changed after preview')
     expect(contractClient.createControlledChangeDocumentObjectShell).not.toHaveBeenCalled()
+  })
+
+  it('reports only structural metadata when working content differs', async () => {
+    const value = configured()
+    ;(value.readControlledChangeDocumentObjectContent as jest.Mock).mockResolvedValue({
+      ...workingContent,
+      generalInformation: {},
+      errorMessage: { id: 'OTHER', number: '600' }
+    })
+    const adapter = new ChangeDocumentObjectCreationAdapter(value, policy)
+    const prepared = await adapter.prepare(request())
+    await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toThrow(
+      /at \$\.errorMessage\.id; expectedKind=string, actualKind=string, expectedHash=[a-f0-9]{64}, actualHash=[a-f0-9]{64}, expectedBytes=\d+, actualBytes=\d+\./
+    )
   })
 
   it('classifies activation and generated-object verification failures as unknown without deletion', async () => {

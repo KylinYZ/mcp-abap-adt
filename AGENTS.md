@@ -16,10 +16,12 @@
 npm install
 npm test -- --runInBand
 npm run build
+npm run test:repository-productionization-runtime -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env"
+npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-abap-adt\env\sap-dev.env" ZVPV001
 git diff --check
 ```
 
-当前 runtime catalog 基线为 `safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=87`、`business-readonly=17`、`operations-readonly=40`；仓库对象创建目录注册 31 类对象；自动化基线为 106 个测试套件、719 项测试。修改源码、`.env` 或构建输出后，必须硬重启 MCP 客户端，并用 healthcheck session 重置与旧 plan `PLAN_NOT_FOUND` 验收。
+当前 runtime catalog 常规基线为 `safe=7`、`development=124`、`diagnostic-readonly=99`、`legacy-full=161`、`development-workbench=87`、`business-readonly=17`、`operations-readonly=40`；仅当 `SAP_MCP_REAL_DEV_VALIDATION=true` 时，DEV `development` / `development-workbench` 额外开放 3 个独立确认的 cleanup 工具，分别为 127 / 90。仓库对象创建目录注册 31 类对象；当前成熟度为 `REAL_DEV_VERIFIED=25`、`AUTOMATION_VERIFIED=3`、`CONTROLLED_IMPLEMENTED=3`，自动化基线为 109 suites / 774 tests。修改源码、`.env` 或构建输出后，必须硬重启 MCP 客户端，并用 healthcheck session 重置与旧 plan `PLAN_NOT_FOUND` 验收。
 
 ## 目录与约定
 
@@ -37,8 +39,8 @@ git diff --check
 - 对真实 SAP 调用保持串行；默认 `SAP_MCP_MAX_CONCURRENT_TOOLS=1`。
 - QAS、PRD、缺失或非法系统角色对所有 Profile 都只能执行本地/只读工具；目录隐藏和 dispatch 拒绝必须同时保留。
 - 源码变更/创建按既有确认策略执行。仓库对象创建只允许 Server 固定的可信 provider：Windows 默认使用 Explorer broker、中文原生窗口和一次性 named pipe，其他平台使用 MCP form；DDIC 属性、包迁移和 RAP apply 仍只允许 MCP form。上述高风险路径均不接受文字或调用方布尔降级。
-- `DDIC_DOMAIN` 已留下 `ZZMCP_VT_DOM` 的真实 DEV 创建与 active 属性复读证据，但尚未完成独立清理，历史计划因已修复的空默认值比较问题保留 `OUTCOME_UNKNOWN`；因此成熟度仍为 `CONTROLLED_IMPLEMENTED`、目录仍为 `writable=false`，不得据此重放或扩大验证范围。
-- 31 类创建侧活动已结束且每类都有明确结果，但 `REAL_DEV_VERIFIED` 仍为 0。后续目标是逐类产品化并在关闭验证开关后正式可写；接手入口为 `docs/evidence/repository-creation-productionization-handoff.md`，实施依据为 `docs/superpowers/plans/2026-08-25-repository-creation-productionization-plan.md`。当前验证开关仍为 true；每次真实操作仍独立确认，任一未知结果不得重放。
+- `DDIC_DOMAIN` 的旧身份 `ZZMCP_VT_DOM` 仍保留 `OUTCOME_UNKNOWN`，不得重放；该类型已通过全新身份 `ZVPD02` 的完整证据独立晋级。
+- 31 类创建侧活动已结束且每类都有明确结果；当前 23 类已达到 `REAL_DEV_VERIFIED`。cleanup 证据采用双模式：既有/已下传对象必须保留唯一 `OBJFUNC=D`；创建前不存在且在同一未释放传输中创建、验证、删除的对象，可用唯一精确 neutral CTS 条目证明本地移除。缺少 create/readback/transport/cleanup/absence 任一证据、neutral 条目重复、跨传输、已释放传输或复用历史失败身份时，Registry 与 coverage 都必须失败关闭。禁止修改 E071/E071K 或删除/释放传输。接手入口为 `docs/evidence/repository-creation-productionization-handoff.md`。每次创建和删除均需各自独立原生确认，任一未知结果不得重放。
 - 原始 `legacy-full` 写工具绕过受控 workflow，只用于明确的专家兼容场景；启用工具不等于获得真实写入授权。
 - 远端写入、迁移、生成或发布结果未知时先只读核验，禁止盲目重试。
 - 不创建或释放传输，不连接生产系统，不在未确认时执行真实写入。

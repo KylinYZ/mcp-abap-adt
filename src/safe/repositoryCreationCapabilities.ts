@@ -10,12 +10,24 @@ const commonObjectProperties = {
   transportRequest: { type: 'string', description: 'Existing unreleased ten-character transport request', minLength: 10, maxLength: 10 }
 };
 
+const REAL_DEV_SOURCE_OBJECTS = new Set<RepositoryObjectKind>([
+  'ABAP_INTERFACE',
+  'PROGRAM_INCLUDE',
+  'CDS_DATA_DEFINITION',
+  'CDS_ACCESS_CONTROL',
+  'CDS_METADATA_EXTENSION',
+  'SERVICE_DEFINITION',
+  'BEHAVIOR_DEFINITION',
+  'CDS_TYPE',
+  'CDS_ASPECT'
+]);
+
 // This matrix records platform maturity, not merely the existence of an ADT endpoint.
 export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabilityDefinition[] = [
   {
     objectKind: 'MESSAGE_CLASS', adtType: 'MSAG/N', displayName: 'Message Class', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'VSCODE_ABAP_REMOTE_FS'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'VSCODE_ABAP_REMOTE_FS', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one message class and optionally initialize bounded three-digit short messages.',
     inputSchema: {
@@ -44,8 +56,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'DDIC_DOMAIN', adtType: 'DOMA/DD', displayName: 'DDIC Domain', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one DDIC domain shell and apply its typed domain properties in an existing transportable package.',
     inputSchema: {
@@ -72,8 +84,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'DATA_ELEMENT', adtType: 'DTEL/DE', displayName: 'DDIC Data Element', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one DDIC data element shell and apply its typed labels and type properties in an existing transportable package.',
     inputSchema: {
@@ -110,7 +122,7 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'PROGRAM', adtType: 'PROG/P', displayName: 'ABAP Program', family: 'ABAP_SOURCE', parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
     evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one complete ABAP program in an existing transportable package.',
@@ -130,9 +142,9 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'FUNCTION_GROUP', adtType: 'FUGR/F', displayName: 'Function Group', family: 'ABAP_FUNCTION', parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
-    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG'],
-    requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: false },
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'REAL_DEV_EXECUTION'],
+    requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create a function group together with its first function module; SAP owns the generated function-pool includes.',
     inputSchema: {
       type: 'object', additionalProperties: false,
@@ -158,8 +170,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'FUNCTION_MODULE', adtType: 'FUGR/FF', displayName: 'Function Module', family: 'ABAP_FUNCTION', parentKind: 'FUNCTION_GROUP',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
-    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one complete function module in an existing function group.',
     inputSchema: {
@@ -178,14 +190,14 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'FUNCTION_GROUP_INCLUDE', adtType: 'FUGR/I', displayName: 'Function Group Include', family: 'ABAP_FUNCTION', parentKind: 'FUNCTION_GROUP',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'VSCODE_ABAP_REMOTE_FS'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['CURRENT_CONTROLLED_WORKFLOW', 'ECLIPSE_ADT_3_60_2', 'VSCODE_ABAP_REMOTE_FS', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
-    summary: 'Create one generated function-group include from a strict three-character suffix and complete ABAP source.',
+    summary: 'Create one function-group include from a strict three-character suffix and complete ABAP source.',
     inputSchema: {
       type: 'object', additionalProperties: false,
       properties: {
-        name: { type: 'string', description: 'Three-character suffix; SAP derives the full L... include name', minLength: 3, maxLength: 3 },
+        name: { type: 'string', description: 'Three-character include suffix; SAP uses the full L... include name for validation and creation', minLength: 3, maxLength: 3 },
         description: { type: 'string', description: 'Short language-dependent description', minLength: 1, maxLength: 120 },
         parentFunctionGroup: { type: 'string', description: 'Existing function group', minLength: 1, maxLength: 26 },
         transportRequest: { type: 'string', description: 'Existing unreleased ten-character transport request', minLength: 10, maxLength: 10 },
@@ -194,14 +206,14 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
       required: ['name', 'description', 'parentFunctionGroup', 'transportRequest', 'source']
     },
     fixedDefaults: { generatedNamePrefix: 'L<FUNCTION_GROUP>', creationContentType: 'application/vnd.sap.adt.functions.fincludes.v2+xml' },
-    validationRules: ['The suffix must be exactly three characters and start with a letter.', 'The parent function group must already exist.', 'The derived full include name must not already exist.', 'The suffix is sent to the ADT create endpoint; the full name is used for verification.'],
+    validationRules: ['The suffix must be exactly three repository-name characters.', 'The parent function group must already exist.', 'The derived full include name must not already exist.', 'The full include name is sent to ADT validation and creation; source verification reads the include working area.'],
     executionStages: ['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'VALIDATE_PARENT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'],
     compensationLimits: ['Only the include proven to have been created by the current plan may be deleted.', 'Unknown create, source, activation, or verification outcomes stop compensation.']
   },
   {
     objectKind: 'PACKAGE', adtType: 'DEVC/K', displayName: 'Development Package', family: 'PACKAGE', parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'ABAP_ADT_API_8_4_2'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: false },
     summary: 'Create one encapsulated development subpackage with record-changes enabled.',
     inputSchema: {
@@ -221,8 +233,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'DATABASE_TABLE', adtType: 'TABL/DT', displayName: 'Database Table', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'ABAP_ADT_API_8_4_2'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: true, transportRequest: true, separateActivation: true },
     summary: 'Create one transparent database table from structured fields and controlled technical settings.',
     inputSchema: {
@@ -266,8 +278,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'DDIC_TABLE_TYPE', adtType: 'TTYP/DA', displayName: 'DDIC Table Type', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'TARGET_ADT_DISCOVERY'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'TARGET_ADT_DISCOVERY', 'REAL_DEV_EXECUTION'],
     requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one structured DDIC table type with a server-advertised ABAP row type and bounded key settings.',
     inputSchema: {
@@ -349,13 +361,13 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
       'Structure components cannot be keys or use unbound CURR/QUAN references in this slice.',
       'Source is locked, checked, activated, and read back after creation.'
     ],
-    executionStages: ['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'],
+    executionStages: ['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'PREWRITE_CHECKS', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'],
     compensationLimits: ['Only the structure proven to have been created by the current plan may be deleted.', 'Unknown shell, source, unlock, or activation outcomes stop automatic compensation.']
   },
   {
     objectKind: 'DDIC_TYPE_GROUP', adtType: 'TYPE/DG', displayName: 'DDIC Type Group', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one ABAP type group with a complete TYPE-POOL source in an existing transportable package.',
     inputSchema: {
@@ -405,8 +417,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'LOGICAL_EXTERNAL_SCHEMA', adtType: 'DESD/TYP', displayName: 'Logical External Schema', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one Logical External Schema using the ADT server-driven objectTypes.v1 contract.',
     inputSchema: {
@@ -432,8 +444,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'NUMBER_RANGE_OBJECT', adtType: 'NROB/NRO', displayName: 'Number Range Object', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one Number Range Object using the ADT server-driven objectTypes.v1 contract and verified DDIC references.',
     inputSchema: {
@@ -478,8 +490,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'SAP_OBJECT_TYPE', adtType: 'RONT/ROT', displayName: 'SAP Object Type', family: 'RAP_METADATA', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one SAP Object Type through the ADT newObjectTypes.v1 contract and a Blue v2 embedded creation payload.',
     inputSchema: {
@@ -522,8 +534,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'SAP_OBJECT_NODE_TYPE', adtType: 'NONT/NOT', displayName: 'SAP Object Node Type', family: 'RAP_METADATA', parentKind: 'SAP_OBJECT_TYPE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one SAP Object Node Type for an existing active SAP Object Type through the ADT newObjectTypes.v1 contract.',
     inputSchema: {
@@ -568,8 +580,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   },
   {
     objectKind: 'CHANGE_DOCUMENT_OBJECT', adtType: 'CHDO/CHD', displayName: 'Change Document Object', family: 'DDIC', parentKind: 'PACKAGE',
-    maturity: 'CONTROLLED_IMPLEMENTED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY'],
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'TARGET_ADT_DISCOVERY', 'REAL_DEV_EXECUTION'],
     requirements: { source: true, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one Change Document Object and verify the Function Module or Class generated by SAP activation.',
     inputSchema: {
@@ -606,22 +618,15 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
             },
             required: ['name']
           }
-        },
-        errorMessage: {
-          type: 'object', additionalProperties: false,
-          properties: {
-            id: { type: 'string', description: 'Existing active message class', minLength: 1, maxLength: 20 },
-            number: { type: 'string', description: 'Three-digit error message number', minLength: 3, maxLength: 3 }
-          },
-          required: ['id', 'number']
         }
       },
-      required: ['name', 'description', 'packageName', 'category', 'tablesAndStructures', 'errorMessage', 'transportRequest']
+      required: ['name', 'description', 'packageName', 'category', 'tablesAndStructures', 'transportRequest']
     },
     fixedDefaults: {
       objectType: 'CHDO/CHD', shellContentType: 'application/vnd.sap.adt.blues.v1+xml',
       schemaFramework: 'objectTypes.v1', sourceContentType: 'application/json', formatVersion: '1',
       generatedObjectAssignedBySap: true, behaviorDefinitionSapValue: 'behaviorDefiniton',
+      errorMessageId: 'CD', errorMessageNumber: '600',
       multipleChanges: false, logValues: false, logInitialValues: false
     },
     validationRules: [
@@ -630,8 +635,8 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
       'Every table or structure, optional reference table, and message class is resolved as an active repository object and frozen during preview.',
       'The public behaviorDefinition category is mapped internally to the behaviorDefiniton value published by SAP ADT 3.60.2.',
       'logInitialValues requires logValues=true for the same insertion or deletion operation.',
-      'Callers cannot provide generatedObject, JSON, XML, URLs, media types, headers, annotations, or lock handles.',
-      'After activation, standard objects must expose an active FUGR/FF generated object and behavior-definition objects an active CLAS/OC generated object.'
+      'Callers cannot provide the hidden errorMessage default, generatedObject, JSON, XML, URLs, media types, headers, annotations, or lock handles.',
+      'After activation, the target must expose the SAP-assigned active CLAS/OC generated object.'
     ],
     executionStages: [
       'REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCES', 'REVALIDATE_CONTRACT', 'VALIDATE_TRANSPORT',
@@ -648,10 +653,10 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
     'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'
   ]),
   controlledSourceCapability('ABAP_INTERFACE', 'INTF/OI', 'ABAP Interface', 'ABAP_OO', [
-    'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'
+    'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'
   ]),
   controlledSourceCapability('PROGRAM_INCLUDE', 'PROG/I', 'Program Include', 'ABAP_SOURCE', [
-    'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2'
+    'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'REAL_DEV_EXECUTION'
   ]),
   controlledSourceCapability('CDS_DATA_DEFINITION', 'DDLS/DF', 'CDS Data Definition', 'CDS', [
     'ECLIPSE_ADT_3_60_2', 'ABAP_ADT_API_8_4_2', 'VSCODE_ABAP_REMOTE_FS'
@@ -682,9 +687,9 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
   ]),
   {
     objectKind: 'SERVICE_BINDING', adtType: 'SRVB/SVB', displayName: 'Service Binding', family: 'RAP_SERVICE', parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED', targetAvailable: true,
-    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'VSCODE_ABAP_REMOTE_FS'],
-    requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: false },
+    maturity: 'REAL_DEV_VERIFIED', targetAvailable: true,
+    evidenceSources: ['ECLIPSE_ADT_3_60_2', 'ECLIPSE_COMMUNICATION_LOG', 'VSCODE_ABAP_REMOTE_FS', 'REAL_DEV_EXECUTION'],
+    requirements: { source: false, attributes: true, technicalSettings: false, transportRequest: true, separateActivation: true },
     summary: 'Create one OData service binding for an existing active service definition.',
     inputSchema: {
       type: 'object', additionalProperties: false,
@@ -704,7 +709,7 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
       'ODATA V2/V4 and UI/Web API category must agree with the requested binding type.',
       'The created binding is read back and its service definition and binding configuration are verified.'
     ],
-    executionStages: ['REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCE', 'VALIDATE_TRANSPORT', 'CREATE_OBJECT', 'VERIFY_CREATED_OBJECT'],
+    executionStages: ['REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCE', 'VALIDATE_TRANSPORT', 'CREATE_OBJECT', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_CONFIGURATION'],
     compensationLimits: [
       'Only the binding proven to have been created by the current plan may be deleted.',
       'Unknown create or delete outcomes stop automatic retry and compensation.'
@@ -730,9 +735,11 @@ function controlledSourceCapability(
     displayName,
     family,
     parentKind: 'PACKAGE',
-    maturity: 'AUTOMATION_VERIFIED',
+    maturity: REAL_DEV_SOURCE_OBJECTS.has(objectKind) ? 'REAL_DEV_VERIFIED' : 'AUTOMATION_VERIFIED',
     targetAvailable: true,
-    evidenceSources,
+    evidenceSources: REAL_DEV_SOURCE_OBJECTS.has(objectKind)
+      ? [...new Set<RepositoryCreationEvidenceSource>([...evidenceSources, 'REAL_DEV_EXECUTION'])]
+      : evidenceSources,
     requirements: {
       source: true,
       attributes: true,

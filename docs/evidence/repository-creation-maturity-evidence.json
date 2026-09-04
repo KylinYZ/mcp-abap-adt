@@ -1,0 +1,661 @@
+{
+  "schemaVersion": 2,
+  "records": [
+    {
+      "evidenceId": "DDIC_DOMAIN-ZVPD02-20260825",
+      "objectKind": "DDIC_DOMAIN",
+      "adtType": "DOMA/DD",
+      "objectName": "ZVPD02",
+      "create": {
+        "planId": "8d7a45af-d3c5-49f6-aa54-b95fb49c5bbe",
+        "status": "APPLIED",
+        "evidenceRef": "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md#create"
+      },
+      "readback": {
+        "status": "ACTIVE_VERIFIED",
+        "evidenceRef": "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md#readback"
+      },
+      "transport": {
+        "request": "S4HK900009",
+        "packageName": "Z001",
+        "objectEntryVerified": true,
+        "deletionEntryVerified": true,
+        "evidenceRef": "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md#transport"
+      },
+      "cleanup": {
+        "planId": "58b2874c-bc07-4ada-bbeb-4874fb5920ef",
+        "status": "COMPLETED",
+        "evidenceRef": "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md#cleanup"
+      },
+      "absence": {
+        "searchAbsent": true,
+        "evidenceRef": "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md#absence"
+      },
+      "target": {
+        "host": "10.30.254.48",
+        "client": "300",
+        "systemRole": "DEV",
+        "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d",
+        "verifiedAt": "2026-08-25T09:43:36.342Z"
+      },
+      "normalizations": [
+        "SAP materialized the omitted empty valueInformation block as valueTableRef empty and appendExists false."
+      ]
+    },
+    {
+      "evidenceId": "DATA_ELEMENT-ZVPDE01-20260826",
+      "objectKind": "DATA_ELEMENT",
+      "adtType": "DTEL/DE",
+      "objectName": "ZVPDE01",
+      "create": {
+        "planId": "dd512e12-1155-47b8-8180-1ae1e1aa816b",
+        "status": "APPLIED",
+        "evidenceRef": "docs/evidence/repository-creation-data-element-real-dev-verified.md#create"
+      },
+      "readback": {
+        "status": "ACTIVE_VERIFIED",
+        "evidenceRef": "docs/evidence/repository-creation-data-element-real-dev-verified.md#readback"
+      },
+      "transport": {
+        "request": "S4HK900009",
+        "packageName": "Z001",
+        "objectEntryVerified": true,
+        "deletionEntryVerified": true,
+        "evidenceRef": "docs/evidence/repository-creation-data-element-real-dev-verified.md#transport"
+      },
+      "cleanup": {
+        "planId": "86dd48c9-e559-4ec4-b999-d9e8f77e8562",
+        "status": "COMPLETED",
+        "evidenceRef": "docs/evidence/repository-creation-data-element-real-dev-verified.md#cleanup"
+      },
+      "absence": {
+        "searchAbsent": true,
+        "evidenceRef": "docs/evidence/repository-creation-data-element-real-dev-verified.md#absence"
+      },
+      "target": {
+        "host": "10.30.254.48",
+        "client": "300",
+        "systemRole": "DEV",
+        "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d",
+        "verifiedAt": "2026-08-26T00:06:12.606Z"
+      },
+      "normalizations": [
+        "SAP materialized field-label lengths as 10, 20, 40, and 55.",
+        "SAP materialized deactivateInputHistory, changeDocument, leftToRightDirection, and deactivateBIDIFiltering as false."
+      ]
+    },
+    {
+      "evidenceId": "DDIC_TABLE_TYPE-ZVPTT01-20260826",
+      "objectKind": "DDIC_TABLE_TYPE",
+      "adtType": "TTYP/DA",
+      "objectName": "ZVPTT01",
+      "create": {
+        "planId": "2073e8d7-b6fc-4ffe-bd79-52aad87987bd",
+        "status": "APPLIED",
+        "evidenceRef": "docs/evidence/repository-creation-table-type-real-dev-verified.md#create"
+      },
+      "readback": {
+        "status": "ACTIVE_VERIFIED",
+        "evidenceRef": "docs/evidence/repository-creation-table-type-real-dev-verified.md#readback"
+      },
+      "transport": {
+        "request": "S4HK900009",
+        "packageName": "Z001",
+        "objectEntryVerified": true,
+        "deletionEntryVerified": true,
+        "evidenceRef": "docs/evidence/repository-creation-table-type-real-dev-verified.md#transport"
+      },
+      "cleanup": {
+        "planId": "f0ae2008-44c5-4dce-a32d-cd506cb403e0",
+        "status": "COMPLETED",
+        "evidenceRef": "docs/evidence/repository-creation-table-type-real-dev-verified.md#cleanup"
+      },
+      "absence": {
+        "searchAbsent": true,
+        "evidenceRef": "docs/evidence/repository-creation-table-type-real-dev-verified.md#absence"
+      },
+      "target": {
+        "host": "10.30.254.48",
+        "client": "300",
+        "systemRole": "DEV",
+        "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d",
+        "verifiedAt": "2026-08-26T00:57:21.336Z"
+      },
+      "normalizations": [
+        "The explicit standard access, standard non-unique primary key, and notSpecified secondary-key defaults matched active SAP readback."
+      ]
+    },
+    {
+      "evidenceId": "PROGRAM-ZVPPG01-20260826",
+      "objectKind": "PROGRAM",
+      "adtType": "PROG/P",
+      "objectName": "ZVPPG01",
+      "create": { "planId": "3480ac9a-7340-4d6b-9c69-177525c001db", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#program" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#program" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#program" },
+      "cleanup": { "planId": "de86946c-b195-4a62-aa80-fe2768ca6fc1", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#program" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#program" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:15:33.448Z" },
+      "normalizations": ["SAP normalized LF plus trailing newline to CRLF without a trailing newline; all non-line-ending source content matched."]
+    },
+    {
+      "evidenceId": "MESSAGE_CLASS-ZVPMSG01-20260826",
+      "objectKind": "MESSAGE_CLASS",
+      "adtType": "MSAG/N",
+      "objectName": "ZVPMSG01",
+      "create": { "planId": "5d04b01e-e2e5-4187-8c29-f6073253bc56", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#message-class" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#message-class" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#message-class" },
+      "cleanup": { "planId": "8c466cdc-60ee-4266-87d3-523551849b58", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#message-class" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#message-class" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:19:50.051Z" },
+      "normalizations": ["SAP added message documentation links and server-owned changed-by timestamps; message 001 text matched exactly."]
+    },
+    {
+      "evidenceId": "LOGICAL_EXTERNAL_SCHEMA-ZVPSCH01-20260826",
+      "objectKind": "LOGICAL_EXTERNAL_SCHEMA",
+      "adtType": "DESD/TYP",
+      "objectName": "ZVPSCH01",
+      "create": { "planId": "b5031c35-fc9f-498b-a382-75929a0243ca", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#logical-external-schema" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#logical-external-schema" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#logical-external-schema" },
+      "cleanup": { "planId": "249fc43a-6469-4884-bf3c-32f3a2de59d9", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#logical-external-schema" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#logical-external-schema" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:23:40.891Z" },
+      "normalizations": ["SAP omitted optional abapLanguageVersion and usesRouting=false fields while preserving the reviewed schema name and format version."]
+    },
+    {
+      "evidenceId": "NUMBER_RANGE_OBJECT-ZVPNR01-20260826",
+      "objectKind": "NUMBER_RANGE_OBJECT",
+      "adtType": "NROB/NRO",
+      "objectName": "ZVPNR01",
+      "create": { "planId": "3a74ec32-def4-489f-aa7a-2c801c6f775b", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#number-range-object" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#number-range-object" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#number-range-object" },
+      "cleanup": { "planId": "9fe67d53-5a2d-4333-ad5f-3ac44fd60c26", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#number-range-object" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#number-range-object" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:26:03.092Z" },
+      "normalizations": []
+    },
+    {
+      "evidenceId": "CDS_TYPE-ZVPCTYPE01-20260826",
+      "objectKind": "CDS_TYPE",
+      "adtType": "DRTY/STY",
+      "objectName": "ZVPCTYPE01",
+      "create": { "planId": "f8abd791-5207-45db-830f-991c0c4d9f45", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-type" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-type" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-type" },
+      "cleanup": { "planId": "40dbed55-78ad-4f99-96cb-62400072dcf9", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-type" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-type" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:29:14.140Z" },
+      "normalizations": []
+    },
+    {
+      "evidenceId": "CDS_ASPECT-ZVPCASP01-20260826",
+      "objectKind": "CDS_ASPECT",
+      "adtType": "DRAS/RAS",
+      "objectName": "ZVPCASP01",
+      "create": { "planId": "3e1ea9a7-b18c-4628-be02-fe7ebf75a5f5", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-aspect" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-aspect" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-aspect" },
+      "cleanup": { "planId": "74c5d022-27e4-4ef5-a847-b887c25424ff", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-aspect" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#cds-aspect" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:31:56.342Z" },
+      "normalizations": []
+    },
+    {
+      "evidenceId": "SAP_OBJECT_TYPE-ZVPRODTYPE01-20260826",
+      "objectKind": "SAP_OBJECT_TYPE",
+      "adtType": "RONT/ROT",
+      "objectName": "ZVPRODTYPE01",
+      "create": { "planId": "2a515abc-3a5a-4bb1-9195-5a3cdc00f1d6", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-type" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-type" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-type" },
+      "cleanup": { "planId": "cce682a8-e245-4da6-94e4-86410add0a9c", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-type" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-type" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:37:14.957Z" },
+      "normalizations": ["SAP legally omitted the optional objectTypeCode in active content."]
+    },
+    {
+      "evidenceId": "SAP_OBJECT_NODE_TYPE-ZVPRODTYPE01-20260826",
+      "objectKind": "SAP_OBJECT_NODE_TYPE",
+      "adtType": "NONT/NOT",
+      "objectName": "ZVPRODTYPE01",
+      "create": { "planId": "102f242b-301e-43ed-883b-075490a46f94", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-node-type" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-node-type" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-node-type" },
+      "cleanup": { "planId": "cce682a8-e245-4da6-94e4-86410add0a9c", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-node-type" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave1-batch-real-dev-verified.md#sap-object-node-type" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T01:37:14.957Z" },
+      "normalizations": []
+    },
+    {
+      "evidenceId": "PACKAGE-ZVPKG2-20260826",
+      "objectKind": "PACKAGE",
+      "adtType": "DEVC/K",
+      "objectName": "ZVPKG2",
+      "create": { "planId": "f63c494a-456f-4243-8201-18e4d044f591", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#package" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#package" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#package" },
+      "cleanup": { "planId": "de556640-7c90-45e3-97fc-717c0f2f04e4", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#package" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#package" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T06:06:24.282Z" },
+      "normalizations": ["SAP normalized numeric user identity 68157 to the configured authenticated user 068157."]
+    },
+    {
+      "evidenceId": "ABAP_INTERFACE-ZVPIF04-20260826",
+      "objectKind": "ABAP_INTERFACE",
+      "adtType": "INTF/OI",
+      "objectName": "ZVPIF04",
+      "create": { "planId": "03d05d0f-db02-4011-9d08-cfefa5b9e743", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#abap-interface" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#abap-interface" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#abap-interface" },
+      "cleanup": { "planId": "64f6e2fd-830a-4c6f-8f31-b99e1b8c2b0f", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#abap-interface" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#abap-interface" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T07:25:11.145Z" },
+      "normalizations": ["SAP normalized technical master system SAP to S4H, numeric user 68157 to 068157, and LF source to CRLF."]
+    },
+    {
+      "evidenceId": "DDIC_TYPE_GROUP-ZVTG5-20260826",
+      "objectKind": "DDIC_TYPE_GROUP",
+      "adtType": "TYPE/DG",
+      "objectName": "ZVTG5",
+      "create": { "planId": "2434bbda-13a8-403c-b83c-90dd7d427561", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#ddic-type-group" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#ddic-type-group" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#ddic-type-group" },
+      "cleanup": { "planId": "90ceb2ed-5121-4da8-9e95-9a9210e42ec5", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#ddic-type-group" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#ddic-type-group" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T07:28:23.637Z" },
+      "normalizations": ["SAP normalized technical master system SAP to S4H, numeric user 68157 to 068157, and LF source to CRLF."]
+    },
+    {
+      "evidenceId": "PROGRAM_INCLUDE-ZVPINC02-20260826",
+      "objectKind": "PROGRAM_INCLUDE",
+      "adtType": "PROG/I",
+      "objectName": "ZVPINC02",
+      "create": { "planId": "bfe24349-b89f-4b90-9495-92c0d27bd4c6", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md" },
+      "cleanup": { "planId": "b8d8b5f9-53ff-42b7-986f-f3a97f081148", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave2-program-include-real-dev-verified.md" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T07:59:29.657Z" },
+      "normalizations": ["SAP omitted active description metadata; exact search description supplied the ownership evidence."]
+    },
+    {
+      "evidenceId": "DATABASE_TABLE-ZVPTAB02-20260826",
+      "objectKind": "DATABASE_TABLE",
+      "adtType": "TABL/DT",
+      "objectName": "ZVPTAB02",
+      "create": { "planId": "450c0c00-6f16-40c9-9584-35d82517f33d", "status": "APPLIED", "evidenceRef": "docs/evidence/repository-creation-database-table-real-dev-verified.md#create" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-database-table-real-dev-verified.md#readback" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "deletionEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-database-table-real-dev-verified.md#transport" },
+      "cleanup": { "planId": "949a40bd-a5af-4d6b-b724-da5c7fa9e3be", "status": "COMPLETED", "evidenceRef": "docs/evidence/repository-creation-database-table-real-dev-verified.md#cleanup" },
+      "absence": { "searchAbsent": true, "evidenceRef": "docs/evidence/repository-creation-database-table-real-dev-verified.md#absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-26T09:23:51.551Z" },
+      "normalizations": ["SAP aligned DDIC DDL spacing while preserving all semantic tokens.", "CTS retained creation and TABT entries plus one explicit obj_func D deletion entry."]
+    },
+    {
+      "evidenceId": "CDS_DATA_DEFINITION-ZVPCDS02-20260831",
+      "objectKind": "CDS_DATA_DEFINITION",
+      "adtType": "DDLS/DF",
+      "objectName": "ZVPCDS02",
+      "create": { "planId": "24f61425-c167-4d70-afec-9a4defc754f0", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "b306ab61-d87b-4ee4-9d16-0e212ef955d4", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-31T01:42:14.632Z" },
+      "normalizations": ["Same open transport retained one neutral DDLS object key after verified removal."]
+    },
+    {
+      "evidenceId": "CDS_ACCESS_CONTROL-ZVPDCL02-20260831",
+      "objectKind": "CDS_ACCESS_CONTROL",
+      "adtType": "DCLS/DL",
+      "objectName": "ZVPDCL02",
+      "create": { "planId": "c40e0849-729e-4796-90f3-9160d5b93d09", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "56773604-cc1f-4062-8c4b-7508ec82dfdc", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-29T03:17:25.529Z" },
+      "normalizations": ["Same open transport retained one neutral DCLS object key after verified removal."]
+    },
+    {
+      "evidenceId": "CDS_METADATA_EXTENSION-ZVPMDE03-20260831",
+      "objectKind": "CDS_METADATA_EXTENSION",
+      "adtType": "DDLX/EX",
+      "objectName": "ZVPMDE03",
+      "create": { "planId": "c5376f4e-d3ea-48c8-8267-d7ad99277161", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "1207ef33-ac4c-44a5-b42d-be938e1829a2", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-29T03:07:26.116Z" },
+      "normalizations": ["SAP omitted the default standard category and retained one neutral DDLX key after verified removal."]
+    },
+    {
+      "evidenceId": "SERVICE_DEFINITION-ZVPSRV01-20260831",
+      "objectKind": "SERVICE_DEFINITION",
+      "adtType": "SRVD/SRV",
+      "objectName": "ZVPSRV01",
+      "create": { "planId": "9549589d-39d8-4628-9581-a5b8866bfe46", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "8fd00005-e455-4c60-a5cb-4de6349924e2", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-29T04:00:37.158Z" },
+      "normalizations": ["Same open transport retained one neutral SRVD object key after verified removal."]
+    },
+    {
+      "evidenceId": "BEHAVIOR_DEFINITION-ZVPCDS05-20260831",
+      "objectKind": "BEHAVIOR_DEFINITION",
+      "adtType": "BDEF/BDO",
+      "objectName": "ZVPCDS05",
+      "create": { "planId": "62219f7f-1194-44a6-a409-04b9d8effc36", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "e3da302d-5213-4dd0-965f-84e68973f6bd", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-29T02:40:32.094Z" },
+      "normalizations": ["Same open transport retained one neutral BDEF object key after verified removal."]
+    },
+    {
+      "evidenceId": "SERVICE_BINDING-ZVPSVB03-20260831",
+      "objectKind": "SERVICE_BINDING",
+      "adtType": "SRVB/SVB",
+      "objectName": "ZVPSVB03",
+      "create": { "planId": "fa4f950f-f7c7-40f0-9dfe-b74e99821cba", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#create-active" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#neutral-transport" },
+      "cleanup": { "planId": "eb9254f5-4d5c-4709-a4c9-ed19e143309f", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cleanup-absence" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-08-29T00:21:28.518Z" },
+      "normalizations": ["SAP retained one neutral SRVB key and one neutral G4BA companion key after verified removal."]
+    },
+    {
+      "evidenceId": "FUNCTION_MODULE-ZVPFM11C-20260903",
+      "objectKind": "FUNCTION_MODULE",
+      "adtType": "FUGR/FF",
+      "objectName": "ZVPFM11C",
+      "create": { "planId": "a0b3bc5c-debe-4357-b525-b862fbcab6f0", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#create" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#create" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "parentScope": { "parentObjectName": "ZVPFG11", "cleanupPlanId": "5e27bb27-7ce8-46aa-add5-8643db643eb7", "cleanupStatus": "COMPLETED_LOCAL_ABSENCE", "neutralEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#parent-transport" }, "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#parent-transport" },
+      "cleanup": { "planId": "2286f9b8-e40f-4a04-9c61-779dcc9026dd", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#module-cleanup" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-module-real-dev-verified.md#parent-transport" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-03T11:07:03.907Z" },
+      "normalizations": ["SAP records a function module through its parent function-pool CTS key LIMU/REPS/LZVPFG11UXX; the module direct cleanup and parent group cleanup are verified as one bounded lifecycle."]
+    },
+    {
+      "evidenceId": "FUNCTION_GROUP_INCLUDE-LZVPFGI13001-20260904",
+      "objectKind": "FUNCTION_GROUP_INCLUDE",
+      "adtType": "FUGR/I",
+      "objectName": "LZVPFGI13001",
+      "create": { "planId": "90546ae9-c48f-4be7-a430-484e77f5a13a", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#create" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#create" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "parentScope": { "parentObjectName": "ZVPFGI13", "cleanupPlanId": "365e0bdc-2ef0-43e1-b3de-5be5e0649b14", "cleanupStatus": "COMPLETED_LOCAL_ABSENCE", "neutralEntryVerified": true, "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#parent-transport" }, "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#parent-transport" },
+      "cleanup": { "planId": "438c4ce4-fc81-41e9-8de5-c410af87f217", "status": "FAILED_AFTER_ABSENCE", "objectDeleted": true, "failureStage": "cleanup-transport", "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#include-cleanup" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-group-include-real-dev-verified.md#parent-transport" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-04T00:38:02.869Z" },
+      "normalizations": ["Created include source is verified from its own source/main workingArea version; SAP-generated UXX includes are excluded from ownership, activation, source readback, cleanup, and maturity evidence.", "Target SAP search for FUGR/I is normalized by unfiltered exact search plus returned name/type filtering before cleanup."]
+    },
+    {
+      "evidenceId": "FUNCTION_GROUP-ZVPFG9-20260903",
+      "objectKind": "FUNCTION_GROUP",
+      "adtType": "FUGR/F",
+      "objectName": "ZVPFG9",
+      "create": { "planId": "409df9213ed61d484f776b6f6cda0857", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-group-real-dev-verified.md#create" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-function-group-real-dev-verified.md#create" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-function-group-real-dev-verified.md#transport" },
+      "cleanup": { "planId": "c7ffdbfe-8399-46f1-80d9-060c6ea691dd", "status": "COMPLETED_LOCAL_ABSENCE", "objectDeleted": true, "evidenceRef": "docs/evidence/repository-creation-function-group-real-dev-verified.md#cleanup" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-function-group-real-dev-verified.md#cleanup" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-03T10:44:32.267Z" },
+      "normalizations": ["SAP returned the function-pool CTS key as LIMU/REPS/SAPLZVPFG9 while the same open transport retained one neutral R3TR/FUGR/ZVPFG9 entry after verified deletion."]
+    },
+    {
+      "evidenceId": "CHANGE_DOCUMENT_OBJECT-ZVPCHDO05-20260903",
+      "objectKind": "CHANGE_DOCUMENT_OBJECT",
+      "adtType": "CHDO/CHD",
+      "objectName": "ZVPCHDO05",
+      "create": { "planId": "bea2ab37-22a2-47e0-86cf-53dc7c0897ae", "status": "APPLIED", "preCreationAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-applied" },
+      "readback": { "status": "ACTIVE_VERIFIED", "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-applied" },
+      "transport": { "request": "S4HK900009", "packageName": "Z001", "objectEntryVerified": true, "cleanupMode": "SAME_OPEN_TRANSPORT_REMOVED", "neutralEntriesVerified": true, "transportOpenAtCreate": true, "transportOpenAtCleanup": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-cleanup" },
+      "cleanup": { "planId": "f4e796e8-05a9-4410-8b7c-79d47abd2d89", "status": "COMPLETED_LOCAL_ABSENCE", "objectDeleted": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-cleanup" },
+      "absence": { "searchAbsent": true, "generatedResourcesAbsent": true, "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#chdo05-cleanup" },
+      "target": { "host": "10.30.254.48", "client": "300", "systemRole": "DEV", "fingerprint": "cc5d25f5e536715d830a23ba1f8a943498aad66c23d6b09d15c816256f67421d", "verifiedAt": "2026-09-03T01:46:12.551Z" },
+      "normalizations": ["SAP omitted the default standard category, materialized hidden errorMessage CD/600, generated active CLAS/OC ZCL_ZVPCHDO05_CHDO, and retained one neutral CHDO key plus one neutral CLAS companion key after verified cascade removal."]
+    }
+  ],
+  "unresolvedValidationIdentities": [
+    {
+      "objectKind": "DDIC_DOMAIN",
+      "objectName": "ZZMCP_VT_DOM",
+      "planId": "c1967732-b1c1-4d49-9802-5a030699c952",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/real-dev-validation-phase-0-gate.md"
+    },
+    {
+      "objectKind": "DATA_ELEMENT",
+      "objectName": "ZVDE1",
+      "planId": "8cdd9118-9f44-4511-b3eb-6072d363db65",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/real-dev-validation-phase-0-gate.md"
+    },
+    {
+      "objectKind": "DDIC_STRUCTURE",
+      "objectName": "ZVSTR1",
+      "planId": "70063115-053d-4f81-862e-ef74581eef4e",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-009"
+    },
+    {
+      "objectKind": "DDIC_TYPE_GROUP",
+      "objectName": "ZVTG1",
+      "planId": "07f19e53-b441-46a4-89ba-1e9a67e18ccf",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-010"
+    },
+    {
+      "objectKind": "ABAP_INTERFACE",
+      "objectName": "ZVIF_CAMPAIGN",
+      "planId": "8a5e0707-caeb-479e-8585-33de6b2a974d",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-012"
+    },
+    {
+      "objectKind": "ABAP_CLASS",
+      "objectName": "ZVCL_CAMPAIGN",
+      "planId": "4ec1b86d-2f75-48d5-a7a7-8c793bb84749",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-013"
+    },
+    {
+      "objectKind": "MESSAGE_CLASS",
+      "objectName": "ZVMSG",
+      "planId": "3750756d-9247-4a83-bb44-77d5a6cef7ae",
+      "status": "COMPENSATION_FAILED",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-014"
+    },
+    {
+      "objectKind": "PROGRAM_INCLUDE",
+      "objectName": "ZVINCL",
+      "planId": "5842c164-66bf-4f20-aa0d-df04aeb76d60",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-015"
+    },
+    {
+      "objectKind": "PACKAGE",
+      "objectName": "ZVPKG",
+      "planId": "0a2d2213-a805-4e04-ae3a-833cf2427383",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#LOCAL_VALIDATION-017"
+    },
+    {
+      "objectKind": "SAP_OBJECT_TYPE",
+      "objectName": "ZVOBJECTTYPE",
+      "planId": "6e2efc2e-b0fb-490c-a2af-7d91aa81a19c",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-011"
+    },
+    {
+      "objectKind": "SAP_OBJECT_TYPE",
+      "objectName": "ZVOBJECTTYPE2",
+      "planId": "fa176dd5-9fd7-4e7c-82d3-12af0190f68c",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#LOCAL_VALIDATION-022"
+    },
+    {
+      "objectKind": "SAP_OBJECT_TYPE",
+      "objectName": "ZVOBJECTTYPE3",
+      "planId": "c235448a-ebc9-46cb-bb36-2f99364a246e",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#TARGET_UNAVAILABLE-023"
+    },
+    {
+      "objectKind": "DDIC_DOMAIN",
+      "objectName": "ZVPD01",
+      "planId": "c60f0f60-2107-4f59-99e4-cb551da2fe7e",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "PROGRESS.md#2026-08-25-Wave-1-DDIC-Domain-首轮产品化闭环"
+    },
+    {
+      "objectKind": "ABAP_INTERFACE",
+      "objectName": "ZVIF2",
+      "planId": "330631b0-ee6e-47fc-ae41-e4d181aebebc",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-027"
+    },
+    {
+      "objectKind": "DDIC_TYPE_GROUP",
+      "objectName": "ZVTG2",
+      "planId": "c5666a0a-a2b5-4c3c-b5c7-5fe185f32805",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-027"
+    },
+    {
+      "objectKind": "MESSAGE_CLASS",
+      "objectName": "ZVMSG2",
+      "planId": "d847ced9-1612-4b23-994e-0a966df7fc73",
+      "status": "COMPENSATION_FAILED",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-028"
+    },
+    {
+      "objectKind": "ABAP_INTERFACE",
+      "objectName": "ZVIF3",
+      "planId": "195379f5-cb0e-4d2d-9dc3-17f33bb39877",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "BLOCKED.md#REMOTE_UNKNOWN-030"
+    },
+    {
+      "objectKind": "ABAP_INTERFACE",
+      "objectName": "ZVPIF01",
+      "planId": "e4ac992e-3ba3-4b9f-9fac-a4f8bf71df9e",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "ABAP_INTERFACE",
+      "objectName": "ZVPIF02",
+      "planId": "cc3dc6ac-2159-4085-b0d0-8983dcd83d41",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "DDIC_TYPE_GROUP",
+      "objectName": "ZVTG3",
+      "planId": "2e71c155-2030-46f1-b0eb-fd1602221504",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "ABAP_CLASS",
+      "objectName": "ZVPCL01",
+      "planId": "16910982-4be4-4602-b8de-c354c0737986",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "PROGRAM_INCLUDE",
+      "objectName": "ZVPINC01",
+      "planId": "ffe1dbe3-c47b-4f87-ad49-4ebbfe2016b6",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "DATABASE_TABLE",
+      "objectName": "ZVPTAB01",
+      "planId": "bb731d9d-e73c-45e6-8c58-b4a699793ae8",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "docs/evidence/repository-creation-wave2-package-interface-typegroup-real-dev-verified.md#not-promoted"
+    },
+    {
+      "objectKind": "DDIC_LOCK_OBJECT",
+      "objectName": "ZVLOCK2",
+      "planId": "581beb32-1cc6-46aa-9c4c-6cf94ab24b4c",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "PROGRESS.md#2026-08-28-DDIC_LOCK_OBJECT-协议修复"
+    },
+    {
+      "objectKind": "DDIC_LOCK_OBJECT",
+      "objectName": "EZVLOCK3",
+      "planId": "cfabe94f-e500-4982-92f0-136f6021804c",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "PROGRESS.md#2026-08-28-DDIC_LOCK_OBJECT-协议修复"
+    },
+    {
+      "objectKind": "DDIC_LOCK_OBJECT",
+      "objectName": "EZVLOCK4",
+      "planId": "73ad3c03-fbac-4474-99db-1130d2893f21",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "PROGRESS.md#2026-08-28-DDIC_LOCK_OBJECT-协议修复"
+    },
+    {
+      "objectKind": "CDS_DATA_DEFINITION",
+      "objectName": "ZVPCDS01",
+      "planId": "d5720091-e070-457a-a98b-64407bae068e",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "PROGRESS.md#2026-08-28-CDS_DATA_DEFINITION-媒体类型修复"
+    },
+    {
+      "objectKind": "CDS_METADATA_EXTENSION",
+      "objectName": "ZVPMDE01",
+      "planId": "23b66141-cd46-4ebd-8a57-7a5fbe7be5c5",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "PROGRESS.md#2026-08-28-CDS_METADATA_EXTENSION-根元素修复"
+    },
+    {
+      "objectKind": "CDS_DATA_DEFINITION",
+      "objectName": "ZVPCDS03",
+      "planId": "7ab449c5-5625-45bd-9972-413b149ef81a",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cts-阻塞"
+    },
+    {
+      "objectKind": "CDS_DATA_DEFINITION",
+      "objectName": "ZVPCDS05",
+      "planId": "91f6543f-58a6-4a2f-96ce-dd9e5f7ebf77",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cts-阻塞"
+    },
+    {
+      "objectKind": "SERVICE_BINDING",
+      "objectName": "ZVPSVB01",
+      "planId": "643bf06d-afff-43ad-ba5e-8761957680e1",
+      "status": "OUTCOME_UNKNOWN",
+      "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#创建与-active-复读"
+    },
+    {
+      "objectKind": "SERVICE_BINDING",
+      "objectName": "ZVPSVB02",
+      "planId": "19d35a9f-a9cd-4c44-af45-ff580ad93034",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cts-阻塞"
+    },
+    {
+      "objectKind": "CHANGE_DOCUMENT_OBJECT",
+      "objectName": "ZVPCHDO04",
+      "planId": "6437088c-11a0-4ba5-a2dc-47594e1c7082",
+      "status": "CLEANUP_VERIFICATION_FAILED",
+      "evidenceRef": "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md#cts-阻塞"
+    }
+  ]
+}

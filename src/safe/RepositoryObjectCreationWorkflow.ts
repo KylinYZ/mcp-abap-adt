@@ -99,7 +99,10 @@ export class RepositoryObjectCreationWorkflow {
           const compensated = await adapter.compensate(plan, record);
           if (compensated) {
             const settled = this.plans.settle(plan.creationPlanId, 'COMPENSATED', {
-              primaryError: { code: 'REMOTE_WRITE_FAILED', stage: 'apply', message: errorMessage(error) }
+              primaryError: {
+                code: 'REMOTE_WRITE_FAILED', stage: 'apply', message: errorMessage(error),
+                ...(safeSourceMismatchDetails(error) ? { details: safeSourceMismatchDetails(error) } : {})
+              }
             });
             throw new SafeAbapError('REMOTE_WRITE_FAILED', 'apply', 'Creation failed and owned resources were compensated.', { plan: settled });
           }
@@ -121,6 +124,35 @@ export class RepositoryObjectCreationWorkflow {
   }
 }
 
+function safeSourceMismatchDetails(error: unknown): Record<string, unknown> | undefined {
+  if (!(error instanceof SafeAbapError) || error.code !== 'SOURCE_VERIFY_FAILED') return undefined;
+  const details = error.details;
+  const mismatch = details?.mismatch;
+  if (!isRecord(mismatch)) return undefined;
+  const hashes = ['expectedHash', 'actualHash', 'expectedLineHash', 'actualLineHash']
+    .map(key => [key, validHash(mismatch[key])] as const);
+  const numbers = ['expectedLineCount', 'actualLineCount', 'firstMismatchLine', 'expectedLineBytes', 'actualLineBytes']
+    .map(key => [key, validNonNegativeInteger(mismatch[key])] as const);
+  if ([...hashes, ...numbers].some(([, value]) => value === undefined)) return undefined;
+  return {
+    sourceMatchType: typeof details?.sourceMatchType === 'string' ? details.sourceMatchType : 'DIFFERENT',
+    mismatch: Object.fromEntries([...hashes, ...numbers])
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validHash(value: unknown): string | undefined {
+  const candidate = String(value || '');
+  return /^[a-f0-9]{64}$/i.test(candidate) ? candidate : undefined;
+}
+
+function validNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
 function assertValidationRequest(
   context: RepositoryCreationContext,
   objectKind: RepositoryObjectKind,
@@ -133,7 +165,9 @@ function assertValidationRequest(
   const transportRequest = String(request.transportRequest || '').trim().toUpperCase();
   const nameMatches = objectKind === 'FUNCTION_GROUP_INCLUDE'
     ? parentFunctionGroup.startsWith(prefix)
-    : objectName.startsWith(prefix);
+    : objectKind === 'DDIC_LOCK_OBJECT'
+      ? objectName.startsWith(`E${prefix}`)
+      : objectName.startsWith(prefix);
   const providedPackageMatches = !packageName || packageName === context.realDevValidationPackage;
   if (!context.realDevValidationObjects?.includes(objectKind)
     || !prefix
@@ -165,7 +199,9 @@ function validationTargetMatches(
   const packageName = target.packageName || target.parentName || '';
   const nameMatches = target.objectKind === 'FUNCTION_GROUP_INCLUDE'
     ? Boolean(target.parentName?.startsWith(prefix) && target.objectName.startsWith('L'))
-    : target.objectName.startsWith(prefix);
+    : target.objectKind === 'DDIC_LOCK_OBJECT'
+      ? target.objectName.startsWith(`E${prefix}`)
+      : target.objectName.startsWith(prefix);
   return Boolean(context.realDevValidationObjects?.includes(target.objectKind)
     && prefix
     && nameMatches

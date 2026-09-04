@@ -210,3 +210,14 @@
 - SAP active table DDL aligns field whitespace. The table verifier needs a conservative token comparison that ignores only non-semantic whitespace outside strings/comments; semantic tokens and order must remain exact.
 - RESOLVED LOCALLY: Database Table now uses an adapter-local strict tokenizer after exact/CRLF comparison. Positive alignment cases and semantic negative cases pass; full 106/719 gates pass. Real DEV retest requires restart and a fresh table identity.
 - Final retest: both `ZVTAB3` (`abap.clnt`) and `ZVTAB4` (`MANDT`) still fail strict semantic token comparison after successful activation; both compensate cleanly. Three consecutive failures reached the campaign stop threshold. Downstream table/CDS dependencies remain blocked until active-source evidence can be captured safely.
+## VERIFIER_MISMATCH-032 — FUNCTION_GROUP CTS key mapping — RESOLVED
+
+- Fresh plan `eeb6c118e157774c7bd7dea2874dc8f4` created and activated `ZVPFG8`/`ZVPFM8`; source verification passed with `FUNCTION_MODULE_FORMAT_NORMALIZED`.
+- Cleanup plan `3c5e0679-e399-4956-9cbb-2681ef9ba96a` deleted the function group, SAP cascaded the function module, and independent searches confirmed both absent.
+- Cleanup stopped at CTS evidence because no unique deletion or neutral key was accepted. Read-only `transportInfo` exposed `LIMU/REPS/SAPLZVPFG8` for the group and `LIMU/FUNC/ZVPFM8` for the module; the standard `R3TR/FUGR/ZVPFG8` mapping was not yet accepted by the verifier.
+- Local fix adds only the standard `R3TR/FUGR/<business-name>` alias for Function Group matching, with regression coverage. After hard restart, new identity `ZVPFG9` completed cleanup plan `c7ffdbfe-8399-46f1-80d9-060c6ea691dd` with one neutral CTS entry and `COMPLETED_LOCAL_ABSENCE`; the failed `ZVPFG8` plan and identity remain consumed. No E071/E071K or database mutation occurred.
+## VERIFIER_MISMATCH-033 — FUNCTION_MODULE shared parent CTS scope — RESOLVED
+
+- `ZVPFM11B` 与 `ZVPFM11C` 均独立创建、激活、删除并确认缺失，但模块级 cleanup 在 CTS 阶段失败；SAP 返回的实际锁/CTS 键为父函数池 `LIMU/REPS/LZVPFG11UXX`，不是模块业务键。
+- 这不是 SAP 拒绝删除或传输归属问题，而是旧 verifier 错误要求共享函数池键对单个模块唯一。maturity evidence 现在冻结父组与父组 cleanup，要求模块自身生命周期全部完成，并由成功的父组 `COMPLETED_LOCAL_ABSENCE` 计划提供同一开放传输 CTS 证据。
+- 父组 cleanup `5e27bb27-7ce8-46aa-add5-8643db643eb7` 已成功，最终独立 search 无 `ZVPFG11`、`ZVPFM11A`、`ZVPFM11B` 或 `ZVPFM11C` 残留；未修改 E071/E071K，未执行数据库操作。

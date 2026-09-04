@@ -13,7 +13,7 @@ import type {
 } from './creationTypes.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
-import { compareFunctionModuleSources, compareSources } from './sourceTools.js';
+import { compareFunctionModuleSources, compareSources, safeSourceMismatchSummary } from './sourceTools.js';
 
 export interface CreationAuditSink {
   append(event: AuditEvent): Promise<void>;
@@ -85,7 +85,7 @@ export class AbapObjectCreationWorkflow {
     let heldLock: { objectUrl: string; lockHandle: string } | undefined;
 
     try {
-      for (const object of plan.objects) this.policy.assertMutationAllowed(object.objectName);
+      for (const object of plan.objects) this.policy.assertMutationAllowed(mutationPolicyName(object));
       await this.validateTransport(plan.objects, plan.transportRequest);
       await this.resolver.assertTargetsAbsent(plan.objects);
       await this.recordStage(plan, 'CREATION_PRECONDITIONS_REVALIDATED', true);
@@ -174,8 +174,11 @@ export class AbapObjectCreationWorkflow {
         await this.activate(created);
         await this.recordStage(plan, `OBJECT_ACTIVATED:${created.objectName}`, true, undefined, true, created);
 
-        await this.resolver.resolveCreated(created, 'active');
-        const actualSource = await this.client.getObjectSource(created.actualSourceUrl as string);
+        const verificationVersion = sourceVerificationVersion(created);
+        await this.resolver.resolveCreated(created, verificationVersion);
+        const actualSource = created.objectType === 'FUNCTION_GROUP_INCLUDE'
+          ? await this.client.getObjectSource(created.actualSourceUrl as string, { version: verificationVersion })
+          : await this.client.getObjectSource(created.actualSourceUrl as string);
         const comparison = created.objectType === 'FUNCTION_MODULE'
           ? compareFunctionModuleSources(created.source as string, actualSource)
           : compareSources(created.source as string, actualSource);
@@ -185,8 +188,13 @@ export class AbapObjectCreationWorkflow {
           throw new SafeAbapError(
             'SOURCE_VERIFY_FAILED',
             'verify',
-            `Activated source for ${created.objectName} does not match the confirmed creation plan.`,
-            { expectedHash: comparison.expectedHash, actualHash: comparison.actualHash, sourceMatchType: comparison.matchType }
+            `Post-activation source for ${created.objectName} does not match the confirmed creation plan.`,
+            {
+              expectedHash: comparison.expectedHash,
+              actualHash: comparison.actualHash,
+              sourceMatchType: comparison.matchType,
+              mismatch: safeSourceMismatchSummary(created.source as string, actualSource)
+            }
           );
         }
 
@@ -492,13 +500,23 @@ function validateOptions(object: ResolvedCreationObject): ValidateOptions {
 function newObjectOptions(object: ResolvedCreationObject, transport: string): NewObjectOptions {
   return {
     objtype: object.adtType,
-    name: object.creationName || object.objectName,
+    name: object.objectName,
     parentName: object.parentName,
     description: object.description,
     parentPath: object.parentPath,
     transport,
     contentType: object.adtType === 'FUGR/I' ? 'application/vnd.sap.adt.functions.fincludes.v2+xml' : undefined
   };
+}
+
+function mutationPolicyName(object: ResolvedCreationObject): string {
+  return object.objectType === 'FUNCTION_GROUP_INCLUDE'
+    ? object.parentFunctionGroup || object.parentName
+    : object.objectName;
+}
+
+function sourceVerificationVersion(object: CreatedObjectRecord): 'active' | 'workingArea' {
+  return object.objectType === 'FUNCTION_GROUP_INCLUDE' ? 'workingArea' : 'active';
 }
 
 function activationFailureDetails(

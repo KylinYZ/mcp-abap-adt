@@ -1,5 +1,5 @@
 import type { CreationObjectInput, CreationPlanView } from '../creationTypes.js'
-import { errorMessage } from '../errors.js'
+import { SafeAbapError, errorMessage } from '../errors.js'
 import { RepositoryCreationOutcomeUnknownError } from '../RepositoryObjectCreationWorkflow.js'
 import type {
   PreparedRepositoryCreation,
@@ -77,7 +77,7 @@ export class FunctionGroupIncludeCreationAdapter implements RepositoryObjectCrea
 
   async prepare(request: Record<string, unknown>): Promise<PreparedRepositoryCreation> {
     const suffix = requiredString(request, 'name', 3).toUpperCase()
-    if (!/^[A-Z][A-Z0-9_]{2}$/.test(suffix)) throw new Error('name must be a three-character include suffix.')
+    if (!/^(?=.*[A-Z0-9])[A-Z0-9_]{3}$/.test(suffix)) throw new Error('name must be a three-character include suffix.')
     const object: CreationObjectInput = {
       objectType: 'FUNCTION_GROUP_INCLUDE', objectName: suffix,
       description: requiredString(request, 'description', 120),
@@ -154,6 +154,15 @@ export async function executeLegacy(
     if (hasUnknownOutcome(status)) {
       throw new RepositoryCreationOutcomeUnknownError(`Legacy controlled creation outcome is unknown: ${errorMessage(error)}`)
     }
+    const sourceMismatch = legacySourceMismatch(status)
+    if (sourceMismatch) {
+      throw new SafeAbapError(
+        'SOURCE_VERIFY_FAILED',
+        'verify',
+        status.primaryError?.message || errorMessage(error),
+        sourceMismatch
+      )
+    }
     throw error
   }
   const status = workflow.status(legacyCreationPlanId)
@@ -198,6 +207,48 @@ function resources(status: CreationPlanView): Array<{ type: string; name: string
 function hasUnknownOutcome(status: CreationPlanView): boolean {
   return status.createdObjects.some(object => object.ownershipProven === false)
     || status.primaryError?.details?.activationOutcome === 'UNKNOWN'
+}
+
+function legacySourceMismatch(status: CreationPlanView): Record<string, unknown> | undefined {
+  if (status.primaryError?.code !== 'SOURCE_VERIFY_FAILED') return undefined
+  const details = status.primaryError.details
+  const mismatch = details?.mismatch
+  if (!isRecord(mismatch)) return undefined
+  const expectedHash = hash(mismatch.expectedHash)
+  const actualHash = hash(mismatch.actualHash)
+  const expectedLineHash = hash(mismatch.expectedLineHash)
+  const actualLineHash = hash(mismatch.actualLineHash)
+  const values = [
+    expectedHash, actualHash, expectedLineHash, actualLineHash,
+    positiveInteger(mismatch.expectedLineCount), positiveInteger(mismatch.actualLineCount),
+    positiveInteger(mismatch.firstMismatchLine), nonNegativeInteger(mismatch.expectedLineBytes), nonNegativeInteger(mismatch.actualLineBytes)
+  ]
+  if (values.some(value => value === undefined)) return undefined
+  return {
+    sourceMatchType: String(details?.sourceMatchType || 'DIFFERENT'),
+    mismatch: {
+      expectedHash, actualHash, expectedLineCount: values[4], actualLineCount: values[5],
+      firstMismatchLine: values[6], expectedLineBytes: values[7], actualLineBytes: values[8],
+      expectedLineHash, actualLineHash
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hash(value: unknown): string | undefined {
+  const candidate = String(value || '')
+  return /^[a-f0-9]{64}$/i.test(candidate) ? candidate : undefined
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
 }
 
 function adtType(objectKind: string): string {

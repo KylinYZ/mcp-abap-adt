@@ -1,4 +1,9 @@
 import { SafeAbapError } from './errors.js';
+import {
+  REPOSITORY_CREATION_MATURITY_EVIDENCE,
+  validateRepositoryCreationMaturityEvidence,
+  type RepositoryCreationMaturityEvidenceManifest
+} from './RepositoryCreationMaturityEvidence.js';
 import type {
   RepositoryCreationCapabilityDefinition,
   RepositoryCreationCapabilityView,
@@ -11,8 +16,13 @@ export class RepositoryObjectCreationRegistry {
   private readonly byKind = new Map<RepositoryObjectKind, RepositoryCreationCapabilityDefinition>();
   private readonly byAdtType = new Map<string, RepositoryCreationCapabilityDefinition>();
 
-  constructor(definitions: RepositoryCreationCapabilityDefinition[] = []) {
+  constructor(
+    definitions: RepositoryCreationCapabilityDefinition[] = [],
+    maturityEvidence: RepositoryCreationMaturityEvidenceManifest = REPOSITORY_CREATION_MATURITY_EVIDENCE
+  ) {
     for (const definition of definitions) this.register(definition);
+    // A maturity label can enable mutation, so it must never outrun checked-in lifecycle evidence.
+    validateRepositoryCreationMaturityEvidence([...this.byKind.values()], maturityEvidence);
   }
 
   register(definition: RepositoryCreationCapabilityDefinition): void {

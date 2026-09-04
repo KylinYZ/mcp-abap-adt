@@ -41,6 +41,18 @@ export function requiredString(request: Record<string, unknown>, key: string, ma
   return value
 }
 
+export function controlledResponsible(candidate: unknown, fallback: string): string {
+  const value = String(candidate || '').trim()
+  return !value || value.toUpperCase() === 'SAP' ? fallback : value
+}
+
+export function sameControlledMasterSystem(actual: unknown, expected: string): boolean {
+  const left = String(actual || '').trim().toUpperCase()
+  const right = String(expected || '').trim().toUpperCase()
+  if (right === 'SAP') return /^[A-Z0-9]{3}$/.test(left) && left !== 'SAP'
+  return left === right
+}
+
 export function repositoryName(request: Record<string, unknown>, key: string, maximum: number): string {
   const value = requiredString(request, key, maximum).toUpperCase()
   if (!/^(?:\/[A-Z0-9_]+\/)?[A-Z][A-Z0-9_]*$/.test(value)) {

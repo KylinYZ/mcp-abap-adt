@@ -48,6 +48,7 @@ export interface ControlledSourceObjectCreationResult {
   location: string
   name: string
   adtType: ControlledSourceObjectAdtType
+  ownershipEvidence?: 'CANONICAL_LOCATION' | 'POST_CREATE_READBACK_REQUIRED'
 }
 
 interface SourceObjectContract {
@@ -105,11 +106,8 @@ const CONTRACTS: Record<ControlledSourceObjectKind, SourceObjectContract> = {
     collectionPath: '/sap/bc/adt/ddic/ddl/sources',
     rootName: 'ddl:ddlSource',
     namespace: 'xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources"',
-    contentType: 'application/vnd.sap.adt.ddlSource.v2+xml',
-    accept: [
-      'application/vnd.sap.adt.ddlSource.v2+xml',
-      'application/vnd.sap.adt.ddlSource+xml'
-    ].join(', ')
+    contentType: 'application/*',
+    accept: 'application/*'
   },
   CDS_ACCESS_CONTROL: {
     validationPath: '/sap/bc/adt/acm/dcl/validation',
@@ -122,8 +120,8 @@ const CONTRACTS: Record<ControlledSourceObjectKind, SourceObjectContract> = {
   CDS_METADATA_EXTENSION: {
     validationPath: '/sap/bc/adt/ddic/ddlx/sources/validation',
     collectionPath: '/sap/bc/adt/ddic/ddlx/sources',
-    rootName: 'blue:blueSource',
-    namespace: 'xmlns:blue="http://www.sap.com/wbobj/blue"',
+    rootName: 'ddlx:ddlxSource',
+    namespace: 'xmlns:ddlx="http://www.sap.com/adt/ddic/ddlxsources"',
     contentType: 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
     accept: 'application/vnd.sap.adt.ddic.ddlx.v1+xml'
   },
@@ -207,18 +205,35 @@ export async function createControlledSourceObjectShell(
     body: buildControlledSourceObjectXml(input)
   })
   const expectedLocation = controlledSourceObjectUrl(input.objectKind, input.name)
+  const responseLocation = String(response.headers.location || response.headers.Location || '').trim()
+  if (response.status === 200 && !responseLocation && !String(response.body || '').trim()) {
+    // Some target source collections synchronously create an active shell but
+    // return neither 201 nor Location. The adapter must prove exact ownership
+    // through search, active metadata, current user, package, and CTS before write.
+    return {
+      location: expectedLocation,
+      name: input.name,
+      adtType: input.adtType,
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    }
+  }
   const location = requireCanonicalCreationLocation(response, expectedLocation, 'Source object creation')
   // Some ADT 3.60.2 source collections acknowledge shell creation with an
   // empty body. The canonical Location already binds the response to this
   // plan; preserve strict identity checks whenever SAP sends a representation.
   if (!String(response.body || '').trim()) {
-    return { location, name: input.name, adtType: input.adtType }
+    return { location, name: input.name, adtType: input.adtType, ownershipEvidence: 'CANONICAL_LOCATION' }
   }
   const created = parseSourceObjectIdentity(response.body)
   if (created.name !== input.name || created.adtType !== input.adtType) {
     throw adtException('Source object creation response identity does not match the requested object.')
   }
-  return { location, name: created.name, adtType: created.adtType as ControlledSourceObjectAdtType }
+  return {
+    location,
+    name: created.name,
+    adtType: created.adtType as ControlledSourceObjectAdtType,
+    ownershipEvidence: 'CANONICAL_LOCATION'
+  }
 }
 
 export function controlledSourceObjectUrl(kind: ControlledSourceObjectKind, name: string): string {
@@ -272,7 +287,7 @@ function contractFor(input: ControlledSourceObjectInput): SourceObjectContract {
 
 function parseSourceObjectIdentity(xml: string): { name: string; adtType: string } {
   const tag = String(xml || '').match(
-    /<(?:class:abapClass|intf:abapInterface|include:abapInclude|ddl:ddlSource|dcl:dclSource|ddla:ddlaSource|srvd:srvdSource|blue:blueSource|dteb:dtebSource)\b[^>]*>/i
+    /<(?:class:abapClass|intf:abapInterface|include:abapInclude|ddl:ddlSource|dcl:dclSource|ddlx:ddlxSource|ddla:ddlaSource|srvd:srvdSource|blue:blueSource|dteb:dtebSource)\b[^>]*>/i
   )?.[0] || ''
   const attributes: Record<string, string> = {}
   for (const match of tag.matchAll(/([:\w-]+)="([^"]*)"/g)) attributes[match[1]] = match[2]

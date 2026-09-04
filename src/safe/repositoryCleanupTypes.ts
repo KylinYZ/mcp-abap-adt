@@ -5,6 +5,7 @@ export type RepositoryCleanupPlanStatus =
   | 'PREVIEWED'
   | 'APPLYING'
   | 'COMPLETED'
+  | 'COMPLETED_LOCAL_ABSENCE'
   | 'FAILED'
   | 'OUTCOME_UNKNOWN'
   | 'EXPIRED';
@@ -12,6 +13,7 @@ export type RepositoryCleanupPlanStatus =
 export interface RepositoryCleanupResource {
   objectKind: RepositoryObjectKind;
   objectName: string;
+  parentName?: string;
   adtType: string;
   objectUrl: string;
   packageName: string;
@@ -19,6 +21,17 @@ export interface RepositoryCleanupResource {
   transportProgramId: string;
   transportObjectType: string;
   transportObjectName: string;
+  transportIdentityAliases?: Array<{
+    programId: string;
+    objectType: string;
+    objectName: string;
+  }>;
+  cleanupMode?: 'DIRECT' | 'CASCADE_VERIFY';
+  transportCompanionKeys?: Array<{
+    programId: string;
+    objectType: string;
+    objectName: string;
+  }>;
 }
 
 export interface PreparedRepositoryCleanup {
@@ -49,10 +62,11 @@ export interface RepositoryCleanupPlan {
   summary: string;
   payloadHash: string;
   payloadBytes: number;
-  cleanupOrder: Array<Pick<RepositoryCleanupResource, 'objectKind' | 'objectName' | 'adtType'>>;
+  cleanupOrder: Array<Pick<RepositoryCleanupResource, 'objectKind' | 'objectName' | 'adtType' | 'cleanupMode'>>;
   resources?: RepositoryCleanupResource[];
   stages: RepositoryCleanupStageResult[];
   resultSummary?: string;
+  transportDisposition?: 'DELETION_ENTRY_VERIFIED' | 'NEUTRAL_ENTRIES_VERIFIED';
   primaryError?: { code: string; stage: string; message: string };
 }
 

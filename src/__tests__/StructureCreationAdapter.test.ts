@@ -58,11 +58,20 @@ describe('StructureCreationAdapter', () => {
     const adapter = new StructureCreationAdapter(value, policy)
     const prepared = await adapter.prepare(request())
     expect(prepared.review).toMatchObject({ shellContract: { adtType: 'TABL/DS', contentType: 'application/vnd.sap.adt.structures.v2+xml' } })
+    expect((prepared.review as any).source).toContain('@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE')
     const stages: string[] = []
     await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({ actualResources: [{ type: 'TABL/DS', name: 'ZZIF_MCP_STRUCT' }] })
     expect(value.createControlledStructureShell).toHaveBeenCalledWith(expect.objectContaining({ name: 'ZZIF_MCP_STRUCT' }), 'application/vnd.sap.adt.structures.v2+xml')
     expect(value.setObjectSource).toHaveBeenCalledWith('/sap/bc/adt/ddic/structures/zzif_mcp_struct/source/main', expect.any(String), 'LOCK-1', 'S4HK900009')
-    expect(stages).toEqual(['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'])
+    expect(stages).toEqual(['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'PREWRITE_CHECKS', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'])
+    expect(value.syntaxCheck).toHaveBeenNthCalledWith(
+      1,
+      '/sap/bc/adt/ddic/structures/zzif_mcp_struct/source/main',
+      '/sap/bc/adt/ddic/structures/zzif_mcp_struct',
+      expect.stringContaining('define structure zzif_mcp_struct'),
+      undefined,
+      'active'
+    )
   })
 
   it('does not proceed when discovery has no accepted content type', async () => {

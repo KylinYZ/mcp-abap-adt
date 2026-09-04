@@ -232,4 +232,21 @@ describe('CDS SourceObjectCreationAdapter', () => {
     })).rejects.toThrow('must match its root CDS entity')
     expect(client.searchObject).not.toHaveBeenCalled()
   })
+
+  it('reads STOB activity from its owning DDLS object URL while freezing the search URI', async () => {
+    const testCase = cases.find(item => item.kind === 'CDS_ACCESS_CONTROL')!
+    const client = clientFor(testCase)
+    const fragmentUri = '/sap/bc/adt/ddic/ddl/sources/zi_mcp_test/source/main#name=zi_mcp_test'
+    client.searchObject.mockImplementation(async (name, type) => {
+      if (name === 'Z001') return [object('Z001', 'DEVC/K', '/sap/bc/adt/packages/z001')]
+      if (name === 'ZI_MCP_TEST' && type === 'STOB') return [object('ZI_MCP_TEST', 'STOB/DO', fragmentUri)]
+      return []
+    })
+    const adapter = new SourceObjectCreationAdapter(testCase.kind, client, policy)
+
+    const prepared = await adapter.prepare(request(testCase))
+
+    expect(client.objectStructure).toHaveBeenCalledWith('/sap/bc/adt/ddic/ddl/sources/zi_mcp_test', 'active')
+    expect((prepared.payload as any).reference.uri).toBe(fragmentUri)
+  })
 })

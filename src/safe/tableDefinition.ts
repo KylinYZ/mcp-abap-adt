@@ -88,6 +88,7 @@ export function buildDdicStructureDdl(input: DdicStructureDefinitionInput): stri
   const lines = fields.flatMap(field => renderField(structureName, { ...field, key: false, notNull: false }))
   return [
     `@EndUserText.label : '${escapeAbapText(description)}'`,
+    '@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE',
     `define structure ${structureName.toLowerCase()} {`,
     '',
     ...lines,

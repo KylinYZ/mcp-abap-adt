@@ -38,8 +38,7 @@ describe('RepositoryObjectCreationHandlers', () => {
       typeCategory: expect.any(Object),
       sapObjectTypeName: expect.any(Object),
       serviceDefinition: expect.any(Object),
-      tablesAndStructures: expect.any(Object),
-      errorMessage: expect.any(Object)
+      tablesAndStructures: expect.any(Object)
     }));
     expect(previewProperties.properties.properties).toEqual(expect.objectContaining({
       typeInformation: expect.any(Object),
@@ -122,7 +121,7 @@ describe('RepositoryObjectCreationHandlers', () => {
     const capability = (result.structuredContent as any).capability;
     const serialized = JSON.stringify(capability);
 
-    expect(capability).toMatchObject({ objectKind: 'DATABASE_TABLE', adtType: 'TABL/DT', writable: false });
+    expect(capability).toMatchObject({ objectKind: 'DATABASE_TABLE', adtType: 'TABL/DT', writable: true });
     expect(capability.inputSchema.properties.fields.items.properties.referenceField).toBeDefined();
     expect(serialized).toContain('CURR');
     expect(serialized).toContain('QUAN');
@@ -165,8 +164,8 @@ describe('RepositoryObjectCreationHandlers', () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'LOGICAL_EXTERNAL_SCHEMA' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'LOGICAL_EXTERNAL_SCHEMA', adtType: 'DESD/TYP', maturity: 'CONTROLLED_IMPLEMENTED',
-      available: true, writable: false,
+      objectKind: 'LOGICAL_EXTERNAL_SCHEMA', adtType: 'DESD/TYP', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true,
       fixedDefaults: {
         shellContentType: 'application/vnd.sap.adt.blues.v1+xml',
         contentType: 'application/json',
@@ -181,8 +180,8 @@ describe('RepositoryObjectCreationHandlers', () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'NUMBER_RANGE_OBJECT' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'NUMBER_RANGE_OBJECT', adtType: 'NROB/NRO', maturity: 'CONTROLLED_IMPLEMENTED',
-      available: true, writable: false, fixedDefaults: { contentType: 'application/json', schemaFramework: 'objectTypes.v1' }
+      objectKind: 'NUMBER_RANGE_OBJECT', adtType: 'NROB/NRO', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true, fixedDefaults: { contentType: 'application/json', schemaFramework: 'objectTypes.v1' }
     });
     expect(capability.inputSchema.required).toEqual([
       'name', 'description', 'packageName', 'numberLengthDomain', 'percentWarning',
@@ -198,8 +197,8 @@ describe('RepositoryObjectCreationHandlers', () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'SAP_OBJECT_TYPE' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'SAP_OBJECT_TYPE', adtType: 'RONT/ROT', maturity: 'CONTROLLED_IMPLEMENTED',
-      available: true, writable: false,
+      objectKind: 'SAP_OBJECT_TYPE', adtType: 'RONT/ROT', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true,
       fixedDefaults: {
         shellContentType: 'application/vnd.sap.adt.blues.v2+xml',
         creationFramework: 'newObjectTypes.v1',
@@ -221,8 +220,8 @@ describe('RepositoryObjectCreationHandlers', () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'SAP_OBJECT_NODE_TYPE' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'SAP_OBJECT_NODE_TYPE', adtType: 'NONT/NOT', maturity: 'CONTROLLED_IMPLEMENTED',
-      available: true, writable: false,
+      objectKind: 'SAP_OBJECT_NODE_TYPE', adtType: 'NONT/NOT', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true,
       fixedDefaults: {
         shellContentType: 'application/vnd.sap.adt.blues.v2+xml',
         creationFramework: 'newObjectTypes.v1',
@@ -244,19 +243,22 @@ describe('RepositoryObjectCreationHandlers', () => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind: 'CHANGE_DOCUMENT_OBJECT' });
     const capability = (result.structuredContent as any).capability;
     expect(capability).toMatchObject({
-      objectKind: 'CHANGE_DOCUMENT_OBJECT', adtType: 'CHDO/CHD', maturity: 'CONTROLLED_IMPLEMENTED',
-      available: true, writable: false,
+      objectKind: 'CHANGE_DOCUMENT_OBJECT', adtType: 'CHDO/CHD', maturity: 'REAL_DEV_VERIFIED',
+      available: true, writable: true,
       fixedDefaults: {
         shellContentType: 'application/vnd.sap.adt.blues.v1+xml',
         sourceContentType: 'application/json',
         generatedObjectAssignedBySap: true,
-        behaviorDefinitionSapValue: 'behaviorDefiniton'
+        behaviorDefinitionSapValue: 'behaviorDefiniton',
+        errorMessageId: 'CD',
+        errorMessageNumber: '600'
       }
     });
     expect(capability.inputSchema.required).toEqual([
-      'name', 'description', 'packageName', 'category', 'tablesAndStructures', 'errorMessage', 'transportRequest'
+      'name', 'description', 'packageName', 'category', 'tablesAndStructures', 'transportRequest'
     ]);
     expect(capability.inputSchema.properties.category.enum).toEqual(['standard', 'behaviorDefinition']);
+    expect(capability.inputSchema.properties).not.toHaveProperty('errorMessage');
     expect(capability.inputSchema.properties).not.toHaveProperty('generatedObject');
     expect(capability.inputSchema.properties).not.toHaveProperty('json');
     expect(capability.inputSchema.properties).not.toHaveProperty('xml');
@@ -272,7 +274,7 @@ describe('RepositoryObjectCreationHandlers', () => {
 
     expect(capability).toMatchObject({
       objectKind: 'CDS_METADATA_EXTENSION', adtType: 'DDLX/EX',
-      maturity: 'AUTOMATION_VERIFIED', available: true, writable: false
+      maturity: 'REAL_DEV_VERIFIED', available: true, writable: true
     });
     expect(capability.inputSchema.required).toContain('referencedObjectName');
     expect(capability.executionStages).toContain('REVALIDATE_REFERENCE');
@@ -281,15 +283,17 @@ describe('RepositoryObjectCreationHandlers', () => {
   });
 
   it.each([
-    ['CDS_ANNOTATION_DEFINITION', 'DDLA/ADF', false],
-    ['SERVICE_DEFINITION', 'SRVD/SRV', true],
-    ['BEHAVIOR_DEFINITION', 'BDEF/BDO', true]
-  ])('describes controlled Slice 2C kind %s without enabling writes', async (objectKind, adtType, requiresReference) => {
+    ['CDS_ANNOTATION_DEFINITION', 'DDLA/ADF', false, 'AUTOMATION_VERIFIED', false],
+    ['SERVICE_DEFINITION', 'SRVD/SRV', true, 'REAL_DEV_VERIFIED', true],
+    ['BEHAVIOR_DEFINITION', 'BDEF/BDO', true, 'REAL_DEV_VERIFIED', true]
+  ])('describes controlled Slice 2C kind %s with evidence-backed write state', async (
+    objectKind, adtType, requiresReference, maturity, writable
+  ) => {
     const result = await handlers().handle('describeRepositoryObjectCreation', { objectKind });
     const capability = (result.structuredContent as any).capability;
 
     expect(capability).toMatchObject({
-      objectKind, adtType, maturity: 'AUTOMATION_VERIFIED', available: true, writable: false
+      objectKind, adtType, maturity, available: true, writable
     });
     expect(capability.inputSchema.required.includes('referencedObjectName')).toBe(requiresReference);
     expect(capability.inputSchema.properties).not.toHaveProperty('url');

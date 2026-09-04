@@ -137,10 +137,33 @@ describe('AbapCreationResolver', () => {
     expect(adt.mainPrograms).not.toHaveBeenCalled();
   });
 
+  it('accepts Eclipse-style numeric function-group include suffixes', async () => {
+    const adt = client();
+    adt.searchObject.mockImplementation(async query => query === 'ZMCP_ADT_TEST' ? [{
+      'adtcore:name': 'ZMCP_ADT_TEST', 'adtcore:type': 'FUGR/F',
+      'adtcore:uri': '/sap/bc/adt/functions/groups/zmcp_adt_test', 'adtcore:packageName': 'Z001'
+    }] as never : query === 'Z001' ? [{
+      'adtcore:name': 'Z001', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/z001'
+    }] as never : []);
+
+    await expect(new AbapCreationResolver(adt, policy).resolve([{
+      objectType: 'FUNCTION_GROUP_INCLUDE', objectName: '001', description: 'Include',
+      parentFunctionGroup: 'ZMCP_ADT_TEST', source: 'DATA gv_zmcp_adt_test001 TYPE i VALUE 1.'
+    }])).resolves.toEqual([expect.objectContaining({
+      objectType: 'FUNCTION_GROUP_INCLUDE',
+      objectName: 'LZMCP_ADT_TEST001',
+      creationName: '001',
+      adtType: 'FUGR/I',
+      objectUrl: '/sap/bc/adt/functions/groups/zmcp_adt_test/includes/lzmcp_adt_test001',
+      sourceUrl: '/sap/bc/adt/functions/groups/zmcp_adt_test/includes/lzmcp_adt_test001/source/main',
+      packageName: 'Z001'
+    })]);
+  });
+
   it('rejects an invalid function-group include suffix', async () => {
     await expect(new AbapCreationResolver(client(), policy).resolve([{
       objectType: 'FUNCTION_GROUP_INCLUDE', objectName: 'TOOLONG', description: 'Include',
       parentFunctionGroup: 'ZFG', source: 'FUNCTION-POOL zfg.'
-    }])).rejects.toThrow('three-character suffix');
+    }])).rejects.toThrow('three-character include suffix');
   });
 });

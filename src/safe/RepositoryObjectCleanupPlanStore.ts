@@ -43,7 +43,8 @@ export class RepositoryObjectCleanupPlanStore {
       cleanupOrder: prepared.resources.map(resource => ({
         objectKind: resource.objectKind,
         objectName: resource.objectName,
-        adtType: resource.adtType
+        adtType: resource.adtType,
+        cleanupMode: resource.cleanupMode || 'DIRECT'
       })),
       resources: clone(prepared.resources),
       stages: []
@@ -74,7 +75,7 @@ export class RepositoryObjectCleanupPlanStore {
   settle(
     cleanupPlanId: string,
     status: Exclude<RepositoryCleanupPlanStatus, 'PREVIEWED' | 'APPLYING' | 'EXPIRED'>,
-    update: Partial<Pick<RepositoryCleanupPlan, 'resultSummary' | 'primaryError'>> = {}
+    update: Partial<Pick<RepositoryCleanupPlan, 'resultSummary' | 'primaryError' | 'transportDisposition'>> = {}
   ): RepositoryCleanupPlanView {
     const plan = this.plans.get(cleanupPlanId);
     if (!plan) throw new SafeAbapError('PLAN_NOT_FOUND', 'cleanup-plan', 'Repository cleanup plan was not found.');
@@ -154,6 +155,7 @@ function view(plan: RepositoryCleanupPlan): RepositoryCleanupPlanView {
     cleanupOrder: plan.cleanupOrder,
     stages: plan.stages,
     resultSummary: plan.resultSummary,
+    transportDisposition: plan.transportDisposition,
     primaryError: plan.primaryError
   });
 }

@@ -267,7 +267,8 @@ export function assertControlledChangeDocumentObjectContract(
   const configuredGeneral = configurationPropertiesOf(configurationProperties.generalInformation, 'Change Document Object general-information configuration')
   const configuredTables = asObject(configurationProperties.tablesAndStructures, 'Change Document Object tables configuration')
   const configuredTableItems = configurationPropertiesOf(asObject(configuredTables.items, 'Change Document Object table-item configuration'), 'Change Document Object table-item configuration')
-  const configuredError = configurationPropertiesOf(configurationProperties.errorMessage, 'Change Document Object error-message configuration')
+  const configuredErrorObject = asObject(configurationProperties.errorMessage, 'Change Document Object error-message configuration')
+  const configuredError = configurationPropertiesOf(configuredErrorObject, 'Change Document Object error-message configuration')
 
   if (!properties.formatVersion
     || !header.description
@@ -291,6 +292,7 @@ export function assertControlledChangeDocumentObjectContract(
     || !typeValues(configuredGeneral.generatedObject).includes('FUNC')
     || !typeValues(configuredTableItems.name).includes('TABL')
     || !typeValues(configuredTableItems.referenceTable).includes('TABL')
+    || configuredErrorObject['sap.adt.hidden'] !== true
     || !typeValues(configuredError.id).includes('MSAG')) {
     throw adtException('Target Change Document Object contract is incompatible with the reviewed ADT 3.60.2 contract.')
   }

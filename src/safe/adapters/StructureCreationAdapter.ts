@@ -106,6 +106,15 @@ export class StructureCreationAdapter implements RepositoryObjectCreationAdapter
     assertStructureIdentity(inactive.metaData as unknown as Record<string, unknown>, payload.input)
     const actualSourceUrl = sourceUrlFromStructure(inactive.metaData as unknown as Record<string, unknown>, payload.sourceUrl)
     recordStage('RESOLVE_CREATED_OBJECT', true, actualSourceUrl)
+    const prewriteChecks = await this.client.syntaxCheck(
+      actualSourceUrl,
+      payload.objectUrl,
+      payload.source,
+      undefined,
+      'active'
+    )
+    assertNoCheckErrors(prewriteChecks, 'PREWRITE_CHECKS')
+    recordStage('PREWRITE_CHECKS', true)
     const lock = await this.client.lock(payload.objectUrl, 'MODIFY')
     recordStage('LOCK_RESOURCE', true)
     let operationError: unknown

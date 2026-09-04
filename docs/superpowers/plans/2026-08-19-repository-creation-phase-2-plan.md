@@ -52,7 +52,7 @@ Phase 2 接入十三类常规源码/服务对象。公共 MCP 面仍为五工具
 
 ### Slice 2D：Service Binding
 
-使用 Eclipse ADT Service Binding 插件、通信日志和 `vscode_abap_remote_fs` 锁定 `/sap/bc/adt/businessservices/bindings`、`application/vnd.sap.adt.businessservices.servicebinding.v1+xml`、V2/V4 及 UI/Web API 类别映射。创建前绑定 active `SRVD/SRV`，创建后读取 canonical binding XML 复核名称、包、Service Definition、协议版本、类别和 `0001` 服务版本；不需要单独激活。当前 Slice 2D 已达到 `AUTOMATION_VERIFIED`，但没有执行真实 SAP 写入。
+使用 Eclipse ADT Service Binding 插件、通信日志和 `vscode_abap_remote_fs` 锁定 `/sap/bc/adt/businessservices/bindings`、目标 discovery 发布的 `application/vnd.sap.adt.businessservices.servicebinding.v2+xml`、V2/V4 及 UI/Web API 类别映射。创建前绑定 active `SRVD/SRV`，创建后执行标准 ADT activation，并从 active 版本复核名称、包、Service Definition、协议版本、类别、`0001` 服务版本、`bindingCreated=true` 和 `published=false`。当前 Slice 2D 已达到 `AUTOMATION_VERIFIED`，但仍需新的真实 DEV 完整生命周期验证。
 
 ## 4. 每类对象的升级门
 

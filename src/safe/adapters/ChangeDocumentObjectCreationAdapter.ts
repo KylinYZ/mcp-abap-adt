@@ -51,6 +51,8 @@ interface ChangeDocumentObjectCreationPayload {
   messageClassReference: FrozenChangeDocumentReference
 }
 
+const FIXED_ERROR_MESSAGE = { id: 'CD', number: '600' } as const
+
 export class ChangeDocumentObjectCreationAdapter implements RepositoryObjectCreationAdapter {
   readonly objectKind = 'CHANGE_DOCUMENT_OBJECT' as Extract<RepositoryObjectKind, 'CHANGE_DOCUMENT_OBJECT'>
 
@@ -66,7 +68,10 @@ export class ChangeDocumentObjectCreationAdapter implements RepositoryObjectCrea
     const category = changeDocumentCategory(request.category)
     const abapLanguageVersion = languageVersion(request.abapLanguageVersion)
     const tablesAndStructures = tableEntries(request.tablesAndStructures)
-    const errorMessage = errorMessageInput(request.errorMessage)
+    if (request.errorMessage !== undefined) {
+      throw new Error('errorMessage is a hidden server-owned Change Document Object default and cannot be provided.')
+    }
+    const errorMessage = { ...FIXED_ERROR_MESSAGE }
     const transportRequest = this.policy.assertTransportFormat(String(request.transportRequest || ''))
     this.policy.assertMutationAllowed(name)
     this.policy.assertTransportablePackage(packageName)
@@ -334,8 +339,17 @@ function assertWorkingContentMatches(
   expected: ControlledChangeDocumentObjectContent,
   actual: ControlledChangeDocumentObjectContent
 ): void {
-  if (stableJson(withoutGeneratedObject(actual)) !== stableJson(withoutGeneratedObject(expected))) {
-    throw new Error('Change Document Object working content does not match the confirmed plan.')
+  const actualWithoutGenerated = withoutGeneratedObject(actual)
+  const expectedWithoutGenerated = withoutGeneratedObject(expected)
+  const actualCategory = actual.generalInformation.category
+  const expectedCategory = expected.generalInformation.category
+  if ((actualCategory === undefined && expectedCategory !== 'standard')
+    || (actualCategory !== undefined && actualCategory !== expectedCategory)) {
+    throw contentMismatch('Change Document Object working content', expectedWithoutGenerated, actualWithoutGenerated)
+  }
+  actualWithoutGenerated.generalInformation = { ...actualWithoutGenerated.generalInformation, category: expectedCategory }
+  if (stableJson(actualWithoutGenerated) !== stableJson(expectedWithoutGenerated)) {
+    throw contentMismatch('Change Document Object working content', expectedWithoutGenerated, actualWithoutGenerated)
   }
 }
 
@@ -366,10 +380,10 @@ function withoutGeneratedObject(content: ControlledChangeDocumentObjectContent):
 
 async function verifyGeneratedObject(
   client: ControlledCreationAdtClient,
-  category: ChangeDocumentObjectCategory,
+  _category: ChangeDocumentObjectCategory,
   name: string
 ): Promise<FrozenChangeDocumentReference> {
-  const expectedType = category === 'behaviorDefinition' ? 'CLAS/OC' : 'FUGR/FF'
+  const expectedType = 'CLAS/OC'
   return resolveActiveReference(client, name, expectedType, [expectedType], 'generated object')
 }
 
@@ -485,13 +499,6 @@ function loggingOptions(value: unknown, label: string): { logValues: boolean; lo
   return { logValues, logInitialValues }
 }
 
-function errorMessageInput(value: unknown): { id: string; number: string } {
-  const message = objectInput(value, 'errorMessage')
-  const number = String(message.number || '')
-  if (!/^\d{3}$/.test(number)) throw new Error('errorMessage.number must contain exactly three digits.')
-  return { id: referenceName(message.id, 'errorMessage.id', 20), number }
-}
-
 function objectInput(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object.`)
   return value as Record<string, unknown>
@@ -546,6 +553,60 @@ function stableJson(value: unknown): string {
     return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(',')}}`
   }
   return JSON.stringify(value)
+}
+
+function contentMismatch(label: string, expected: unknown, actual: unknown): Error {
+  const expectedJson = stableJson(expected)
+  const actualJson = stableJson(actual)
+  const path = firstMismatchPath(expected, actual) || '$'
+  return new Error(
+    `${label} does not match the confirmed plan at ${path}; `
+    + `expectedKind=${valueKind(valueAtPath(expected, path))}, actualKind=${valueKind(valueAtPath(actual, path))}, `
+    + `expectedHash=${createHash('sha256').update(expectedJson).digest('hex')}, `
+    + `actualHash=${createHash('sha256').update(actualJson).digest('hex')}, `
+    + `expectedBytes=${Buffer.byteLength(expectedJson, 'utf8')}, actualBytes=${Buffer.byteLength(actualJson, 'utf8')}.`
+  )
+}
+
+function firstMismatchPath(expected: unknown, actual: unknown, path = '$'): string | undefined {
+  if (valueKind(expected) !== valueKind(actual)) return path
+  if (Array.isArray(expected) && Array.isArray(actual)) {
+    if (expected.length !== actual.length) return `${path}.length`
+    for (let index = 0; index < expected.length; index += 1) {
+      const mismatch = firstMismatchPath(expected[index], actual[index], `${path}[${index}]`)
+      if (mismatch) return mismatch
+    }
+    return undefined
+  }
+  if (expected && actual && typeof expected === 'object' && typeof actual === 'object') {
+    const expectedObject = expected as Record<string, unknown>
+    const actualObject = actual as Record<string, unknown>
+    const keys = [...new Set([...Object.keys(expectedObject), ...Object.keys(actualObject)])].sort()
+    for (const key of keys) {
+      if (!(key in expectedObject) || !(key in actualObject)) return `${path}.${key}`
+      const mismatch = firstMismatchPath(expectedObject[key], actualObject[key], `${path}.${key}`)
+      if (mismatch) return mismatch
+    }
+    return undefined
+  }
+  return Object.is(expected, actual) ? undefined : path
+}
+
+function valueAtPath(value: unknown, path: string): unknown {
+  if (path === '$') return value
+  const parts = path.slice(2).split(/\.|\[|\]/).filter(Boolean)
+  let current = value
+  for (const part of parts) {
+    if (!current || typeof current !== 'object') return undefined
+    current = (current as Record<string, unknown>)[part]
+  }
+  return current
+}
+
+function valueKind(value: unknown): string {
+  if (Array.isArray(value)) return 'array'
+  if (value === null) return 'null'
+  return typeof value
 }
 
 function baseContentType(value: string): string {

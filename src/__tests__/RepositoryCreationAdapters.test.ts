@@ -74,7 +74,7 @@ describe('controlled repository creation adapters', () => {
     expect(stages).toEqual(['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'VERIFY_PROPERTIES'])
   })
 
-  it('rejects SAP as the parent package responsible value during preview', async () => {
+  it('uses the authenticated user when the parent exposes responsible SAP and validates it remotely', async () => {
     const client = baseClient()
     client.searchObject.mockImplementation(async name => name === 'ZPARENT' ? [{
       'adtcore:name': 'ZPARENT', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/zparent'
@@ -82,12 +82,20 @@ describe('controlled repository creation adapters', () => {
     client.readControlledPackage.mockResolvedValue({
       name: 'ZPARENT', language: 'ZH', masterLanguage: 'ZH', masterSystem: 'S4H', responsible: 'SAP'
     })
+    client.validateControlledPackage.mockResolvedValue({ success: true })
+    client.getControlledPackageConstraints.mockResolvedValue('<constraints/>')
+    transportable(client)
     const adapter = new PackageCreationAdapter(client, policy)
     await expect(adapter.prepare({
       name: 'ZCHILD', description: 'Child', parentPackageName: 'ZPARENT', softwareComponent: 'HOME',
       transportLayer: 'SAP', transportRequest: 'S4HK900009'
-    })).rejects.toThrow('valid responsible user')
-    expect(client.validateControlledPackage).not.toHaveBeenCalled()
+    })).resolves.toMatchObject({
+      payload: { input: { responsible: '068157' } },
+      review: { responsible: '068157', responsibleSource: 'CURRENT_AUTHENTICATED_USER' }
+    })
+    expect(client.validateControlledPackage).toHaveBeenCalledTimes(2)
+    expect(client.validateControlledPackage).toHaveBeenCalledWith(expect.objectContaining({ responsible: '068157' }), 'basic')
+    expect(client.validateControlledPackage).toHaveBeenCalledWith(expect.objectContaining({ responsible: '068157' }), 'full')
   })
 
   it('executes the complete table source and technical-settings chain', async () => {
@@ -163,9 +171,21 @@ describe('controlled repository creation adapters', () => {
       ]
     })
 
-    await expect(adapter.execute(plan(prepared), jest.fn())).rejects.toThrow(
+    const verificationMessages: string[] = []
+    await expect(adapter.execute(plan(prepared), (stage, success, message) => {
+      if (stage === 'VERIFY_SOURCE' && !success && message) verificationMessages.push(message)
+    })).rejects.toThrow(
       'Active source for ZZIF_MCP_TEST does not match the confirmed plan.'
     )
+    const diagnostics = JSON.parse(verificationMessages[0])
+    expect(diagnostics).toEqual(expect.objectContaining({
+      expectedHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      actualHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      expectedTokenCount: expect.any(Number), actualTokenCount: expect.any(Number),
+      firstMismatchIndex: expect.any(Number), expectedTokenKind: expect.any(String), actualTokenKind: expect.any(String)
+    }))
+    expect(verificationMessages[0]).not.toContain(expectedFragment)
+    expect(verificationMessages[0]).not.toContain(actualFragment)
     expect(client.writeControlledTableSettings).not.toHaveBeenCalled()
   })
 

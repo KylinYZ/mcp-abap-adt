@@ -1,7 +1,9 @@
 import {
+  compareAbapClassSources,
   compareFunctionModuleSources,
   compareSources,
   createUnifiedDiff,
+  safeSourceMismatchSummary,
   sourceHash
 } from '../safe/sourceTools';
 
@@ -68,6 +70,73 @@ describe('source tools', () => {
     });
   });
 
+  it('accepts the Eclipse parameter-template scaffold and standalone signature terminator', () => {
+    const expected = [
+      'FUNCTION zmcp_test001.',
+      '',
+      'WRITE \'12\'.',
+      '',
+      '',
+      'ENDFUNCTION.'
+    ].join('\n');
+    const actual = [
+      'FUNCTION ZMCP_TEST001',
+      '  " You can use the template \'functionModuleParameter\' to add here the signature!',
+      '.',
+      '',
+      'WRITE \'12\'.',
+      '',
+      '',
+      'ENDFUNCTION.'
+    ].join('\r\n');
+
+    expect(compareFunctionModuleSources(expected, actual)).toMatchObject({
+      matchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED',
+      matches: true
+    });
+  });
+
+  it('accepts the Eclipse scaffold for an empty function-module implementation', () => {
+    const expected = [
+      'FUNCTION zvpfgi12a.',
+      'ENDFUNCTION.'
+    ].join('\n');
+    const actual = [
+      'FUNCTION ZVPFGI12A',
+      '  " You can use the template \'functionModuleParameter\' to add here the signature!',
+      '.',
+      'ENDFUNCTION.'
+    ].join('\r\n');
+
+    expect(compareFunctionModuleSources(expected, actual)).toMatchObject({
+      matchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED',
+      matches: true
+    });
+  });
+
+  it('accepts SAP uppercasing the function-module signature', () => {
+    const expected = 'FUNCTION z_test.\n  WRITE \'ok\'.\nENDFUNCTION.';
+    const actual = 'FUNCTION Z_TEST.\r\n  WRITE \'ok\'.\r\nENDFUNCTION.';
+
+    expect(compareFunctionModuleSources(expected, actual)).toMatchObject({
+      matchType: 'FUNCTION_MODULE_FORMAT_NORMALIZED',
+      matches: true
+    });
+  });
+
+  it('reports source mismatch metadata without exposing either line', () => {
+    const expected = 'FUNCTION z_test.\n  DATA(secret_expected) = 1.\nENDFUNCTION.';
+    const actual = 'FUNCTION z_test.\n  DATA(secret_actual) = 2.\nENDFUNCTION.';
+    const summary = safeSourceMismatchSummary(expected, actual);
+
+    expect(summary).toMatchObject({
+      expectedHash: sourceHash(expected), actualHash: sourceHash(actual),
+      expectedLineCount: 3, actualLineCount: 3, firstMismatchLine: 2
+    });
+    expect(JSON.stringify(summary)).not.toContain('secret_expected');
+    expect(JSON.stringify(summary)).not.toContain('secret_actual');
+  });
+
   it('does not mistake a signature comment ending in a period for the signature terminator', () => {
     const expected = 'FUNCTION z_test\n  " Parameter description.\n  IMPORTING\n    VALUE(iv_input) TYPE string.\n  DATA(result) = iv_input.\nENDFUNCTION.';
     const actual = 'FUNCTION z_test\r\n  " Parameter description.\r\n  IMPORTING\r\n    VALUE(iv_input) TYPE string.\r\n\r\n\r\n  DATA(result) = iv_input.\r\nENDFUNCTION.';
@@ -90,6 +159,52 @@ describe('source tools', () => {
     const expected = 'FUNCTION z_test\n  IMPORTING\n    VALUE(iv_input) TYPE string.\n\n  ev_output = iv_input.\nENDFUNCTION.';
 
     expect(compareFunctionModuleSources(expected, actual)).toMatchObject({
+      matchType: 'DIFFERENT',
+      matches: false
+    });
+  });
+
+  it('accepts SAP pretty-print of an empty public final class', () => {
+    const expected = [
+      'CLASS zvpcl02 DEFINITION PUBLIC FINAL CREATE PUBLIC.',
+      'ENDCLASS.',
+      'CLASS zvpcl02 IMPLEMENTATION.',
+      'ENDCLASS.'
+    ].join('\n');
+    const actual = [
+      'class ZVPCL02 definition',
+      '  public',
+      '  final',
+      '  create public .',
+      '',
+      'public section.',
+      'protected section.',
+      'private section.',
+      'ENDCLASS.',
+      '',
+      '',
+      '',
+      'CLASS ZVPCL02 IMPLEMENTATION.',
+      'ENDCLASS.'
+    ].join('\r\n');
+
+    expect(compareAbapClassSources(expected, actual)).toMatchObject({
+      matchType: 'ABAP_CLASS_FORMAT_NORMALIZED',
+      matches: true,
+      expectedHash: sourceHash(expected),
+      actualHash: sourceHash(actual)
+    });
+    expect(compareSources(expected, actual)).toMatchObject({ matchType: 'DIFFERENT', matches: false });
+  });
+
+  it.each([
+    ['class name', 'CLASS zother DEFINITION PUBLIC FINAL CREATE PUBLIC.\nENDCLASS.\nCLASS zother IMPLEMENTATION.\nENDCLASS.'],
+    ['missing final', 'CLASS zvpcl02 DEFINITION PUBLIC CREATE PUBLIC.\nENDCLASS.\nCLASS zvpcl02 IMPLEMENTATION.\nENDCLASS.'],
+    ['definition method', 'CLASS zvpcl02 DEFINITION PUBLIC FINAL CREATE PUBLIC.\n  PUBLIC SECTION.\n    METHODS run.\nENDCLASS.\nCLASS zvpcl02 IMPLEMENTATION.\nENDCLASS.'],
+    ['implementation body', 'CLASS zvpcl02 DEFINITION PUBLIC FINAL CREATE PUBLIC.\nENDCLASS.\nCLASS zvpcl02 IMPLEMENTATION.\n  METHOD run.\n  ENDMETHOD.\nENDCLASS.']
+  ])('rejects class %s differences outside empty-skeleton formatting', (_caseName, actual) => {
+    const expected = 'CLASS zvpcl02 DEFINITION PUBLIC FINAL CREATE PUBLIC.\nENDCLASS.\nCLASS zvpcl02 IMPLEMENTATION.\nENDCLASS.';
+    expect(compareAbapClassSources(expected, actual)).toMatchObject({
       matchType: 'DIFFERENT',
       matches: false
     });

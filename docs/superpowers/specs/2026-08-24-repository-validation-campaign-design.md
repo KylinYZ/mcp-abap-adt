@@ -24,13 +24,13 @@ PROGRAM,FUNCTION_GROUP,FUNCTION_GROUP_INCLUDE,FUNCTION_MODULE,PACKAGE,DATABASE_T
 
 计划目标独立冻结 `packageName` 和 `parentName`：前者用于验证活动的包约束，后者只表示父函数组、父包或业务引用。不得再把所有 `parentName` 都解释为包名。现有普通适配器可继续用 `parentName` 兼容表示包，父对象型 legacy 适配器必须同时写入真实 `packageName`。
 
-`FUNCTION_GROUP_INCLUDE` 的公开 `name` 是三字符 suffix，而最终技术名由 SAP 派生为 `L<FUNCTION_GROUP><SUFFIX>`。该类型改为验证：
+`FUNCTION_GROUP_INCLUDE` 的公开 `name` 是三字符 suffix，而最终技术名由 MCP 按 SAP 命名规则派生为 `L<FUNCTION_GROUP><SUFFIX>`，并以完整 include 名发送给 ADT validation/create。该类型改为验证：
 
 - `parentFunctionGroup` 必须以 `ZV` 开头并已存在；
-- suffix 必须严格匹配字母开头的三字符格式；
+- suffix 必须严格匹配三字符仓库名片段，允许 Eclipse 常见的数字 suffix，例如 `001`；
 - preview 校验公开的父函数组与 suffix，apply 校验计划冻结的 `parentName` 和 SAP 返回的完整目标名；
-- 测试建议使用父函数组 `ZVFG1` 和 suffix `Z01`，预期完整名为 `LZVFG1Z01`；
-- 后续复读和清理只使用 preview/status 返回的实际完整名称，不由调用方手工拼接。
+- 测试建议使用父函数组 `ZVFG1` 和 suffix `001`，预期完整名为 `LZVFG1001`；
+- 后续复读和清理只使用 preview/status 返回的实际完整名称，不由调用方手工拼接；源码复读使用 created include 自身的 `source/main?version=workingArea`，不得读取或激活 SAP 生成的 `UXX` include。
 
 ## 执行与停止规则
 

@@ -110,7 +110,7 @@ export interface RepositoryCreationPlan {
   compensationLimits: string[];
   actualResources?: Array<{ type: string; name: string }>;
   resultSummary?: string;
-  primaryError?: { code: string; stage: string; message: string };
+  primaryError?: { code: string; stage: string; message: string; details?: Record<string, unknown> };
 }
 
 export type RepositoryCreationPlanView = Omit<RepositoryCreationPlan, 'createdAt' | 'expiresAt' | 'terminalAt' | 'payload' | 'context'> & {

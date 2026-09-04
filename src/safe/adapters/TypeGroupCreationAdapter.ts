@@ -20,8 +20,10 @@ import {
   assertTargetAbsent,
   assertTransportAvailable,
   assertValidation,
+  controlledResponsible,
   repositoryName,
-  requiredString
+  requiredString,
+  sameControlledMasterSystem
 } from './creationAdapterTools.js'
 import { compareSources } from '../sourceTools.js'
 
@@ -105,17 +107,31 @@ export class TypeGroupCreationAdapter implements RepositoryObjectCreationAdapter
     assertTransportAvailable(transportInfo, transportDetails, payload.input.transportRequest)
     recordStage('VALIDATE_TRANSPORT', true)
 
+    let creation
     try {
-      await createTypeGroup(this.client, payload.input, payload.contentType)
+      creation = await createTypeGroup(this.client, payload.input, payload.contentType)
     } catch (error) {
       throw unknownWrite('DDIC type group shell create', error)
     }
-    plan.actualResources = [{ type: 'TYPE/DG', name: payload.input.name }]
     recordStage('CREATE_SHELL', true)
 
-    const inactive = await this.client.objectStructure(payload.objectUrl, 'inactive')
-    assertTypeGroupIdentity(inactive.metaData as unknown as Record<string, unknown>, payload.input)
-    const actualSourceUrl = sourceUrlFromTypeGroup(inactive.metaData as unknown as Record<string, unknown>, payload.sourceUrl)
+    let createdStructure
+    if (creation.ownershipEvidence === 'POST_CREATE_READBACK_REQUIRED') {
+      try {
+        createdStructure = await provePostCreateTypeGroupOwnership(this.client, payload.input, payload.objectUrl)
+      } catch (error) {
+        throw unknownWrite('DDIC type group shell ownership proof', error)
+      }
+      recordStage('PROVE_SHELL_OWNERSHIP', true, payload.objectUrl)
+    } else {
+      createdStructure = await this.client.objectStructure(payload.objectUrl, 'inactive')
+      assertTypeGroupIdentity(createdStructure.metaData as unknown as Record<string, unknown>, payload.input)
+    }
+    plan.actualResources = [{ type: 'TYPE/DG', name: payload.input.name }]
+    const actualSourceUrl = sourceUrlFromTypeGroup(
+      createdStructure.metaData as unknown as Record<string, unknown>,
+      payload.sourceUrl
+    )
     recordStage('RESOLVE_CREATED_OBJECT', true, actualSourceUrl)
     const lock = await this.client.lock(payload.objectUrl, 'MODIFY')
     recordStage('LOCK_RESOURCE', true)
@@ -222,7 +238,7 @@ function identityInput(
 ): ControlledTypeGroupShellInput {
   const language = packageMetadata.language || packageMetadata.masterLanguage
   const masterLanguage = packageMetadata.masterLanguage || language
-  const responsible = packageMetadata.responsible || policy.sapUser
+  const responsible = controlledResponsible(packageMetadata.responsible, policy.sapUser)
   if (!language || !masterLanguage || !packageMetadata.masterSystem || !responsible) {
     throw new Error(`Package ${values.packageName} did not expose the identity metadata required for controlled creation.`)
   }
@@ -240,6 +256,12 @@ function assertTypeGroupSource(name: string, source: string): void {
   if (!new RegExp(`\\bTYPE-POOL\\s+${escaped}\\s*\\.`, 'i').test(source)) {
     throw new Error(`Type group source must contain TYPE-POOL ${name} .`)
   }
+  const declarations = source.matchAll(/\b(?:TYPES|CONSTANTS|DATA)\s+([A-Z][A-Z0-9_]*)/gi)
+  for (const declaration of declarations) {
+    if (!declaration[1].toUpperCase().startsWith(`${name}_`)) {
+      throw new Error(`Type group declarations must begin with ${name}_.`)
+    }
+  }
 }
 
 function sourceInput(request: Record<string, unknown>): string {
@@ -255,6 +277,51 @@ function assertTypeGroupIdentity(metaData: Record<string, unknown>, input: Contr
     || String(metaData['adtcore:type'] || '').toUpperCase() !== 'TYPE/DG') {
     throw new Error(`Created type group ${input.name} does not match the confirmed plan.`)
   }
+}
+
+async function provePostCreateTypeGroupOwnership(
+  client: ControlledCreationAdtClient,
+  input: ControlledTypeGroupShellInput,
+  objectUrl: string
+) {
+  const exact = (await client.searchObject(input.name, 'TYPE/DG', 10)).filter(item => (
+    item['adtcore:name'].toUpperCase() === input.name
+    && item['adtcore:type'].toUpperCase() === 'TYPE/DG'
+  ))
+  if (exact.length !== 1
+    || exact[0]['adtcore:uri'] !== objectUrl
+    || String(exact[0]['adtcore:packageName'] || '').toUpperCase() !== input.packageName) {
+    throw new Error(`SAP did not return one exact owned type group shell for ${input.name}.`)
+  }
+  const active = await client.objectStructure(objectUrl, 'active')
+  const metadata = active.metaData as unknown as Record<string, unknown>
+  assertTypeGroupIdentity(metadata, input)
+  if (String(metadata['adtcore:version'] || '').toLowerCase() !== 'active'
+    || String(metadata['adtcore:description'] || '') !== input.description
+    || !sameSapIdentity(metadata['adtcore:responsible'], input.responsible)
+    || String(metadata['adtcore:masterLanguage'] || '').toUpperCase() !== input.masterLanguage.toUpperCase()
+    || !sameControlledMasterSystem(metadata['adtcore:masterSystem'], input.masterSystem)) {
+    throw new Error(`SAP active type group metadata for ${input.name} does not prove ownership.`)
+  }
+  const [transportInfo, transportDetails] = await Promise.all([
+    client.transportInfo(objectUrl, input.packageName, 'I'),
+    client.transportDetails(input.transportRequest)
+  ])
+  assertTransportAvailable(transportInfo, transportDetails, input.transportRequest)
+  if (String(transportInfo.OBJECTNAME || transportInfo.LOCKS?.OBJECT_KEY?.OBJ_NAME || '').toUpperCase() !== input.name
+    || String(transportInfo.URI || '') !== objectUrl) {
+    throw new Error(`SAP transport identity for ${input.name} does not prove ownership.`)
+  }
+  return active
+}
+
+function sameSapIdentity(actual: unknown, expected: string): boolean {
+  const left = String(actual ?? '').trim().toUpperCase()
+  const right = String(expected || '').trim().toUpperCase()
+  if (/^\d+$/.test(left) && /^\d+$/.test(right)) {
+    return left.replace(/^0+/, '') === right.replace(/^0+/, '')
+  }
+  return left === right
 }
 
 function sourceUrlFromTypeGroup(metaData: Record<string, unknown>, fallback: string): string {

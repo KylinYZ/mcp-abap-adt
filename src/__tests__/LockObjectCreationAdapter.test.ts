@@ -39,15 +39,15 @@ function configured(): jest.Mocked<ControlledCreationAdtClient> {
   })
   value.transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'S4HK900009' }] } as never)
   value.transportDetails.mockResolvedValue({ 'tm:status': 'D' } as never)
-  ;(value.createControlledLockObjectShell as jest.Mock).mockResolvedValue({ location: '/sap/bc/adt/ddic/lockobjects/sources/zzenqchk', lockObject: { name: 'ZZENQCHK', packageName: 'Z001', primaryTable: 'ZZIF_MCP_TEST' } })
-  value.objectStructure.mockResolvedValue({ objectUrl: '/sap/bc/adt/ddic/lockobjects/sources/zzenqchk', metaData: { 'adtcore:name': 'ZZENQCHK', 'adtcore:type': 'ENQU/DL', 'adtcore:version': 'active' }, links: [] } as never)
+  ;(value.createControlledLockObjectShell as jest.Mock).mockResolvedValue({ location: '/sap/bc/adt/ddic/lockobjects/sources/ezzenqchk', lockObject: { name: 'EZZENQCHK', packageName: 'Z001', primaryTable: 'ZZIF_MCP_TEST' } })
+  value.objectStructure.mockResolvedValue({ objectUrl: '/sap/bc/adt/ddic/lockobjects/sources/ezzenqchk', metaData: { 'adtcore:name': 'EZZENQCHK', 'adtcore:type': 'ENQU/DL', 'adtcore:version': 'active' }, links: [] } as never)
   value.lock.mockResolvedValue({ LOCK_HANDLE: 'LOCK-1' } as never)
   value.unLock.mockResolvedValue('')
   return value
 }
 
 function request(): Record<string, unknown> {
-  return { objectKind: 'DDIC_LOCK_OBJECT', name: 'ZZENQCHK', description: 'MCP锁对象', packageName: 'Z001', primaryTable: 'ZZIF_MCP_TEST', transportRequest: 'S4HK900009' }
+  return { objectKind: 'DDIC_LOCK_OBJECT', name: 'EZZENQCHK', description: 'MCP锁对象', packageName: 'Z001', primaryTable: 'ZZIF_MCP_TEST', transportRequest: 'S4HK900009' }
 }
 
 function plan(prepared: PreparedRepositoryCreation): RepositoryCreationPlan {
@@ -61,7 +61,7 @@ describe('LockObjectCreationAdapter', () => {
     const prepared = await adapter.prepare(request())
     expect(prepared.review).toMatchObject({ shellContract: { adtType: 'ENQU/DL', contentType: 'application/vnd.sap.adt.lockobjects.v1+xml', allowRFC: false } })
     const stages: string[] = []
-    await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({ actualResources: [{ type: 'ENQU/DL', name: 'ZZENQCHK' }] })
+    await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({ actualResources: [{ type: 'ENQU/DL', name: 'EZZENQCHK' }] })
     expect(value.createControlledLockObjectShell).toHaveBeenCalledWith(expect.objectContaining({ primaryTable: 'ZZIF_MCP_TEST' }), 'application/vnd.sap.adt.lockobjects.v1+xml')
     expect(stages).toEqual(['REVALIDATE_ABSENCE', 'REVALIDATE_REFERENCE', 'VALIDATE_TRANSPORT', 'CREATE_OBJECT', 'VERIFY_CREATED_OBJECT'])
   })
@@ -70,5 +70,13 @@ describe('LockObjectCreationAdapter', () => {
     const value = configured()
     value.searchObject.mockResolvedValue([])
     await expect(new LockObjectCreationAdapter(value, policy).prepare(request())).rejects.toThrow('Package Z001 was not found')
+  })
+
+  it('rejects lock object names without the required E prefix before SAP access', async () => {
+    const value = configured()
+    await expect(new LockObjectCreationAdapter(value, policy).prepare({
+      ...request(), name: 'ZVLOCK2'
+    })).rejects.toThrow('must begin with E')
+    expect(value.searchObject).not.toHaveBeenCalled()
   })
 })

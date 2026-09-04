@@ -34,7 +34,7 @@
 - 完整 cleanup workflow 只进入 execution gate 一次。
 - 每个对象在删除前重新验证 identity/transport/dependencies。
 - 删除结果未知立即停止；不重试、不继续父对象。
-- 删除后 search 缺失并复核传输。
+- 删除后 search 缺失，并复核固定传输/task 中恰好保留匹配的 CTS 删除条目；不得修改 E071 或删除整个传输。
 
 ### 1.4 工具与测试
 
@@ -47,7 +47,7 @@
 ## 阶段 2：Maturity Evidence Gate
 
 1. 新增 repository creation maturity evidence manifest。
-2. 记录 create/readback/transport/cleanup/absence 五类证据。
+2. 记录 create/readback/transport/cleanup/absence 五类证据；transport 必须同时证明创建时归属与删除后唯一精确 CTS 删除条目。
 3. Registry 测试要求 `REAL_DEV_VERIFIED` 必须有完整 evidence。
 4. Coverage 脚本输出每种 maturity 数量和缺失证据。
 5. capability 仍逐类显式声明，不支持通配晋级。
@@ -64,7 +64,7 @@
 2. preview → 原生确认 → apply。
 3. 独立 active/final readback 和 transport evidence。
 4. 单独 cleanup preview → 原生删除确认 → apply。
-5. search 缺失和 transport 复查。
+5. search 缺失和 transport 复查；CTS 必须保留唯一精确删除条目，以便下游系统同步删除。
 6. 写 evidence manifest。
 7. 把该 capability 晋级 `REAL_DEV_VERIFIED`。
 8. 关闭 validation switch 后验证该类型仍可生成正常 preview；不要再次真实创建。

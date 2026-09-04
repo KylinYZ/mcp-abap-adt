@@ -23,6 +23,9 @@ describe('lock object creation API', () => {
   it('parses the validation check result', async () => {
     const client = { request: jest.fn().mockResolvedValue({ body: '<DATA><CHECK_RESULT>X</CHECK_RESULT></DATA>' }) }
     await expect(validateControlledLockObjectShell(client as never, input)).resolves.toEqual({ success: true })
+    expect(client.request).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      headers: { Accept: 'application/vnd.sap.as+xml' }
+    }))
   })
 
   it('requires canonical creation identity', async () => {

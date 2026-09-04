@@ -266,6 +266,122 @@ describe('AbapObjectCreationWorkflow', () => {
     expect(test.auditEvents.at(-1)).toMatchObject({ activationOutcome: 'UNKNOWN' });
   });
 
+  it('creates a function-group include with the full L include name and verifies workingArea source only', async () => {
+    const include: ResolvedCreationObject = {
+      objectType: 'FUNCTION_GROUP_INCLUDE',
+      objectName: 'LZVFG1001',
+      description: 'Include 001',
+      adtType: 'FUGR/I',
+      packageName: 'Z001',
+      parentName: 'ZVFG1',
+      parentPath: '/sap/bc/adt/functions/groups/zvfg1',
+      parentFunctionGroup: 'ZVFG1',
+      objectUrl: '/sap/bc/adt/functions/groups/zvfg1/includes/lzvfg1001',
+      sourceUrl: '/sap/bc/adt/functions/groups/zvfg1/includes/lzvfg1001/source/main',
+      activationParentUrl: '/sap/bc/adt/functions/groups/zvfg1',
+      creationName: '001',
+      source: 'DATA gv_zvfg1001 TYPE i VALUE 1.',
+      sourceHash: 'include-source-hash'
+    };
+    const existing = new Set<string>();
+    const calls: string[] = [];
+    const resolvedVersions: string[] = [];
+    const createOptions: unknown[] = [];
+    const resolver = {
+      resolve: jest.fn(async () => [{ ...include }]),
+      assertTargetsAbsent: jest.fn(async (targets: ResolvedCreationObject[]) => {
+        const found = targets.find(target => existing.has(target.objectName));
+        if (found) throw new Error(`${found.objectName} already exists`);
+      }),
+      resolveCreated: jest.fn(async (expected: ResolvedCreationObject, version = 'inactive') => {
+        if (!existing.has(expected.objectName)) throw new Error('not found');
+        resolvedVersions.push(`${expected.objectName}:${version}`);
+        return { ...expected };
+      })
+    };
+    const client = {
+      transportInfo: jest.fn(async () => ({
+        DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
+      })),
+      transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+      validateNewObject: jest.fn(async (options: { objname?: string }) => {
+        calls.push(`validate:${options.objname}`);
+        return { success: true };
+      }),
+      createObject: jest.fn(async (options: { name: string }) => {
+        createOptions.push(options);
+        calls.push(`create:${options.name}`);
+        existing.add(options.name);
+      }),
+      lock: jest.fn(async (url: string) => {
+        calls.push(`lock:${url}`);
+        return { LOCK_HANDLE: `lock-${url}` };
+      }),
+      setObjectSource: jest.fn(async () => { calls.push('write:LZVFG1001'); }),
+      syntaxCheck: jest.fn(async () => {
+        calls.push('syntax:LZVFG1001');
+        return [];
+      }),
+      unLock: jest.fn(async () => { calls.push('unlock:LZVFG1001'); return ''; }),
+      getObjectSource: jest.fn(async (url: string, options?: { version?: string }) => {
+        calls.push(`getSource:${url}:${options?.version || 'default'}`);
+        if (url.toUpperCase().includes('UXX')) throw new Error('UXX must not be read for created include verification');
+        return include.source as string;
+      }),
+      activate: jest.fn(async (...args: unknown[]) => {
+        calls.push(`activate:${String(args[0])}`);
+        return { success: true, messages: [], inactive: [] };
+      }),
+      deleteObject: jest.fn()
+    } as unknown as jest.Mocked<CreationAdtClient>;
+    const policy = new SafetyPolicy({
+      sapUrl: 'https://dev.example.com', sapClient: '100', systemRole: 'DEV',
+      allowedHosts: 'dev.example.com', allowedClients: '100', allowedNamespaces: 'Z', auditPath: './audit'
+    });
+    const workflow = new AbapObjectCreationWorkflow(
+      client,
+      resolver as unknown as AbapCreationResolver,
+      policy,
+      new CreationPlanStore(60_000, () => 1_000, () => 'include-plan'),
+      { append: async () => undefined }
+    );
+
+    await workflow.preview({
+      objects: [{
+        objectType: 'FUNCTION_GROUP_INCLUDE',
+        objectName: '001',
+        description: 'Include 001',
+        parentFunctionGroup: 'ZVFG1',
+        source: include.source
+      }],
+      transportRequest: 'DEVK900001'
+    });
+    await expect(workflow.apply({
+      creationPlanId: 'include-plan', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({
+      status: 'success',
+      plan: {
+        status: 'APPLIED',
+        createdObjects: [expect.objectContaining({
+          objectName: 'LZVFG1001',
+          sourceMatchType: 'EXACT'
+        })]
+      }
+    });
+
+    expect(createOptions).toEqual([expect.objectContaining({
+      objtype: 'FUGR/I',
+      name: 'LZVFG1001',
+      parentName: 'ZVFG1',
+      contentType: 'application/vnd.sap.adt.functions.fincludes.v2+xml'
+    })]);
+    expect(client.activate).toHaveBeenCalledWith('LZVFG1001', include.objectUrl, undefined, true);
+    expect(client.getObjectSource).toHaveBeenCalledWith(include.sourceUrl, { version: 'workingArea' });
+    expect(resolvedVersions).toEqual(['LZVFG1001:inactive', 'LZVFG1001:workingArea']);
+    expect(calls.join('\n').toUpperCase()).not.toContain('UXX');
+    expect(existing).toEqual(new Set(['LZVFG1001']));
+  });
+
   it('uses Eclipse function-module activation, verifies the parent, and compensates in reverse order', async () => {
     const functionGroup: ResolvedCreationObject = {
       objectType: 'FUNCTION_GROUP',

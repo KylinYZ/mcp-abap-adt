@@ -1,5 +1,6 @@
 import { TypeGroupCreationAdapter } from '../safe/adapters/TypeGroupCreationAdapter'
 import type { ControlledCreationAdtClient } from '../safe/adapters/controlledCreationTools'
+import { RepositoryCreationOutcomeUnknownError } from '../safe/RepositoryObjectCreationWorkflow'
 import type { PreparedRepositoryCreation, RepositoryCreationPlan } from '../safe/repositoryCreationTypes'
 import { SafetyPolicy } from '../safe/SafetyPolicy'
 
@@ -68,7 +69,77 @@ describe('TypeGroupCreationAdapter', () => {
     expect(stages).toEqual(['REVALIDATE_ABSENCE', 'VALIDATE_TRANSPORT', 'CREATE_SHELL', 'RESOLVE_CREATED_OBJECT', 'LOCK_RESOURCE', 'WRITE_SOURCE', 'RUN_CHECKS', 'UNLOCK_RESOURCE', 'ACTIVATE_OBJECT', 'VERIFY_ACTIVE_OBJECT', 'VERIFY_SOURCE'])
   })
 
+  it('proves exact ownership before writing after HTTP 200 without Location', async () => {
+    const value = configured()
+    value.readControlledPackage.mockResolvedValue({
+      name: 'Z001', language: 'ZH', masterLanguage: 'ZH', masterSystem: 'SAP', responsible: 'SAP'
+    })
+    let shellCreated = false
+    ;(value.createControlledTypeGroupShell as jest.Mock).mockImplementation(async () => {
+      shellCreated = true
+      return {
+        location: '/sap/bc/adt/ddic/typegroups/zztg1', typeGroup: { name: 'ZZTG1' },
+        ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+      }
+    })
+    value.searchObject.mockImplementation(async name => {
+      if (name === 'Z001') return [{
+        'adtcore:name': 'Z001', 'adtcore:type': 'DEVC/K', 'adtcore:uri': '/sap/bc/adt/packages/z001'
+      }]
+      return shellCreated && name === 'ZZTG1' ? [{
+        'adtcore:name': 'ZZTG1', 'adtcore:type': 'TYPE/DG',
+        'adtcore:uri': '/sap/bc/adt/ddic/typegroups/zztg1', 'adtcore:packageName': 'Z001'
+      }] : []
+    })
+    value.objectStructure.mockResolvedValue({
+      objectUrl: '/sap/bc/adt/ddic/typegroups/zztg1',
+      metaData: {
+        'adtcore:name': 'ZZTG1', 'adtcore:type': 'TYPE/DG', 'adtcore:version': 'active',
+        'adtcore:description': 'MCP类型组', 'adtcore:masterLanguage': 'ZH',
+        'adtcore:masterSystem': 'S4H', 'adtcore:responsible': '68157',
+        'abapsource:sourceUri': 'source/main'
+      }, links: []
+    } as never)
+    value.transportInfo.mockResolvedValue({
+      OBJECTNAME: 'ZZTG1', URI: '/sap/bc/adt/ddic/typegroups/zztg1',
+      TRANSPORTS: [{ TRKORR: 'S4HK900009' }]
+    } as never)
+    const adapter = new TypeGroupCreationAdapter(value, policy)
+    const prepared = await adapter.prepare(request())
+    const stages: string[] = []
+
+    await expect(adapter.execute(plan(prepared), stage => stages.push(stage))).resolves.toMatchObject({
+      actualResources: [{ type: 'TYPE/DG', name: 'ZZTG1' }]
+    })
+    expect(stages).toContain('PROVE_SHELL_OWNERSHIP')
+    expect(value.setObjectSource).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps HTTP 200 ownership unknown when exact readback evidence is missing', async () => {
+    const value = configured()
+    ;(value.createControlledTypeGroupShell as jest.Mock).mockResolvedValue({
+      location: '/sap/bc/adt/ddic/typegroups/zztg1', typeGroup: { name: 'ZZTG1' },
+      ownershipEvidence: 'POST_CREATE_READBACK_REQUIRED'
+    })
+    const adapter = new TypeGroupCreationAdapter(value, policy)
+    const prepared = await adapter.prepare(request())
+    const executionPlan = plan(prepared)
+
+    await expect(adapter.execute(executionPlan, jest.fn())).rejects.toBeInstanceOf(RepositoryCreationOutcomeUnknownError)
+    expect(executionPlan.actualResources).toBeUndefined()
+    expect(value.lock).not.toHaveBeenCalled()
+    expect(value.deleteObject).not.toHaveBeenCalled()
+  })
+
   it('rejects a source that does not declare the requested type pool', async () => {
     await expect(new TypeGroupCreationAdapter(configured(), policy).prepare({ ...request(), source: 'TYPE-POOL OTHER .' })).rejects.toThrow('TYPE-POOL ZZTG1')
+  })
+
+  it('rejects declarations outside the target TYPE-POOL prefix before SAP access', async () => {
+    const value = configured()
+    await expect(new TypeGroupCreationAdapter(value, policy).prepare({
+      ...request(), source: 'TYPE-POOL zztg1.\nTYPES ty_text TYPE c LENGTH 20.'
+    })).rejects.toThrow('ZZTG1_')
+    expect(value.searchObject).not.toHaveBeenCalled()
   })
 })
