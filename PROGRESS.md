@@ -211,3 +211,9 @@
 - 矩阵：diagnostics.knowledge-queries GAP → PARTIAL（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=13、GAP=9、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 42/71。证据：docs/evidence/knowledge-queries-real-dev-verified.md。
 - 接线同步：index.ts + ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=161、diagnostic-readonly=130、legacy-full=193、workbench=128、operations=50）+ AGENTS.md 基线（148/1410）。
 - 遗留：无系统残留。剩余可做项已基本枯竭：analysis.history 的 cr_history 经探针确认 E071/E070 datapview 受限（同 TSTCT 环境级限制）；剩余均为写方向工作流（recover-failed-create/set-description/rename/i18n.write）或环境前置（git.abapgit、AMDP、analysis.lint 引擎）。
+
+## 2026-09-17 闲时轮（十八）：矩阵保真更新——实测证据回写 PARTIAL 行
+
+- git.abapgit 行 restrictionReason 补真机实测：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装，checkInstallPrerequisites 实测），前置现状可经该工具只读发现。
+- analysis.history 行 restrictionReason 补真机实测：E071/E070 datapreview 数据读取一律 Internal server error（表结构可查），cr_history 的自由 SQL 通道在该 DEV 不可用；VSP 同走 E071/E070 亦受同等限制。
+- 校验与推送：matrix --check 通过；commit + 代理推送。

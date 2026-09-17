@@ -2151,7 +2151,7 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "版本历史与传输信息查询覆盖部分历史场景；共同变更/影响面/边界分析无等价。",
+        "restrictionReason": "版本历史与传输信息查询覆盖部分历史场景；共同变更/影响面/边界分析无等价。cr_history 通道实测受限（2026-09-17）：E071/E070 的 datapreview 数据读取一律 Internal server error（表结构可查），自由 SQL 历史分析在该 DEV 不可用；VSP 同走 E070A/E071 SQL 亦受同等限制。",
         "liftCondition": "co-change 分析任务完成只读实现后晋级。"
       },
       "priority": "P2",
@@ -2189,7 +2189,7 @@
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。",
+        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。真机实测（2026-09-17，checkInstallPrerequisites）：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装），abapGit 对齐在当前环境无从验证，前置现状可经 checkInstallPrerequisites 只读发现。",
         "liftCondition": "abapgit-export-alignment 任务确定只读导出路径后晋级。"
       },
       "priority": "P1",
