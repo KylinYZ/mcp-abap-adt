@@ -32,8 +32,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
 | P1 | 3 | 10 | 6 | 4 | 2 | 0 | 25 |
-| P2 | 0 | 10 | 6 | 5 | 4 | 0 | 25 |
-| 合计 | 7 | 35 | 12 | 11 | 6 | 0 | 71 |
+| P2 | 0 | 10 | 6 | 4 | 5 | 0 | 25 |
+| 合计 | 7 | 35 | 12 | 10 | 7 | 0 | 71 |
 
 计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**42/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
@@ -157,7 +157,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `analysis.callgraph` | 调用图/调用者/被调用者分析与静态-动态对比 | SAP(action=analyze, params={type:call_graph\|callers\|callees\|analyze_call_graph\|compare_call_graphs\|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution | EQUIVALENT | P0 | `usageReferences`、`usageReferenceSnippets`、`typeHierarchy`、`getCallees` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.boundaries` | 包边界违规检查（clean core） | SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries | EQUIVALENT | P2 | `checkPackageBoundaries` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | GAP | P2 | （无） | （无） | （无） |
+| `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
 | `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | PARTIAL | P2 | `revisions`、`transportInfo` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 
 ### git
@@ -228,6 +228,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
   解除条件：仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。
 - **`debug.amdp-helper`**（P1）：AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。
   解除条件：专用 DEV + 明确授权 + helper 前置检查通过并完成独立风险评审后单独评估。
+- **`analysis.lint`**（P2）：abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。
+  解除条件：出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。
 - **`install.zadt-vsp`**（P2）：本项目不自动在 SAP 端安装/部署对象；helper 部署属于有业务副作用的系统变更。
   解除条件：用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。
 - **`install.abapgit`**（P2）：本项目不自动在 SAP 端安装/部署对象；abapGit 部署属于有业务副作用的系统变更。

@@ -194,3 +194,10 @@
 - 矩阵：install.diagnostics PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=12、GAP=11、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 42/71。证据：docs/evidence/install-diagnostics-real-dev-verified.md。
 - 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=159、diagnostic-readonly=128、legacy-full=191、workbench=126、operations=48）+ AGENTS.md 基线（146/1394）。
 - 遗留：无系统残留。剩余可做项：analysis.history（co-change 等只读分析）、analysis.lint（需 abaplint 引擎）、codeintel.navigation 邻域核实、crud.recover-failed-create/set-description/refactor.rename（写方向工作流，需谨慎设计）等 P2；P1 git.abapgit/AMDP 受环境前置约束。
+
+## 2026-09-17 闲时轮（十六）：analysis.lint 归位 INTENTIONAL_RESTRICTION——abaplint 引擎不可得
+
+- 调研结论：矩阵行 analysis.lint（P2 GAP，离线 ABAP 静态分析）的依赖 abaplint 引擎不可得——npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测）；VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。
+- 处理：按矩阵词汇归位 INTENTIONAL_RESTRICTION（GAP 移出可做桶），restrictionReason 记录 404 实测证据与替代路径（ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl 已在 catalog，覆盖"发现语法错误"核心需求；abaplint 离线规则集无等价物），liftCondition 写明重新评估条件。
+- 期间一次 JSON 转义事故（node -e 内嵌引号破坏 JSON），已 git checkout 恢复并以 JSON.parse 验证后重做。
+- 现状：MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=12、GAP=10、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 42/71（完成率不变，GAP 桶去虚存实）。

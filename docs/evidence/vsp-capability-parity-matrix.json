@@ -2091,18 +2091,18 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
+        "status": "INTENTIONAL_RESTRICTION",
         "taskPath": [],
         "profiles": [],
         "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "restrictionReason": "abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。",
+        "liftCondition": "出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。"
       },
       "priority": "P2",
       "evidence": [
         "source-audit"
       ],
-      "nextMilestone": "offline-lint-spike"
+      "nextMilestone": ""
     },
     {
       "id": "analysis.history",
