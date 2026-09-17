@@ -185,3 +185,12 @@
 - 矩阵：read.transaction GAP → PARTIAL（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=34、PARTIAL=13、GAP=11、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 41/71。证据：docs/evidence/transaction-read-real-dev-verified.md。
 - 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=158、diagnostic-readonly=127、legacy-full=190、workbench=125、operations=47）+ AGENTS.md 基线（145/1383）。
 - 遗留：无系统残留。剩余可做项：analysis.history（co-change 等只读分析）、install.diagnostics（helper 前置只读检查）、analysis.lint（需 abaplint 引擎）等 P2；P1 git.abapgit/AMDP 受环境前置约束。
+
+## 2026-09-17 闲时轮（十五）：install.diagnostics 晋级 EQUIVALENT——安装前置只读发现工具
+
+- 本轮工作（预筛指定项）：helper 前置只读 discovery 落地为只读工具 `checkInstallPrerequisites`（挂 InstallDiagnosticsHandlers，无入参）——ZADT_VSP helper TADIR 探测（LIKE 'ZADT_VSP%'，失败重试 1 次）+ abapGit ADT 服务可达性分类（/sap/bc/adt/abapgit/repos，v2 Accept；available/not_installed/forbidden/error 四态，"does not exist" 语义归 not_installed）+ 本地 Node 运行时。notes 明确"本服务器不做任何安装动作"（安装属 INTENTIONAL_RESTRICTION 行）。VSP 的 ListDependencies 是本地嵌入 ZIP 清单（安装动作输入），对本项目不适用，矩阵 restrictionReason 已记录差异。
+- 本地门禁全绿：Jest 146 suites / 1394 tests、build、coverage、parity、diff --check；本能力新增 11 例单测（API 5 + Handlers 6）。
+- 真机验证（scripts/install-diagnostics-real-dev-smoke.mjs，全程只读 SELECT/GET）：ZADT_VSP helper installed=false（该系统从未安装 helper；首轮 TADIR 瞬时 500 由重试吸收）；abapGit 分类 not_installed（ADT 报资源不存在，语义识别正确）；Node v22.22.2 报告；notes 边界生效。SMOKE OK。
+- 矩阵：install.diagnostics PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=12、GAP=11、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 42/71。证据：docs/evidence/install-diagnostics-real-dev-verified.md。
+- 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=159、diagnostic-readonly=128、legacy-full=191、workbench=126、operations=48）+ AGENTS.md 基线（146/1394）。
+- 遗留：无系统残留。剩余可做项：analysis.history（co-change 等只读分析）、analysis.lint（需 abaplint 引擎）、codeintel.navigation 邻域核实、crud.recover-failed-create/set-description/refactor.rename（写方向工作流，需谨慎设计）等 P2；P1 git.abapgit/AMDP 受环境前置约束。

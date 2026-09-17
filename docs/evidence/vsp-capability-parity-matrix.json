@@ -2286,10 +2286,11 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "EQUIVALENT",
         "taskPath": [
           "healthcheck",
-          "featureDetails"
+          "featureDetails",
+          "checkInstallPrerequisites"
         ],
         "profiles": [
           "development",
@@ -2301,12 +2302,14 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "提供本地进程与 ADT 特性诊断，但不管理 SAP 端 helper 安装依赖。",
+        "restrictionReason": "checkInstallPrerequisites 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/install-diagnostics-real-dev-verified.md）：ZADT_VSP helper TADIR 探测 installed=false（该系统从未安装 helper，探测含瞬时 500 重试）；abapGit ADT 服务（/sap/bc/adt/abapgit/repos，v2 Accept）分类 not_installed（资源不存在语义识别）；本地 Node v22 运行时报告；notes 明确不做任何安装动作。本地进程与 ADT 特性诊断由 healthcheck/featureDetails 继续覆盖。",
         "liftCondition": "helper 前置检查任务（只读 discovery）完成后晋级。"
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
       "nextMilestone": ""
     },

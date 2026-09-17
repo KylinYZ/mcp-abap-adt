@@ -32,10 +32,10 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
 | P1 | 3 | 10 | 6 | 4 | 2 | 0 | 25 |
-| P2 | 0 | 9 | 7 | 5 | 4 | 0 | 25 |
-| 合计 | 7 | 34 | 13 | 11 | 6 | 0 | 71 |
+| P2 | 0 | 10 | 6 | 5 | 4 | 0 | 25 |
+| 合计 | 7 | 35 | 12 | 11 | 6 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**41/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**42/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -173,7 +173,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `install.zadt-vsp` | 向 SAP 端部署 ZADT_VSP WebSocket helper | system type=install_zadt_vsp + focused InstallZADTVSP | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
 | `install.abapgit` | 向 SAP 端部署 abapGit（standalone/dev edition） | system type=install_abapgit + focused InstallAbapGit | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
 | `install.deploy-zip` | 从 abapGit 格式 ZIP 批量导入对象到包 | system type=deploy_zip + focused DeployZip | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
-| `install.diagnostics` | 安装依赖清单与安装自检 | system type=list_dependencies\|install_dummy_test + focused ListDependencies/InstallDummyTest；system FEATURES | PARTIAL | P2 | `healthcheck`、`featureDetails` | development, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `install.diagnostics` | 安装依赖清单与安装自检 | system type=list_dependencies\|install_dummy_test + focused ListDependencies/InstallDummyTest；system FEATURES | EQUIVALENT | P2 | `healthcheck`、`featureDetails`、`checkInstallPrerequisites` | development, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
 ### fileio
 

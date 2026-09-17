@@ -121,7 +121,10 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'compareSourceObjects',
   // 事务码元数据只读（矩阵 read.transaction 行）：TSTC/TSTCT 自由 SQL
   //（vit/wb TRAN 端点在该 DEV 无映射）；事务码运行不在此列
-  'getTransaction'
+  'getTransaction',
+  // 安装前置只读发现（矩阵 install.diagnostics 行）：只读 discovery，
+  // 不做任何安装动作（安装属 INTENTIONAL_RESTRICTION 行）
+  'checkInstallPrerequisites'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

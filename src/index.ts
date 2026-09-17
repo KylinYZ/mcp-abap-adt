@@ -126,6 +126,7 @@ import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
 import { createI18nReadClient } from './adt/I18nReadApi.js';
 import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
 import { createTransactionReadClient } from './adt/TransactionReadApi.js';
+import { createInstallDiagnosticsClient } from './adt/InstallDiagnosticsApi.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
 import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
@@ -138,6 +139,7 @@ import { RevisionSourceHandlers } from './handlers/RevisionSourceHandlers.js';
 import { I18nReadHandlers } from './handlers/I18nReadHandlers.js';
 import { BoundaryCheckHandlers } from './handlers/BoundaryCheckHandlers.js';
 import { TransactionReadHandlers } from './handlers/TransactionReadHandlers.js';
+import { InstallDiagnosticsHandlers } from './handlers/InstallDiagnosticsHandlers.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
@@ -187,6 +189,7 @@ export class AbapAdtServer extends Server {
   private i18nReadHandlers: I18nReadHandlers;
   private boundaryCheckHandlers: BoundaryCheckHandlers;
   private transactionReadHandlers: TransactionReadHandlers;
+  private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
@@ -365,6 +368,19 @@ export class AbapAdtServer extends Server {
     // 事务码元数据只读工具（read.transaction）：TSTC/TSTCT 自由 SQL（该 DEV 的
     // vit/wb TRAN 端点无映射，VSP 同源受限）。
     this.transactionReadHandlers = new TransactionReadHandlers(createTransactionReadClient(readClient));
+    // 安装前置只读发现工具（install.diagnostics）：ZADT_VSP helper TADIR 探测 +
+    // abapGit 服务可达性分类 + 本地运行时；不做任何安装动作。git repos 的
+    // GET 由 httpClient 直发（状态码分类需要原始 status 而非异常）。
+    this.installDiagnosticsHandlers = new InstallDiagnosticsHandlers(
+      createInstallDiagnosticsClient({
+        searchObject: (query, objType, max) => readClient.searchObject(query, objType, max),
+        runQuery: (sqlQuery, rowNumber, decode) => readClient.runQuery(sqlQuery, rowNumber, decode),
+        requestGitRepos: () => readClient.httpClient.request('/sap/bc/adt/abapgit/repos', {
+          method: 'GET',
+          headers: { Accept: 'application/abapgit.adt.repos.v2+xml' }
+        })
+      })
+    );
     // SM21 is read-only; it follows the stateless read rollout switch when enabled.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
@@ -748,7 +764,8 @@ export class AbapAdtServer extends Server {
       ...this.revisionSourceHandlers.getTools(),
       ...this.i18nReadHandlers.getTools(),
       ...this.boundaryCheckHandlers.getTools(),
-      ...this.transactionReadHandlers.getTools()
+      ...this.transactionReadHandlers.getTools(),
+      ...this.installDiagnosticsHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -907,6 +924,10 @@ export class AbapAdtServer extends Server {
         // 事务码元数据只读工具（read.transaction）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.transactionReadHandlers.supports(toolName)) {
           return this.transactionReadHandlers.handle(toolName, limitedArguments);
+        }
+        // 安装前置只读发现工具（install.diagnostics）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.installDiagnosticsHandlers.supports(toolName)) {
+          return this.installDiagnosticsHandlers.handle(toolName, limitedArguments);
         }
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);

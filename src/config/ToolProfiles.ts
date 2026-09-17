@@ -80,7 +80,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 对象间源码对比（crud.compare-source）：双对象当前源码 LCS unified diff
   'compareSourceObjects',
   // 事务码元数据只读（read.transaction）：TSTC/TSTCT 自由 SQL
-  'getTransaction'
+  'getTransaction',
+  // 安装前置只读发现（install.diagnostics）：helper TADIR 探测 + abapGit 可达性
+  'checkInstallPrerequisites'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([
