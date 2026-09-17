@@ -12,7 +12,7 @@
 | VSP（只读对照） | `9886d2727f47506368b0a3c2f1c1766f1200f747` | dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪） |
 | 本项目 | `a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef` | dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等） |
 
-生成日期：2026-09-17；矩阵行数：71。
+生成日期：2026-09-18；矩阵行数：71。
 profile 别名：focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。
 
 ## 状态与证据词汇
@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
-| P1 | 3 | 10 | 6 | 4 | 2 | 0 | 25 |
+| P1 | 3 | 11 | 4 | 4 | 2 | 1 | 25 |
 | P2 | 0 | 10 | 7 | 3 | 5 | 0 | 25 |
-| 合计 | 7 | 35 | 13 | 9 | 7 | 0 | 71 |
+| 合计 | 7 | 36 | 11 | 9 | 7 | 1 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**42/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**43/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -118,7 +118,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `rfc.remote-enabled.call` | 通过 classic RFC 直连调用任意 remote-enabled 函数模块 | SAP(action=rfc, target="<FM>", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT） | GAP | P0 | （无） | （无） | （无） |
 | `rfc.remote-enabled.describe` | 描述 remote-enabled 函数模块接口（JSON Schema） | SAP(action=rfc, target="<FM>", params={op:describe}) | GAP | P0 | （无） | （无） | （无） |
-| `rfc.remote-enabled.discovery` | RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索 | SAP(action=rfc, params={op:info\|ping\|probe\|search}) | PARTIAL | P1 | `inspectSapSystem`、`searchObject`、`packageSearchHelp` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `rfc.remote-enabled.discovery` | RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索 | SAP(action=rfc, params={op:info\|ping\|probe\|search}) | UNVERIFIED | P1 | `inspectSapSystem`、`searchObject`、`packageSearchHelp`、`probeRfcSystem` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `rfc.helper-bridge` | 经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座 | debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座 | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 | `rfc.remote-enabled.read-table` | 经 RFC 直读 DDIC 表（fields/where/top） | SAP(action=rfc, target="<TABLE>", params={op:read_table,fields,where,top}) | PARTIAL | P1 | `tableContents`、`runQuery`、`describeClassicTable` | development, development-workbench, business-readonly, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
@@ -146,7 +146,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `diagnostics.dumps` | 运行时错误（ST22 dump）列表、详情与聚合分析 | SAP(action=analyze, params={type:list_dumps\|get_dump\|group_dumps\|explain_dump\|similar_dumps\|dump_impact}) + focused ListDumps/GetDump | EQUIVALENT | P1 | `readRuntimeDumps`、`analyzeRuntimeErrors`、`groupRuntimeDumps`、`findSimilarDumps` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.application-log` | 读取 BAL 应用日志（SLG1） | SAP(action=analyze, params={type:application_log}) | EQUIVALENT | P1 | `readApplicationLog` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
-| `diagnostics.spool-jobs` | 后台作业清单/日志与 spool 请求读取 | SAP(action=analyze, params={type:spool_list\|spool_read\|job_list\|job_log}) | PARTIAL | P1 | `listSpoolRequests`、`listJobs` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `diagnostics.spool-jobs` | 后台作业清单/日志与 spool 请求读取 | SAP(action=analyze, params={type:spool_list\|spool_read\|job_list\|job_log}) | EQUIVALENT | P1 | `listSpoolRequests`、`listJobs`、`readSpoolContent` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.knowledge-queries` | FM 测试数据、文档、IMG 活动检索等诊断辅助查询 | SAP(action=analyze, params={type:fm_test_data\|documentation\|img_search\|img_activity\|cluster_read}) | PARTIAL | P2 | `getAbapDocumentation`、`searchImgActivities` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.traces` | ABAP profiler/性能跟踪文件列表与命中分析 | SAP(action=analyze, params={type:list_traces\|get_trace}) + focused ListTraces/GetTrace | EQUIVALENT | P1 | `tracesList`、`tracesListRequests`、`tracesHitList`、`tracesStatements`、`tracesDbAccess` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.sql-trace` | SQL 跟踪（ST05）状态与记录读取 | SAP(action=analyze, params={type:sql_trace_state\|list_sql_traces}) + focused GetSQLTraceState/ListSQLTraces | EQUIVALENT | P1 | `tracesDbAccess`、`tracesStatements` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |

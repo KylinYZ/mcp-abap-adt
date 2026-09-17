@@ -29,7 +29,9 @@ export type RfcErrorCode =
   /** 目标 FM 不在只读 allowlist 内，调用被门控拒绝。 */
   | 'RF_CALL_NOT_ALLOWED'
   /** 连接池状态错误（例如释放一个不属于池的连接条目）。 */
-  | 'RFC_POOL_STATE';
+  | 'RFC_POOL_STATE'
+  /** FM 侧 RAISE 的 ABAP 异常（非传输故障：连接保留，不触发池剔除）。 */
+  | 'RFC_ABAP_EXCEPTION';
 
 /** RFC 错误携带的附加结构化信息（如出错字段名、FM 名、拒绝原因等）。 */
 export type RfcErrorDetails = Readonly<Record<string, unknown>>;

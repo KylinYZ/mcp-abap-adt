@@ -66,7 +66,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // UI5/Fiori BSP 只读三工具（ui5.read）：filestore 列表/文件树/文件内容
   'ui5ListApps', 'ui5GetApp', 'ui5GetFileContent',
   // SPOOL/后台作业只读二工具（diagnostics.spool-jobs 只读子集）：自由 SQL 查询
-  'listSpoolRequests', 'listJobs',
+  'listSpoolRequests', 'listJobs', 'readSpoolContent',
   // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET
   'getMessages',
   // 版本源码只读工具（revisions.source）：按版本标签/序号读取历史版本源码
@@ -85,7 +85,10 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'checkInstallPrerequisites',
   // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL 文档 +
   // IMG 检索
-  'getAbapDocumentation', 'searchImgActivities'
+  'getAbapDocumentation', 'searchImgActivities',
+  // RFC 探测（rfc.remote-enabled.discovery 直链）：SOAP-RFC 上的 RFC_PING +
+  // RFC_SYSTEM_INFO 系统指纹
+  'probeRfcSystem'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

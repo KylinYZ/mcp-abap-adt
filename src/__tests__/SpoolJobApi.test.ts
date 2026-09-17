@@ -2,7 +2,8 @@ import {
   listSpoolRequests,
   listJobs,
   bindSpoolJobQueryRunner,
-  createSpoolJobClient
+  createSpoolJobClient,
+  readSpoolContent,
 } from '../adt/SpoolJobApi.js';
 import { normalizeRepositoryName } from '../adt/CrossReferenceApi.js';
 import type { SpoolJobRow, SpoolJobQueryRunner } from '../adt/SpoolJobApi.js';
@@ -25,6 +26,7 @@ function runnerRouter(routes: {
   tst01?: SpoolJobRow[];
   tbtcp?: SpoolJobRow[];
   tbtco?: SpoolJobRow[];
+  tst03?: SpoolJobRow[];
 }): SpoolJobQueryRunner & { calls: Array<{ sql: string; limit: number }> } {
   const calls: Array<{ sql: string; limit: number }> = [];
   const run = jest.fn(async (sql: string, limit: number) => {
@@ -33,6 +35,7 @@ function runnerRouter(routes: {
     let rows: SpoolJobRow[] | undefined;
     if (lower.includes('from tsp01')) rows = routes.tsp01;
     else if (lower.includes('from tst01')) rows = routes.tst01;
+    else if (lower.includes('from tst03')) rows = routes.tst03;
     else if (lower.includes('from tbtcp')) rows = routes.tbtcp;
     else if (lower.includes('from tbtco')) rows = routes.tbtco;
     if (!rows) throw new Error(`unexpected sql in test: ${sql}`);
@@ -253,5 +256,66 @@ describe('binding and guards', () => {
   it('keeps the repository-name guard in place for name inputs', () => {
     expect(() => normalizeRepositoryName("A';--", 'x')).toThrow();
     expect(normalizeRepositoryName('NIGHTJOB', 'x')).toBe('NIGHTJOB');
+  });
+});
+
+
+describe('readSpoolContent (spool_read; closes the PARTIAL content gap)', () => {
+  const TSP01_ONE = {
+    RQIDENT: '77', RQCLIENT: '300', RQOWNER: 'DEVUSER', RQCRETIME: '20260917030000000000',
+    RQTITLE: 'Job list output', RQ0NAME: 'LOCL', RQ1NAME: '', RQ2NAME: 'ZPROG_STEP',
+    RQDOCTYPE: 'LIST', RQDEST: 'LOCL', RQCOPIES: '1', RQPJREQ: '', RQO1NAME: 'TEMSE77'
+  };
+  const TST01_ONE = { DNAME: 'TEMSE77', DSTOTYP: 'D', DROWS: '1', DSIZE: '10', DCHARCOD: '4110' };
+  // "HELLO" 的 UTF-16LE 字节 hex（码页 4110/4103 = UTF-16，真机即此编码）
+  const TST03_ONE = { DPART: '1', DROWNO: '1', DDATALEN: '10', DCONTENT: '480045004C004C004F00' };
+
+  it('decodes text-like LIST content with the aligned query chain', async () => {
+    const runner = runnerRouter({ tsp01: [TSP01_ONE], tst01: [TST01_ONE], tst03: [TST03_ONE] });
+    const result = await readSpoolContent(runner, 77);
+
+    // 查询链：tsp01 单条 → tst01 头 → tst03 内容（dpart/drowno 排序，对齐 VSP 第 258 行）
+    expect(runner.calls.map(c => /FROM (tsp01|tst01|tst03)/.exec(c.sql)![1])).toEqual(['tsp01', 'tst01', 'tst03']);
+    expect(runner.calls.find(c => /FROM tst03/.test(c.sql))!.sql).toContain('ORDER BY dpart, drowno');
+    // 请求条目复用清单口径（含 tst01 头富化字段）
+    expect(result.request).toMatchObject({ number: 77, owner: 'DEVUSER', docType: 'LIST', temse: 'TEMSE77' });
+    expect(result.contentType).toBe('LIST');
+    expect(result.text).toBe('HELLO');
+    expect(result.rawNote).toBeUndefined();
+  });
+
+  it('returns a raw note for binary/OTF documents instead of decoded content', async () => {
+    const runner = runnerRouter({
+      tsp01: [{ ...TSP01_ONE, RQDOCTYPE: 'OTF' }], tst01: [TST01_ONE], tst03: [TST03_ONE]
+    });
+    const result = await readSpoolContent(runner, 77);
+    expect(result.text).toBeUndefined();
+    expect(result.rawNote).toMatch(/binary\/OTF/);
+    expect(result.rawNote).toContain('5');
+  });
+
+  it('falls back to latin-1 decoding for non-UTF16 code pages', async () => {
+    const latin = runnerRouter({
+      tsp01: [TSP01_ONE],
+      tst01: [{ ...TST01_ONE, DCHARCOD: '1103' }],
+      tst03: [{ DPART: '1', DROWNO: '1', DDATALEN: '5', DCONTENT: '48454C4C4F' }]
+    });
+    const result = await readSpoolContent(latin, 77);
+    expect(result.text).toBe('HELLO');
+  });
+
+  it('rejects unknown spool numbers and invalid inputs', async () => {
+    const runner = runnerRouter({ tsp01: [] });
+    await expect(readSpoolContent(runner, 404)).rejects.toThrow(/does not exist/);
+    await expect(readSpoolContent(runner, 0)).rejects.toThrow(/positive/);
+    await expect(readSpoolContent(runner, 1.5)).rejects.toThrow(/positive/);
+  });
+
+  it('exposes readSpoolContent on the bound client', async () => {
+    const runner = runnerRouter({ tsp01: [TSP01_ONE], tst01: [TST01_ONE], tst03: [TST03_ONE] });
+    const client = createSpoolJobClient(runner);
+    const result = await client.readSpoolContent(77);
+    expect(result.request.number).toBe(77);
+    expect(result.text).toBe('HELLO');
   });
 });

@@ -217,3 +217,13 @@
 - git.abapgit 行 restrictionReason 补真机实测：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装，checkInstallPrerequisites 实测），前置现状可经该工具只读发现。
 - analysis.history 行 restrictionReason 补真机实测：E071/E070 datapreview 数据读取一律 Internal server error（表结构可查），cr_history 的自由 SQL 通道在该 DEV 不可用；VSP 同走 E071/E070 亦受同等限制。
 - 校验与推送：matrix --check 通过；commit + 代理推送。
+
+## 2026-09-18 闲时轮：spool-jobs 补齐内容读取——晋级 EQUIVALENT
+
+- 状态甄别：起跑时发现矩阵已被第十九+轮推进（spool-jobs 只读子集已真机验证记 PARTIAL，剩余差距为 spool 内容读取）；本轮撤销了与既有 SpoolJobApi 重叠的重复实现（新建三文件未接线即删，零污染），改为在既有模块上追加第三个工具 `readSpoolContent`（tsp01→tst01 头→tst03 内容 hex 解码；按 dcharcod 4103/4110 UTF-16LE 与 latin-1 分支解码并清理 ABAP list 控制字节；OTF/二进制返回 raw 说明）。handler/绑定/清单映射全口径复用，新增 5 个 mock 用例（合计 27）。
+- 真机缺陷修复：① quoteLiteral 已含引号导致双重包裹（datapreview "after ''" 解析错）；② 该 DEV spool 内容为 UTF-16LE（dcharcod=4103），latin-1 近似乱码——两处均已修复并以双码页 mock 覆盖。
+- 真机结果：readSpoolContent 对真实请求 #23674 取回 568 字符可读 LIST 内容（真实报表标题/日期/结构线）；listSpoolRequests 复验 10 条真实请求。
+- 本地门禁全绿：Jest 150 suites / 1414 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：diagnostics.spool-jobs PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状：MCP_SUPERSET=7、EQUIVALENT=36、PARTIAL=12、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 43/71。profile 计数：dev=162、workbench=129、diag=131、full=194、ops=46。证据：docs/evidence/spool-content-real-dev-verified.md。
+- 遗留：job_log（RFC/XBP 方向，RESTRICTION）；OTF/二进制解码与 ABAP list 精确排版还原（VSP 亦有差异）；readRuntimeDumps 服务端 runtimeError 过滤缺陷（轮四遗留）。
+- 下一轮起点建议：P1 剩余中 debug.amdp-adt（amdp-discovery-spike，ADT 原路径 discovery）；P2 可做 read.transaction（TSTC/TSTCT 只读查询，与 applog/spool 同模式）。

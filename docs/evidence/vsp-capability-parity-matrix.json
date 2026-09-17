@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-17",
+  "generatedAt": "2026-09-18",
   "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
   "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
   "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
@@ -1398,11 +1398,12 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "UNVERIFIED",
         "taskPath": [
           "inspectSapSystem",
           "searchObject",
-          "packageSearchHelp"
+          "packageSearchHelp",
+          "probeRfcSystem"
         ],
         "profiles": [
           "development",
@@ -1415,14 +1416,15 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "系统信息与函数模块发现可经 ADT 部分覆盖；无 RFC 协议级 ping/info/probe 探测（open-rfc 提供 RFC_PING/RFC_SYSTEM_INFO 调用面，属 rfc-transport-spike 阶段 1 接入范围）。",
-        "liftCondition": "rfc-transport-spike 以 open-rfc 为传输基座接入协议探测（RFC_PING/RFC_SYSTEM_INFO）后补齐；前置同 rfc.remote-enabled.call（Node 引擎兼容评估）。"
+        "restrictionReason": "rfc 直链探测已实施 probeRfcSystem（open-rfc 纯 TS 客户端，与 VSP open-rfc-go 同源同协议；通道实测 2026-09-18 RFC_PING 成功）：SOAP-RFC 桥 /sap/bc/soap/rfc 上 RFC_PING 连通性 + RFC_SYSTEM_INFO 系统指纹（sysid/release/kernel/host/codepage）。协议层安全链路全量生效：allowlist 只读门控（白名单外 RF_CALL_NOT_ALLOWED）→ invokeFmCall 超时/取消 → OpenRfcTransport（连接池可挂）。RFC_SIMULATE_AUTH_CHECK 授权模拟探测尚未纳入（notes 标注）。真机端到端验证未跑，暂不晋级。",
+        "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation"
       ],
-      "nextMilestone": ""
+      "nextMilestone": "rfc-probe-real-dev-smoke"
     },
     {
       "id": "rfc.helper-bridge",
@@ -1851,10 +1853,11 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "EQUIVALENT",
         "taskPath": [
           "listSpoolRequests",
-          "listJobs"
+          "listJobs",
+          "readSpoolContent"
         ],
         "profiles": [
           "development",
@@ -1867,7 +1870,7 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "只读 SQL 子集已实施并经真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/spool-jobs-real-dev-verified.md）：listJobs 近 7 天 50 个作业（状态释义、起止时间、步骤增补含程序/变体/spool 号）；listSpoolRequests 50 个请求（TST01 头增补 storage=D/码页 4103/行数/字节 + TBTCP 作业引用）；交叉印证通过；注入负例参数层拒绝。已知边界（随结果 notes 返回，故记 PARTIAL 而非 EQUIVALENT）：spool 内容读取（TST03/TemSe 解码）与作业日志（VSP 走 RFC/XBP，属 rfc-transport-spike 开放 RFC 方向后的接入范围）不在子集内；另发现并适配该 DEV datapreview 缺陷——tbtco/tbtcp 的 WHERE+ORDER BY 组合确定性报解析错（'DES' is not allowed here），回退为 WHERE-only + 客户端排序并在 notes 标注（tsp01 正常不受影响）。",
+        "restrictionReason": "清单与内容读取全链路真机验证（2026-09-18）：listJobs/listSpoolRequests（2026-09-17 验证）+ readSpoolContent（tsp01→tst01 头→tst03 内容，按 dcharcod 4103/4110 UTF-16LE 与 latin-1 分支解码，ABAP list 控制字节清理后输出可读文本，LIST 类真机取回 568 字符可读内容）；非文本类（OTF/PDF）返回 raw 说明不解码、VSP 的完整 ABAP list 排版还原器与 job_log（RFC/XBP）仍属差异方向。",
         "liftCondition": "spool 内容读取（TemSe/TST03 解码）与作业日志读取（需 RFC/XBP，随 rfc-transport-spike 以 open-rfc 基座落地后接入）补齐后可评估 EQUIVALENT。"
       },
       "priority": "P1",

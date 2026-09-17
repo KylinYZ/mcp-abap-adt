@@ -43,7 +43,7 @@ type SpoolJobToolDefinition = ToolDefinition & {
 };
 
 /** 本处理器认领的工具名。 */
-const SPOOL_JOB_TOOL_NAMES = new Set(['listSpoolRequests', 'listJobs']);
+const SPOOL_JOB_TOOL_NAMES = new Set(['listSpoolRequests', 'listJobs', 'readSpoolContent']);
 
 /** 日期参数长度上限（YYYY-MM-DD 为 10，容许 YYYYMMDD 为 8）。 */
 const DATE_MAX_LENGTH = 10;
@@ -112,6 +112,20 @@ export class SpoolJobHandlers {
           }
         },
         ...readOnly
+      },
+      {
+        name: 'readSpoolContent',
+        description:
+          "Read one spool request's TemSe header (TST01) and content (TST03): text-like documents (LIST/TEXT) are returned as text; binary/OTF documents return a raw note instead of decoded content. Read-only.",
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            requestNumber: { type: 'number', description: 'Spool request number (RQIDENT).', minimum: 1 }
+          },
+          required: ['requestNumber']
+        },
+        ...readOnly
       }
     ];
   }
@@ -126,6 +140,14 @@ export class SpoolJobHandlers {
           return success(await this.spoolJob.listSpoolRequests(this.filterArgs(toolName, argumentsValue)));
         case 'listJobs':
           return success(await this.spoolJob.listJobs(this.filterArgs(toolName, argumentsValue)));
+        case 'readSpoolContent': {
+          // spool 编号为必填正整数；校验留在进入客户端之前
+          const requestNumber = Number(argumentsValue.requestNumber)
+          if (!Number.isInteger(requestNumber) || requestNumber <= 0) {
+            throw new McpError(ErrorCode.InvalidParams, 'readSpoolContent requires a positive requestNumber (RQIDENT).')
+          }
+          return success(await this.spoolJob.readSpoolContent(requestNumber))
+        }
         default:
           throw new McpError(ErrorCode.MethodNotFound, `Unknown spool/job tool: ${toolName}`);
       }

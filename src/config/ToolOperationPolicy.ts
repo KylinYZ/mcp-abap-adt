@@ -98,9 +98,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // UI5/Fiori BSP 只读三工具（矩阵 ui5.read 行）：filestore 列表/文件树/文件内容，
   // 仅三个 GET 端点；ui5.write 方向维持缺口不开放
   'ui5ListApps', 'ui5GetApp', 'ui5GetFileContent',
-  // SPOOL/后台作业只读二工具（矩阵 diagnostics.spool-jobs 只读子集）：自由 SQL
-  // 查询 TSP01/TST01/TBTCP/TBTCO；作业日志（RFC/XBP）与 spool 内容读取不在内
-  'listSpoolRequests', 'listJobs',
+  // SPOOL/后台作业只读工具（矩阵 diagnostics.spool-jobs）：自由 SQL
+  // 查询 TSP01/TST01/TBTCP/TBTCO/TST03；作业日志（RFC/XBP）不在内
+  'listSpoolRequests', 'listJobs', 'readSpoolContent',
   // 消息类文本只读工具（矩阵 read.message-class-texts 行）：messageclass 资源
   // GET，可选 sap-language 语言覆盖；文本写入方向（i18n.write）不开放
   'getMessages',
@@ -127,7 +127,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'checkInstallPrerequisites',
   // 知识查询只读二工具（矩阵 diagnostics.knowledge-queries 行子集）：
   // DOKIL/DOKTL 文档读取 + IMG 活动检索；fm_test_data/cluster_read 不在子集
-  'getAbapDocumentation', 'searchImgActivities'
+  'getAbapDocumentation', 'searchImgActivities',
+  // RFC 探测（rfc.remote-enabled.discovery 直链）：无副作用系统 RFM
+  'probeRfcSystem'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

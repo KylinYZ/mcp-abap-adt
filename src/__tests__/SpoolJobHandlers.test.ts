@@ -11,15 +11,16 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 function clientMock(): SpoolJobClient {
   return {
     listSpoolRequests: jest.fn(async () => ({ requests: [], count: 0, notes: ['note'] })),
-    listJobs: jest.fn(async () => ({ jobs: [], count: 0, notes: ['note'] }))
+    listJobs: jest.fn(async () => ({ jobs: [], count: 0, notes: ['note'] })),
+    readSpoolContent: jest.fn(async () => ({ request: { number: 1 }, contentType: 'LIST', text: 'ok' }))
   };
 }
 
 describe('SpoolJobHandlers tool catalog', () => {
-  it('publishes two uniquely named read-only tools', () => {
+  it('publishes three uniquely named read-only tools', () => {
     const handlers = new SpoolJobHandlers(clientMock());
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['listSpoolRequests', 'listJobs']);
+    expect(tools.map(t => t.name)).toEqual(['listSpoolRequests', 'listJobs', 'readSpoolContent']);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true

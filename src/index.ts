@@ -128,6 +128,7 @@ import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
 import { createTransactionReadClient } from './adt/TransactionReadApi.js';
 import { createInstallDiagnosticsClient } from './adt/InstallDiagnosticsApi.js';
 import { createKnowledgeQueriesClient } from './adt/KnowledgeQueriesApi.js';
+import { RfcProbeHandlers } from './handlers/RfcProbeHandlers.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
 import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
@@ -193,6 +194,7 @@ export class AbapAdtServer extends Server {
   private transactionReadHandlers: TransactionReadHandlers;
   private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
   private knowledgeQueriesHandlers: KnowledgeQueriesHandlers;
+  private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
@@ -387,6 +389,21 @@ export class AbapAdtServer extends Server {
     // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
     // 文档 + IMG 自定义活动/文件夹检索，自由 SQL 只读。
     this.knowledgeQueriesHandlers = new KnowledgeQueriesHandlers(createKnowledgeQueriesClient(readClient));
+    // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：open-rfc 直连
+    // SAP 网关（node:net，无 SDK），连接参数由既有 ADT 环境推导（主机/
+    // client/凭据同源，实例号经 RFC_SYSNR 覆盖，缺省 '01' 与专用 DEV
+    // .vsp.json rfc_sysnr 实测一致）。
+    const rfcTargetHost = new URL(process.env.SAP_URL as string).hostname;
+    this.rfcProbeHandlers = new RfcProbeHandlers(
+      {
+        host: rfcTargetHost,
+        client: (process.env.SAP_CLIENT ?? '001').padStart(3, '0'),
+        user: process.env.SAP_USER ?? '',
+        password: sapPassword,
+        language: (process.env.SAP_LANGUAGE ?? 'EN').slice(0, 2),
+        sysnr: process.env.RFC_SYSNR
+      }
+    );
     // SM21 is read-only; it follows the stateless read rollout switch when enabled.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
@@ -772,7 +789,8 @@ export class AbapAdtServer extends Server {
       ...this.boundaryCheckHandlers.getTools(),
       ...this.transactionReadHandlers.getTools(),
       ...this.installDiagnosticsHandlers.getTools(),
-      ...this.knowledgeQueriesHandlers.getTools()
+      ...this.knowledgeQueriesHandlers.getTools(),
+      ...this.rfcProbeHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -939,6 +957,10 @@ export class AbapAdtServer extends Server {
         // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.knowledgeQueriesHandlers.supports(toolName)) {
           return this.knowledgeQueriesHandlers.handle(toolName, limitedArguments);
+        }
+        // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.rfcProbeHandlers.supports(toolName)) {
+          return this.rfcProbeHandlers.handle(toolName, limitedArguments);
         }
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);
