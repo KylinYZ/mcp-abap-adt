@@ -125,6 +125,7 @@ import { createMessageClassReadClient } from './adt/MessageClassReadApi.js';
 import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
 import { createI18nReadClient } from './adt/I18nReadApi.js';
 import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
+import { createTransactionReadClient } from './adt/TransactionReadApi.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
 import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
@@ -136,6 +137,7 @@ import { MessageClassReadHandlers } from './handlers/MessageClassReadHandlers.js
 import { RevisionSourceHandlers } from './handlers/RevisionSourceHandlers.js';
 import { I18nReadHandlers } from './handlers/I18nReadHandlers.js';
 import { BoundaryCheckHandlers } from './handlers/BoundaryCheckHandlers.js';
+import { TransactionReadHandlers } from './handlers/TransactionReadHandlers.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
@@ -184,6 +186,7 @@ export class AbapAdtServer extends Server {
   private revisionSourceHandlers: RevisionSourceHandlers;
   private i18nReadHandlers: I18nReadHandlers;
   private boundaryCheckHandlers: BoundaryCheckHandlers;
+  private transactionReadHandlers: TransactionReadHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
@@ -359,6 +362,9 @@ export class AbapAdtServer extends Server {
     // 包边界只读检查工具（analysis.boundaries 只读子集）：TADIR 枚举 + 源码
     // 依赖提取 + TADIR 目标包反查，全部只读 SQL/GET。
     this.boundaryCheckHandlers = new BoundaryCheckHandlers(createBoundaryCheckClient(readClient));
+    // 事务码元数据只读工具（read.transaction）：TSTC/TSTCT 自由 SQL（该 DEV 的
+    // vit/wb TRAN 端点无映射，VSP 同源受限）。
+    this.transactionReadHandlers = new TransactionReadHandlers(createTransactionReadClient(readClient));
     // SM21 is read-only; it follows the stateless read rollout switch when enabled.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
@@ -741,7 +747,8 @@ export class AbapAdtServer extends Server {
       ...this.messageClassReadHandlers.getTools(),
       ...this.revisionSourceHandlers.getTools(),
       ...this.i18nReadHandlers.getTools(),
-      ...this.boundaryCheckHandlers.getTools()
+      ...this.boundaryCheckHandlers.getTools(),
+      ...this.transactionReadHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -896,6 +903,10 @@ export class AbapAdtServer extends Server {
         // 包边界只读检查工具（analysis.boundaries）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.boundaryCheckHandlers.supports(toolName)) {
           return this.boundaryCheckHandlers.handle(toolName, limitedArguments);
+        }
+        // 事务码元数据只读工具（read.transaction）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.transactionReadHandlers.supports(toolName)) {
+          return this.transactionReadHandlers.handle(toolName, limitedArguments);
         }
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);

@@ -174,3 +174,14 @@
 - 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=157、diagnostic-readonly=126、legacy-full=189、workbench=124、operations=46）。
 - 新增协作规则（所有者本轮指示）：每轮完成后 git commit + push；网络不通走本地代理 127.0.0.1:7890。本轮起执行首次提交推送。
 - 遗留：无系统残留。剩余可做项：analysis.history（co-change 等只读分析）、install.diagnostics（helper 前置只读检查）、read.transaction（事务码元数据）、analysis.lint（需 abaplint 引擎）等 P2；P1 git.abapgit/AMDP 受环境前置约束。
+
+## 2026-09-17 闲时轮（十四）：read.transaction 晋级 PARTIAL——事务码元数据只读工具（描述通道环境受限）
+
+- 本轮工作（预筛指定项）：read.transaction 落地为只读工具 `getTransaction`（挂 TransactionReadHandlers）——TSTC（事务码→承载程序 PGMNA）+ TSTCT（按语言 SPRSL 取描述 TTEXT）两条自由 SQL。VSP client.go GetTransaction L1384-1412 的任务语义移植；通道差异经真机实测确认。
+- 真机实测发现（探针逐层定位）：① VSP 的 ADT vit/wb TRAN 端点在该 DEV 无 TRAN 映射（"No URI-Mapping defined"，SE38/SM37 双探针）；② 替代通道 TSTCT 的 datapreview 数据读取一律 Internal server error（无 WHERE/各种 WHERE 全形态，表结构 describe 正常）——环境级数据预览限制。
+- 适配：TSTCT 描述查询容错为"缺失 + note 标注"（不让它拖垮 program 主语义）；"事务码不存在"按 InvalidParams 透出。矩阵如实记 PARTIAL（描述要素在目标环境不可得），liftCondition 写明解除条件。
+- 本地门禁全绿：Jest 145 suites / 1383 tests、build、coverage、parity、diff --check；本能力新增 14 例单测（API 7 + Handlers 7，含 TSTCT 失败容错降级）。
+- 真机验证（scripts/transaction-read-real-dev-smoke.mjs，全程只读 SELECT）：SE38 → 程序 RSABAPPROGRAM 正确；描述缺失 + note 标注 TSTCT 受限；DE 同样受限；ZZZZ9 不存在 → InvalidParams 含 TSTC 提示；注入负例参数层拒绝。SMOKE OK。
+- 矩阵：read.transaction GAP → PARTIAL（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=34、PARTIAL=13、GAP=11、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 41/71。证据：docs/evidence/transaction-read-real-dev-verified.md。
+- 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=158、diagnostic-readonly=127、legacy-full=190、workbench=125、operations=47）+ AGENTS.md 基线（145/1383）。
+- 遗留：无系统残留。剩余可做项：analysis.history（co-change 等只读分析）、install.diagnostics（helper 前置只读检查）、analysis.lint（需 abaplint 引擎）等 P2；P1 git.abapgit/AMDP 受环境前置约束。

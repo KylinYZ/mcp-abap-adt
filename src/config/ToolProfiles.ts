@@ -78,7 +78,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 包边界只读检查工具（analysis.boundaries 只读子集）：TADIR 枚举 + 依赖提取
   'checkPackageBoundaries',
   // 对象间源码对比（crud.compare-source）：双对象当前源码 LCS unified diff
-  'compareSourceObjects'
+  'compareSourceObjects',
+  // 事务码元数据只读（read.transaction）：TSTC/TSTCT 自由 SQL
+  'getTransaction'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

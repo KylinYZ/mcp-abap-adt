@@ -392,17 +392,31 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
+        "status": "PARTIAL",
+        "taskPath": [
+          "getTransaction"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench",
+          "diagnostic-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "getTransaction 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/transaction-read-real-dev-verified.md）：SE38 → 程序 RSABAPPROGRAM 正确返回；描述通道受环境级限制——VSP 的 vit/wb TRAN 端点在该 DEV 无映射，替代通道 TSTCT 的 datapreview 数据读取也一律 Internal server error（表结构可 describe），因此描述容错为缺失 + note 标注（记 PARTIAL 的原因）；不存在事务码/非法名字/非法语言键参数层拒绝。liftCondition：TSTCT 预览限制解除或找到替代描述通道后可评估 EQUIVALENT。",
         "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
+      "liftCondition": "TSTCT datapreview 限制解除或找到替代描述通道（如 ADT 短文本端点）后评估 EQUIVALENT。",
       "nextMilestone": ""
     },
     {

@@ -118,7 +118,10 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'checkPackageBoundaries',
   // 对象间源码对比（矩阵 crud.compare-source 行）：双对象当前源码 LCS unified
   // diff；源 URL 服务端解析，不接受任意 URL
-  'compareSourceObjects'
+  'compareSourceObjects',
+  // 事务码元数据只读（矩阵 read.transaction 行）：TSTC/TSTCT 自由 SQL
+  //（vit/wb TRAN 端点在该 DEV 无映射）；事务码运行不在此列
+  'getTransaction'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

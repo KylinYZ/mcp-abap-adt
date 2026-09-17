@@ -32,8 +32,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
 | P1 | 3 | 10 | 6 | 4 | 2 | 0 | 25 |
-| P2 | 0 | 9 | 6 | 6 | 4 | 0 | 25 |
-| 合计 | 7 | 34 | 12 | 12 | 6 | 0 | 71 |
+| P2 | 0 | 9 | 7 | 5 | 4 | 0 | 25 |
+| 合计 | 7 | 34 | 13 | 11 | 6 | 0 | 71 |
 
 计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**41/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
@@ -63,7 +63,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `read.table-contents` | 读取透明表数据内容与即席 OpenSQL 查询 | SAP(action=read, target="TABL_CONTENTS ...") + focused GetTable/GetTableContents/RunQuery | EQUIVALENT | P0 | `describeClassicTable`、`tableContents`、`runQuery` | development, development-workbench, business-readonly, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.cds-analysis` | 读取 CDS 依赖树、反向影响分析与元素元数据 | SAP(action=read, target="CDS_DEPS\|CDS_IMPACT\|CDS_ELEMENTS ...") + focused GetCDSDependencies/GetCDSImpactAnalysis/GetCDSElementInfo | EQUIVALENT | P1 | `getCdsDependencies`、`getCdsImpactAnalysis`、`getCdsElementInfo` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.coverage` | 运行单元测试并读取行级代码覆盖率 | SAP(action=read, target="COVERAGE ...") + focused GetCodeCoverage | EQUIVALENT | P1 | `runUnitCoverage` | development-workbench, legacy-full | DEV |
-| `read.transaction` | 读取事务码元数据 | SAP(action=read, target="TRAN ...") | GAP | P2 | （无） | （无） | （无） |
+| `read.transaction` | 读取事务码元数据 | SAP(action=read, target="TRAN ...") | PARTIAL | P2 | `getTransaction` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.message-class-texts` | 读取消息类文本（SE91）与 MSAG 对象内容 | SAP(action=read, target="MSAG ...") + focused GetMessages | EQUIVALENT | P2 | `getMessages` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
 ### search
