@@ -63,12 +63,13 @@ describe('RfcProbeHandlers tool catalog', () => {
 describe('RfcProbeHandlers dispatch (allowlist-gated)', () => {
   it('merges ping and system info into one report', async () => {
     const adapter = adapterMock({
-      RFC_PING: { pong: true },
+      RFC_PING: {},
       RFC_SYSTEM_INFO: { SYSID: 'S4H', RFCRELEASE: '816' }
     });
     const handlers = handlerWith(adapter);
     const result = await handlers.handle('probeRfcSystem', {});
     const body = result.structuredContent.result;
+    // RFC_PING 无输出参数：调用成功即 pong=true（显式置位）
     expect(body.ping.pong).toBe(true);
     expect(body.systemInfo.SYSID).toBe('S4H');
     expect(body.systemInfo.RFCRELEASE).toBe('816');

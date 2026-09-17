@@ -1,4 +1,4 @@
-import { Client, type RfcClientOptions } from 'open-rfc';
+import { Client, languageIsoToSap, type RfcClientOptions } from 'open-rfc';
 
 import { FmCallResult } from './call';
 import { RfcError, RfcTransportError } from './errors';
@@ -65,7 +65,10 @@ export class OpenRfcTransport implements TransportAdapter {
         client: normalized.client,
         user: normalized.user,
         passwd: normalized.password,
-        lang: normalized.language
+        // RFC 会话语言固定 E：仅影响 RFM 返回的消息文本语言。中文简体内部码
+        // 为数字 1，会被 open-rfc 的单字母校验拒绝（库限制），且语言会话与
+        // 工作语言解耦是 RFC 生态通用做法
+        lang: 'E'
       },
       clientOptions
     );

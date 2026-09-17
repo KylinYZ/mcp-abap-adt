@@ -142,7 +142,9 @@ export class RfcProbeHandlers {
       if (toolName === 'probeRfcSystem') {
         let ping: Record<string, unknown>;
         try {
-          ping = await this.invokeWhitelisted('RFC_PING');
+          await this.invokeWhitelisted('RFC_PING');
+          // RFC_PING 无输出参数：调用成功本身即连通证明
+          ping = { pong: true, detail: 'RFC_PING succeeded over the direct RFC link' };
         } catch (error) {
           ping = { pong: false, detail: error instanceof Error ? error.message.slice(0, 200) : String(error) };
         }

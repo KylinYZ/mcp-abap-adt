@@ -227,3 +227,13 @@
 - 矩阵：diagnostics.spool-jobs PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状：MCP_SUPERSET=7、EQUIVALENT=36、PARTIAL=12、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 43/71。profile 计数：dev=162、workbench=129、diag=131、full=194、ops=46。证据：docs/evidence/spool-content-real-dev-verified.md。
 - 遗留：job_log（RFC/XBP 方向，RESTRICTION）；OTF/二进制解码与 ABAP list 精确排版还原（VSP 亦有差异）；readRuntimeDumps 服务端 runtimeError 过滤缺陷（轮四遗留）。
 - 下一轮起点建议：P1 剩余中 debug.amdp-adt（amdp-discovery-spike，ADT 原路径 discovery）；P2 可做 read.transaction（TSTC/TSTCT 只读查询，与 applog/spool 同模式）。
+
+## 2026-09-18 轮（十九）：rfc.remote-enabled.discovery 晋级 EQUIVALENT——RFC 直链探测工具（所有者放开 RFC/helper 方向）
+
+- 所有者决策：放开 RFC/helper 方向（此前为排除项），并确认 open-rfc-go 直连已验证可用（专用 DEV rfc_sysnr=01）。
+- 本轮工作：RFC 直链探测落地——npm 引入 `open-rfc@0.2.3`（所有者维护的纯 TS classic RFC 客户端，与 VSP open-rfc-go 同源同协议，无 NW RFC SDK 依赖），`src/rfc/open-rfc-transport.ts` 适配为 TransportAdapter（ABAP 异常 RFC_ABAP_EXCEPTION 与传输故障分离，池剔除只认后者），`probeRfcSystem` 工具经 allowlist 门控 + invokeFmCall 超时链调用 RFC_PING + RFC_SYSTEM_INFO。
+- 通道侦察：经典 RFC 网关 3200/3300 ECONNREFUSED（容器仅暴露 8001 HTTP）；RFC 直链实测 host=10.30.254.48 sysnr=01（.vsp.json rfc_sysnr）。
+- 真机验证（scripts/rfc-probe-real-dev-smoke.mjs，全程只读系统 RFM）：RFC_PING 连通；RFC_SYSTEM_INFO 全量指纹（sysid=S4H release=816 host=sapides dbsys=HDB ip=10.30.254.48 kernel=916 inst=01）。SMOKE OK。
+- 矩阵：rfc.remote-enabled.discovery PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=37、PARTIAL=11、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 44/71。证据：docs/evidence/rfc-probe-real-dev-verified.md。
+- 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=164、diagnostic-readonly=133、legacy-full=196、workbench=131、operations=48）+ AGENTS.md 基线（149/1435）。
+- 遗留：无系统残留。下轮候选：rfc.remote-enabled.call/read-table（open-rfc 底座已通，callRfm 泛化 + RFC_READ_TABLE 白名单内表读取）、RFC_SIMULATE_AUTH_CHECK 授权探测（open-rfc 支持）。

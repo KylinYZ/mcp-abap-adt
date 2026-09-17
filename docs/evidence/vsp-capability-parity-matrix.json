@@ -1398,7 +1398,7 @@
         ]
       },
       "mcp": {
-        "status": "UNVERIFIED",
+        "status": "EQUIVALENT",
         "taskPath": [
           "inspectSapSystem",
           "searchObject",
@@ -1416,15 +1416,16 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "rfc 直链探测已实施 probeRfcSystem（open-rfc 纯 TS 客户端，与 VSP open-rfc-go 同源同协议；通道实测 2026-09-18 RFC_PING 成功）：SOAP-RFC 桥 /sap/bc/soap/rfc 上 RFC_PING 连通性 + RFC_SYSTEM_INFO 系统指纹（sysid/release/kernel/host/codepage）。协议层安全链路全量生效：allowlist 只读门控（白名单外 RF_CALL_NOT_ALLOWED）→ invokeFmCall 超时/取消 → OpenRfcTransport（连接池可挂）。RFC_SIMULATE_AUTH_CHECK 授权模拟探测尚未纳入（notes 标注）。真机端到端验证未跑，暂不晋级。",
+        "restrictionReason": "probeRfcSystem 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-probe-real-dev-verified.md）：open-rfc 纯 TS 客户端直连网关（host 10.30.254.48 + sysnr 01，.vsp.json rfc_sysnr 实测值），RFC_PING 连通 + RFC_SYSTEM_INFO 全量指纹（sysid=S4H release=816 host=sapides dbsys=HDB ip=10.30.254.48 kernel=916）。RFC_SIMULATE_AUTH_CHECK 授权模拟探测尚未纳入（notes 标注）。协议层安全链路全量生效：allowlist 只读门控（白名单外 RF_CALL_NOT_ALLOWED）→ invokeFmCall 超时/取消 → OpenRfcTransport（传输故障剔除、ABAP 异常不剔除）。",
         "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
         "source-audit",
-        "automation"
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "rfc-probe-real-dev-smoke"
+      "nextMilestone": ""
     },
     {
       "id": "rfc.helper-bridge",
