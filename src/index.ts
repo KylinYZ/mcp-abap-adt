@@ -127,6 +127,7 @@ import { createI18nReadClient } from './adt/I18nReadApi.js';
 import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
 import { createTransactionReadClient } from './adt/TransactionReadApi.js';
 import { createInstallDiagnosticsClient } from './adt/InstallDiagnosticsApi.js';
+import { createKnowledgeQueriesClient } from './adt/KnowledgeQueriesApi.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
 import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
@@ -140,6 +141,7 @@ import { I18nReadHandlers } from './handlers/I18nReadHandlers.js';
 import { BoundaryCheckHandlers } from './handlers/BoundaryCheckHandlers.js';
 import { TransactionReadHandlers } from './handlers/TransactionReadHandlers.js';
 import { InstallDiagnosticsHandlers } from './handlers/InstallDiagnosticsHandlers.js';
+import { KnowledgeQueriesHandlers } from './handlers/KnowledgeQueriesHandlers.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
@@ -190,6 +192,7 @@ export class AbapAdtServer extends Server {
   private boundaryCheckHandlers: BoundaryCheckHandlers;
   private transactionReadHandlers: TransactionReadHandlers;
   private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
+  private knowledgeQueriesHandlers: KnowledgeQueriesHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
@@ -381,6 +384,9 @@ export class AbapAdtServer extends Server {
         })
       })
     );
+    // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
+    // 文档 + IMG 自定义活动/文件夹检索，自由 SQL 只读。
+    this.knowledgeQueriesHandlers = new KnowledgeQueriesHandlers(createKnowledgeQueriesClient(readClient));
     // SM21 is read-only; it follows the stateless read rollout switch when enabled.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
@@ -765,7 +771,8 @@ export class AbapAdtServer extends Server {
       ...this.i18nReadHandlers.getTools(),
       ...this.boundaryCheckHandlers.getTools(),
       ...this.transactionReadHandlers.getTools(),
-      ...this.installDiagnosticsHandlers.getTools()
+      ...this.installDiagnosticsHandlers.getTools(),
+      ...this.knowledgeQueriesHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -928,6 +935,10 @@ export class AbapAdtServer extends Server {
         // 安装前置只读发现工具（install.diagnostics）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.installDiagnosticsHandlers.supports(toolName)) {
           return this.installDiagnosticsHandlers.handle(toolName, limitedArguments);
+        }
+        // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.knowledgeQueriesHandlers.supports(toolName)) {
+          return this.knowledgeQueriesHandlers.handle(toolName, limitedArguments);
         }
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);

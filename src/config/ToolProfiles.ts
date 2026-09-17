@@ -82,7 +82,10 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 事务码元数据只读（read.transaction）：TSTC/TSTCT 自由 SQL
   'getTransaction',
   // 安装前置只读发现（install.diagnostics）：helper TADIR 探测 + abapGit 可达性
-  'checkInstallPrerequisites'
+  'checkInstallPrerequisites',
+  // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL 文档 +
+  // IMG 检索
+  'getAbapDocumentation', 'searchImgActivities'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

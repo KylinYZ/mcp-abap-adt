@@ -32,8 +32,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
 | P1 | 3 | 10 | 6 | 4 | 2 | 0 | 25 |
-| P2 | 0 | 10 | 6 | 4 | 5 | 0 | 25 |
-| 合计 | 7 | 35 | 12 | 10 | 7 | 0 | 71 |
+| P2 | 0 | 10 | 7 | 3 | 5 | 0 | 25 |
+| 合计 | 7 | 35 | 13 | 9 | 7 | 0 | 71 |
 
 计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**42/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
@@ -147,7 +147,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `diagnostics.dumps` | 运行时错误（ST22 dump）列表、详情与聚合分析 | SAP(action=analyze, params={type:list_dumps\|get_dump\|group_dumps\|explain_dump\|similar_dumps\|dump_impact}) + focused ListDumps/GetDump | EQUIVALENT | P1 | `readRuntimeDumps`、`analyzeRuntimeErrors`、`groupRuntimeDumps`、`findSimilarDumps` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.application-log` | 读取 BAL 应用日志（SLG1） | SAP(action=analyze, params={type:application_log}) | EQUIVALENT | P1 | `readApplicationLog` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.spool-jobs` | 后台作业清单/日志与 spool 请求读取 | SAP(action=analyze, params={type:spool_list\|spool_read\|job_list\|job_log}) | PARTIAL | P1 | `listSpoolRequests`、`listJobs` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `diagnostics.knowledge-queries` | FM 测试数据、文档、IMG 活动检索等诊断辅助查询 | SAP(action=analyze, params={type:fm_test_data\|documentation\|img_search\|img_activity\|cluster_read}) | GAP | P2 | （无） | （无） | （无） |
+| `diagnostics.knowledge-queries` | FM 测试数据、文档、IMG 活动检索等诊断辅助查询 | SAP(action=analyze, params={type:fm_test_data\|documentation\|img_search\|img_activity\|cluster_read}) | PARTIAL | P2 | `getAbapDocumentation`、`searchImgActivities` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.traces` | ABAP profiler/性能跟踪文件列表与命中分析 | SAP(action=analyze, params={type:list_traces\|get_trace}) + focused ListTraces/GetTrace | EQUIVALENT | P1 | `tracesList`、`tracesListRequests`、`tracesHitList`、`tracesStatements`、`tracesDbAccess` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `diagnostics.sql-trace` | SQL 跟踪（ST05）状态与记录读取 | SAP(action=analyze, params={type:sql_trace_state\|list_sql_traces}) + focused GetSQLTraceState/ListSQLTraces | EQUIVALENT | P1 | `tracesDbAccess`、`tracesStatements` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 

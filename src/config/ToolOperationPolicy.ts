@@ -124,7 +124,10 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'getTransaction',
   // 安装前置只读发现（矩阵 install.diagnostics 行）：只读 discovery，
   // 不做任何安装动作（安装属 INTENTIONAL_RESTRICTION 行）
-  'checkInstallPrerequisites'
+  'checkInstallPrerequisites',
+  // 知识查询只读二工具（矩阵 diagnostics.knowledge-queries 行子集）：
+  // DOKIL/DOKTL 文档读取 + IMG 活动检索；fm_test_data/cluster_read 不在子集
+  'getAbapDocumentation', 'searchImgActivities'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

@@ -201,3 +201,13 @@
 - 处理：按矩阵词汇归位 INTENTIONAL_RESTRICTION（GAP 移出可做桶），restrictionReason 记录 404 实测证据与替代路径（ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl 已在 catalog，覆盖"发现语法错误"核心需求；abaplint 离线规则集无等价物），liftCondition 写明重新评估条件。
 - 期间一次 JSON 转义事故（node -e 内嵌引号破坏 JSON），已 git checkout 恢复并以 JSON.parse 验证后重做。
 - 现状：MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=12、GAP=10、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 42/71（完成率不变，GAP 桶去虚存实）。
+
+## 2026-09-17 闲时轮（十七）：diagnostics.knowledge-queries 晋级 PARTIAL——文档/IMG 检索只读工具
+
+- 本轮工作（预筛指定项）：knowledge-queries 子集落地为两个只读工具（挂 KnowledgeQueriesHandlers）——`getAbapDocumentation`（ABAP 文档：索引模式 DOKIL 跨类跨语言清单 / 正文模式 DOKTL 最新版本 line/dokformat/doktext 行序列，行数上限截断标注）与 `searchImgActivities`（CUS_IMGACT 活动文本 LIKE 检索 + CUS_IMGACH 补 tcode + TNODEIMGT 文件夹）。VSP handlers_docs.go/IMGSearch 移植。fm_test_data/cluster_read/img_activity 路径递归不在子集（notes 标注），矩阵记 PARTIAL。
+- 关键实现点：语言键 ISO→SAP 1 位内部码转换（sapInternalLanguageKey，映射表逐项对齐 VSP spras——DOKTL.LANGU/SPRAS 列均为 1 位，2 位直查永远查空）；文本注入转义+控制字符拒绝。
+- 本地门禁全绿：Jest 148 suites / 1410 tests、build、coverage、parity、diff --check；本能力新增 16 例单测（API 9 + Handlers 7）。
+- 真机验证（scripts/knowledge-queries-real-dev-smoke.mjs，全程只读 SELECT）：LANGU 文档索引 5 条、正文 13 行真实读回（U1 标题、格式码）；IMG 检索 Anlage* 命中 10 节点（活动+文件夹）；不存在文档 InvalidParams 含提示；注入样本安全处理。SMOKE OK。
+- 矩阵：diagnostics.knowledge-queries GAP → PARTIAL（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=35、PARTIAL=13、GAP=9、INTENTIONAL_RESTRICTION=6、UNVERIFIED=0，对齐 42/71。证据：docs/evidence/knowledge-queries-real-dev-verified.md。
+- 接线同步：index.ts + ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=161、diagnostic-readonly=130、legacy-full=193、workbench=128、operations=50）+ AGENTS.md 基线（148/1410）。
+- 遗留：无系统残留。剩余可做项已基本枯竭：analysis.history 的 cr_history 经探针确认 E071/E070 datapview 受限（同 TSTCT 环境级限制）；剩余均为写方向工作流（recover-failed-create/set-description/rename/i18n.write）或环境前置（git.abapgit、AMDP、analysis.lint 引擎）。

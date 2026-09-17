@@ -1893,17 +1893,32 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
+        "status": "PARTIAL",
+        "taskPath": [
+          "getAbapDocumentation",
+          "searchImgActivities"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench",
+          "diagnostic-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "documentation/img_search 子集已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/knowledge-queries-real-dev-verified.md）：getAbapDocumentation 对标准元素 LANGU 索引 5 条（DE/TX 跨类跨语言）+ 正文 13 行（U1 标题、格式码、最新版本）；searchImgActivities 检索 Anlage* 命中 10 节点（活动+文件夹）；注入样本安全处理。语言键经 ISO→SAP 内部码转换（VSP spras 同表，DOKTL/IMG 表均为 1 位内部键）。CUS_IMGACH 数据读取在该 DEV 受 datapreview 限制（tcode 容错为缺失+notes）。fm_test_data/cluster_read/img_activity 路径递归仍不在子集（notes 标注），故记 PARTIAL 而非 EQUIVALENT。",
         "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
+      "liftCondition": "fm_test_data 与 cluster_read 通道确认可用、img_activity 完整路径递归实现后评估 EQUIVALENT。",
       "nextMilestone": ""
     },
     {
