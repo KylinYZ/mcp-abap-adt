@@ -37,6 +37,9 @@ MCP 配置示例：
 
 ### 源码
 
+需要 Node.js 22.14+（Node 18/20 已 EOL，自 0.7.0 起不再支持；Windows 可用
+nvm-windows 按仓库 `.nvmrc` 切换）。
+
 ```bash
 npm install
 npm run build
@@ -67,7 +70,7 @@ QAS、PRD、缺失和未知系统角色无论 Profile 都只能执行本地/只�
 4. 只把返回的 `changePlanId` 传给 `applyAbapChange`。
 5. 用 `getAbapChangeStatus` 检查语法、激活、哈希和解锁结果。
 
-仓库对象使用 `list/describe/preview/apply/status` 五个受控工具。清理是独立的破坏性流程，仅在明确范围的 DEV 验证开关下开放。逐类证据和阻塞身份见 [`docs/evidence/`](docs/evidence/)。
+仓库对象使用 `list/describe/preview/apply/status` 五个受控工具。清理是独立的破坏性流程，在 DEV workbench 中开放，并由 `SAP_MCP_ALLOWED_NAMESPACES` 和传输归属校验共同约束。逐类证据和阻塞身份见 [`docs/evidence/`](docs/evidence/)。
 
 ## 文档地图
 

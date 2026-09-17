@@ -27,6 +27,12 @@ export function usesSapExecutionGate(toolName: string): boolean {
     && toolName !== 'getRepositoryObjectCleanupStatus'
     && toolName !== 'runQualityCheck'
     && toolName !== 'getQualityCheckStatus'
+    // 受控激活：apply 在确认层内部会再次经过 executionGate（applyConfirmed），
+    // 若外层 dispatch 已占用唯一槽位会自我死锁（maxConcurrentTools=1 时必现），
+    // 因此与 applyRepositoryObjectCreation 等确认型工具同样豁免外层 gate；
+    // getObjectActivationStatus 是纯本地 plan 读取，与同构 status 工具一并豁免。
+    && toolName !== 'applyObjectActivation'
+    && toolName !== 'getObjectActivationStatus'
     && toolName !== 'healthcheck';
 }
 

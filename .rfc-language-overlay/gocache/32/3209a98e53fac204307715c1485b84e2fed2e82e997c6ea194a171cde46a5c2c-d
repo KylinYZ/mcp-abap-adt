@@ -1,0 +1,10 @@
+./container.go
+./fastser.go
+./fields.go
+./lz4.go
+./record.go
+./container_test.go
+./fastser_test.go
+./fields_test.go
+./lz4_test.go
+./record_test.go

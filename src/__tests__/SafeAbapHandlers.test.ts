@@ -214,6 +214,43 @@ describe('SafeAbapHandlers', () => {
     expect(content[0].text).toContain('无需先在聊天中要求文字确认');
   });
 
+  it('passes the classInclude hint through to the change workflow preview', async () => {
+    // source.class-include 受控链入口：classInclude 是可选枚举参数，dispatch 必须原样透传
+    const workflow = { preview: jest.fn().mockResolvedValue({ status: 'preview' }) };
+    const handlers = new SafeAbapHandlers(workflow as never);
+
+    await handlers.handle('previewAbapChange', {
+      objectType: 'CLASS',
+      objectName: 'ZCL_TEST',
+      newSource: '* MARKER',
+      transportRequest: 'DEVK900001',
+      classInclude: 'definitions'
+    });
+
+    expect(workflow.preview).toHaveBeenCalledWith({
+      objectType: 'CLASS',
+      objectName: 'ZCL_TEST',
+      newSource: '* MARKER',
+      transportRequest: 'DEVK900001',
+      classInclude: 'definitions'
+    });
+
+    // 未提供时必须显式传 undefined，保持输入形状确定
+    await handlers.handle('previewAbapChange', {
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.',
+      transportRequest: 'DEVK900001'
+    });
+    expect(workflow.preview).toHaveBeenLastCalledWith({
+      objectType: 'PROGRAM',
+      objectName: 'ZTEST',
+      newSource: 'REPORT ztest.',
+      transportRequest: 'DEVK900001',
+      classInclude: undefined
+    });
+  });
+
   it('keeps legacy tools hidden unless legacy-full is selected', () => {
     const handlers = new SafeAbapHandlers({} as never);
     const safeTools = handlers.getTools();

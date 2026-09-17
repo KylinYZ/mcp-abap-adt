@@ -1,0 +1,8 @@
+./backend.go
+./codegen.go
+./compile.go
+./linepacker.go
+./opcodes.go
+./optimize.go
+./parser.go
+./types.go

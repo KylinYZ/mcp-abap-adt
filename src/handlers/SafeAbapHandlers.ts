@@ -102,7 +102,12 @@ export class SafeAbapHandlers {
             objectType: { type: 'string', description: 'PROGRAM, INCLUDE, CLASS, or FUNCTION_MODULE' },
             objectName: { type: 'string', description: 'Exact ABAP object name' },
             newSource: { type: 'string', description: 'Complete proposed source for the resolved ADT source resource' },
-            transportRequest: { type: 'string', description: 'Existing unreleased ten-character transport request' }
+            transportRequest: { type: 'string', description: 'Existing unreleased ten-character transport request' },
+            classInclude: {
+              type: 'string',
+              enum: ['definitions', 'implementations', 'macros', 'testclasses'],
+              description: 'Optional CLASS-only include granularity: edit this class include instead of the main source'
+            }
           },
           required: ['objectType', 'objectName', 'newSource', 'transportRequest']
         },
@@ -243,7 +248,8 @@ export class SafeAbapHandlers {
           objectType: String(args.objectType || ''),
           objectName: String(args.objectName || ''),
           newSource: typeof args.newSource === 'string' ? args.newSource : '',
-          transportRequest: String(args.transportRequest || '')
+          transportRequest: String(args.transportRequest || ''),
+          classInclude: typeof args.classInclude === 'string' ? args.classInclude : undefined
         });
       case 'applyAbapChange':
         return this.confirmation.confirmAndApply(
@@ -287,6 +293,7 @@ export class SafeAbapHandlers {
     objectName: string;
     newSource: string;
     transportRequest: string;
+    classInclude?: string;
   }): Promise<Record<string, unknown>> {
     const preview = await this.workflow.preview(input);
     return {

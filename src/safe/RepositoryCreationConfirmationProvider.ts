@@ -275,9 +275,9 @@ export class WindowsNativeRepositoryCreationConfirmationProvider implements Repo
     const requestLine = JSON.stringify({
       challengeId: request.challengeId,
       title: cleanup ? 'SAP 验证对象删除确认' : 'SAP 受控创建确认',
-      introduction: cleanup ? '请确认是否删除以下 SAP DEV 验证对象' : '请确认是否在 SAP DEV 中创建以下对象',
+      introduction: cleanup ? '请确认是否删除以下 SAP DEV 对象' : '请确认是否在 SAP DEV 中创建以下对象',
       objectGroupTitle: cleanup ? '删除对象' : '创建对象',
-      warning: cleanup ? '确认后将执行一次不可重放的 SAP 验证对象删除。' : '确认后将执行一次受控 SAP 创建流程。',
+      warning: cleanup ? '确认后将执行一次不可重放的 SAP 对象删除。' : '确认后将执行一次受控 SAP 创建流程。',
       confirmButtonText: cleanup ? '确认删除' : '确认创建',
       message: confirmationMessage(request),
       summary: request.summary,

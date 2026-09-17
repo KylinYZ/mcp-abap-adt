@@ -1,0 +1,3 @@
+# test log
+getenv OPEN_RFC_BXML_ORACLE
+open testdata\fuzz\FuzzDecode

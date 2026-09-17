@@ -67,7 +67,18 @@ export interface ResolvedAbapObject {
   packageName?: string;
   parentObject?: string;
   activationParentUrl?: string;
+  /**
+   * 类 include 粒度写入目标（definitions/implementations/macros/testclasses）。
+   * 仅在 CLASS + classInclude 提示解析成功时存在：sourceUrl 指向该 include 的
+   * 可写源资源，lockUrl/activationUrl 仍指向父类（include 无独立锁/激活身份）。
+   */
+  classInclude?: ClassIncludeKind;
 }
+
+/** 受控链可编辑的四种类 include 粒度（与 ADT class:includeType 一致，不含 main）。 */
+export type ClassIncludeKind = 'definitions' | 'implementations' | 'macros' | 'testclasses';
+
+export const CLASS_INCLUDE_KINDS: readonly ClassIncludeKind[] = ['definitions', 'implementations', 'macros', 'testclasses'];
 
 export interface DiffSummary {
   addedLines: number;

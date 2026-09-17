@@ -1,0 +1,13 @@
+./cpic.go
+./function.go
+./grammar.go
+./logon.go
+./ticket.go
+./cpic_basic_test.go
+./cpic_composite_test.go
+./cpic_response_test.go
+./fuzz_test.go
+./grammar_test.go
+./logon_language_test.go
+./testhelpers_test.go
+./ticket_test.go

@@ -1,15 +1,22 @@
 import { SafeAbapError, errorMessage } from './errors.js';
 import { normalizeObjectName } from './SafetyPolicy.js';
-import type { ResolvedAbapObject, SafeAdtClient, SupportedObjectType } from './types.js';
+import type {
+  ClassIncludeKind,
+  ResolvedAbapObject,
+  SafeAdtClient,
+  SupportedObjectType
+} from './types.js';
+import { CLASS_INCLUDE_KINDS } from './types.js';
 
 const SUPPORTED_TYPES = new Set<SupportedObjectType>(['PROGRAM', 'INCLUDE', 'CLASS', 'FUNCTION_MODULE']);
 
 export class AbapObjectResolver {
   constructor(private readonly client: SafeAdtClient) {}
 
-  async resolve(objectTypeValue: string, objectNameValue: string): Promise<ResolvedAbapObject> {
+  async resolve(objectTypeValue: string, objectNameValue: string, classIncludeValue?: string): Promise<ResolvedAbapObject> {
     const objectType = normalizeObjectType(objectTypeValue);
     const objectName = normalizeObjectName(objectNameValue);
+    const classInclude = normalizeClassInclude(classIncludeValue, objectType);
 
     try {
       const results = await this.client.searchObject(objectName, undefined, 50);
@@ -29,7 +36,10 @@ export class AbapObjectResolver {
       const functionGroupInclude = objectType === 'INCLUDE' && isFunctionGroupInclude(searchResult);
       const structure = await this.client.objectStructure(searchResult['adtcore:uri'], 'active');
       const objectUrl = validateAdtUri(structure.objectUrl || searchResult['adtcore:uri'], 'object URL');
-      const sourceUrl = resolveSourceUrl(structure, objectUrl);
+      // classInclude 提示下 sourceUrl 指向对应 include 的可写源资源；锁与激活仍归属父类
+      const sourceUrl = classInclude
+        ? resolveClassIncludeSourceUrl(structure, objectUrl, objectName, classInclude)
+        : resolveSourceUrl(structure, objectUrl);
       let mainProgram: string | undefined;
 
       if (objectType === 'INCLUDE' && !functionGroupInclude) {
@@ -61,7 +71,8 @@ export class AbapObjectResolver {
         mainProgram,
         packageName: searchResult['adtcore:packageName'],
         parentObject: objectType === 'FUNCTION_MODULE' ? functionGroupName(objectUrl) : undefined,
-        activationParentUrl: objectType === 'FUNCTION_MODULE' ? functionGroupUrl(objectUrl) : undefined
+        activationParentUrl: objectType === 'FUNCTION_MODULE' ? functionGroupUrl(objectUrl) : undefined,
+        ...(classInclude ? { classInclude } : {})
       };
     } catch (error) {
       if (error instanceof SafeAbapError) {
@@ -86,6 +97,57 @@ export function normalizeObjectType(value: string): SupportedObjectType {
     );
   }
   return normalized;
+}
+
+/**
+ * 校验可选的 classInclude 提示：仅接受四种 include 粒度，且只对 CLASS 对象有意义。
+ * 缺省返回 undefined（保持既有主源解析行为完全不变）。
+ */
+function normalizeClassInclude(value: string | undefined, objectType: SupportedObjectType): ClassIncludeKind | undefined {
+  if (value === undefined || value === '') return undefined;
+  const normalized = String(value).trim().toLowerCase();
+  const kind = CLASS_INCLUDE_KINDS.find(candidate => candidate === normalized);
+  if (!kind) {
+    throw new SafeAbapError(
+      'VALIDATION_FAILED',
+      'resolve',
+      `classInclude must be one of ${CLASS_INCLUDE_KINDS.join(', ')}.`
+    );
+  }
+  if (objectType !== 'CLASS') {
+    throw new SafeAbapError(
+      'VALIDATION_FAILED',
+      'resolve',
+      `classInclude is only valid for CLASS objects (received objectType ${objectType}).`
+    );
+  }
+  return kind;
+}
+
+/**
+ * 从类 structure 的 includes 清单中解析指定 include 的可写源 URL。
+ * testclasses include 在类没有测试类时不存在——此时给确定性错误并指引
+ * 先用专家 createTestInclude 工具补建，而不是静默落到主源。
+ */
+function resolveClassIncludeSourceUrl(
+  structure: Awaited<ReturnType<SafeAdtClient['objectStructure']>>,
+  objectUrl: string,
+  objectName: string,
+  kind: ClassIncludeKind
+): string {
+  const includes = 'includes' in structure ? structure.includes : [];
+  const match = includes.find(include => include['class:includeType'] === kind);
+  if (!match) {
+    throw new SafeAbapError(
+      'OBJECT_RESOLUTION_FAILED',
+      'resolve',
+      kind === 'testclasses'
+        ? `Class ${objectName} has no testclasses include; create it first (legacy createTestInclude tool) before editing it.`
+        : `Class ${objectName} does not expose a ${kind} include source.`,
+      { availableIncludeTypes: includes.map(include => String(include['class:includeType'] || '')) }
+    );
+  }
+  return resolveAdtUri(match['abapsource:sourceUri'], objectUrl, `${kind} include source URL`);
 }
 
 function matchesObject(

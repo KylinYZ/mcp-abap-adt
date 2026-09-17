@@ -1,0 +1,4 @@
+# test log
+open testdata\fuzz\FuzzDecodeDecimalFloat16
+open testdata\fuzz\FuzzDecodePackedDecimal
+open testdata\fuzz\FuzzDecodeXMLEntityReference

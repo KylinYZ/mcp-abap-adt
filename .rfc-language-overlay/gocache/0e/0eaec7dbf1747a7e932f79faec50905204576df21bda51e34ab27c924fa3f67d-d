@@ -1,0 +1,9 @@
+./analyzer.go
+./candidates.go
+./compressor.go
+./contract.go
+./deps.go
+./methodlevel.go
+./provider.go
+./types.go
+./upstream.go

@@ -38,7 +38,7 @@ async function main() {
     const tools = await validationRuntime.client.listTools();
     const available = new Set(tools.tools.map(tool => tool.name));
     for (const name of cleanupTools) {
-      assert(available.has(name), `${name} is loaded only in the explicit validation profile`);
+      assert(available.has(name), `${name} is available in the DEV workbench profile`);
     }
 
     const health = parse(await validationRuntime.call('healthcheck'));
@@ -65,7 +65,7 @@ async function main() {
     const tools = await productionRuntime.client.listTools();
     const available = new Set(tools.tools.map(tool => tool.name));
     for (const name of cleanupTools) {
-      assert(!available.has(name), `${name} is hidden when real DEV validation is disabled`);
+      assert(available.has(name), `${name} remains available independently of validation mode`);
     }
     const catalog = parse(await productionRuntime.call('listRepositoryObjectCreationCapabilities'));
     const verified = (catalog.capabilities || []).filter(capability => capability.maturity === 'REAL_DEV_VERIFIED');

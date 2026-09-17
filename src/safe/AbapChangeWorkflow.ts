@@ -34,6 +34,8 @@ export interface PreviewChangeInput {
   objectName: string;
   newSource: string;
   transportRequest: string;
+  /** 可选：CLASS include 粒度目标（definitions/implementations/macros/testclasses）。 */
+  classInclude?: string;
 }
 
 export interface ApplyChangeInput {
@@ -107,7 +109,7 @@ export class AbapChangeWorkflow {
       throw new SafeAbapError('VERIFY_FAILED', 'preview', 'newSource must contain the complete proposed ABAP source.');
     }
 
-    const object = await this.resolver.resolve(input.objectType, input.objectName);
+    const object = await this.resolver.resolve(input.objectType, input.objectName, input.classInclude);
     await this.validateTransport(object, transportRequest);
     const originalSource = await this.client.getObjectSource(object.sourceUrl);
     const originalHash = sourceHash(originalSource);

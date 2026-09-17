@@ -58,6 +58,31 @@ describe('AbapChangeConfirmation', () => {
     };
   }
 
+  it('labels the class include granularity in the confirmation message', async () => {
+    // class include 变更的确认消息必须显式标注 include 粒度，
+    // 防止调用方把 include 写入误认为整类主源写入而误批准
+    const includePlan: ChangePlanView = {
+      ...plan,
+      object: {
+        ...plan.object,
+        objectType: 'CLASS',
+        objectName: 'ZCL_TEST',
+        classInclude: 'definitions'
+      }
+    };
+    const workflow = { status: jest.fn().mockReturnValue(includePlan), apply: jest.fn().mockResolvedValue({ status: 'success' }) };
+    const options: AbapChangeConfirmationOptions = {
+      allowTextConfirmation: false,
+      supportsFormElicitation: () => true,
+      elicitInput: jest.fn().mockResolvedValue({ action: 'accept', content: { decision: 'apply' } } satisfies ElicitResult)
+    };
+    await new AbapChangeConfirmation(workflow as unknown as AbapChangeWorkflow, options).confirmAndApply('plan-1');
+    expect(options.elicitInput).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('ZCL_TEST（definitions include）') }),
+      expect.any(Number)
+    );
+  });
+
   it('applies after the native form is accepted and checked', async () => {
     const { confirmation, workflow, options } = createSubject();
 

@@ -173,6 +173,44 @@ describe('AbapChangeWorkflow', () => {
       .rejects.toThrow('already applied');
   });
 
+  it('previews a class include change against the include source URL', async () => {
+    // source.class-include 受控链：classInclude 提示必须透传给 resolver，
+    // 冻结进 plan 的 sourceUrl 是 include 源资源，锁/激活仍指向父类
+    const classIncludeObject: ResolvedAbapObject = {
+      ...object,
+      objectType: 'CLASS',
+      objectName: 'ZCL_TEST',
+      adtType: 'CLAS/OC',
+      objectUrl: '/sap/bc/adt/oo/classes/zcl_test',
+      sourceUrl: '/sap/bc/adt/oo/classes/zcl_test/source/definitions',
+      lockUrl: '/sap/bc/adt/oo/classes/zcl_test',
+      activationUrl: '/sap/bc/adt/oo/classes/zcl_test',
+      classInclude: 'definitions'
+    };
+    const test = harness({ initialSource: '' });
+    (test.workflow as any).resolver.resolve.mockResolvedValue(classIncludeObject);
+
+    const preview = await test.workflow.preview({
+      objectType: 'CLASS',
+      objectName: 'ZCL_TEST',
+      newSource: '* MCP SMOKE MARKER',
+      transportRequest: 'DEVK900001',
+      classInclude: 'definitions'
+    });
+
+    expect((test.workflow as any).resolver.resolve).toHaveBeenCalledWith('CLASS', 'ZCL_TEST', 'definitions');
+    expect(preview).toMatchObject({ status: 'preview', confirmationRequired: true });
+    const plan = test.workflow.status('plan-1');
+    expect(plan.object.sourceUrl).toBe('/sap/bc/adt/oo/classes/zcl_test/source/definitions');
+    expect(plan.object.classInclude).toBe('definitions');
+    expect(plan.object.lockUrl).toBe('/sap/bc/adt/oo/classes/zcl_test');
+
+    // apply 全链路复用：写入/校验/激活都按冻结的 include sourceUrl 执行
+    await test.workflow.apply({ changePlanId: 'plan-1', confirmedByUser: true, confirmationMode: 'elicitation' });
+    expect(test.workflow.status('plan-1').status).toBe('APPLIED');
+    expect(test.client.getObjectSource).toHaveBeenLastCalledWith('/sap/bc/adt/oo/classes/zcl_test/source/definitions');
+  });
+
   it('does not reject a WARNING severity label during syntax validation', async () => {
     const test = harness({ syntaxMessages: [{
       severity: 'WARNING',

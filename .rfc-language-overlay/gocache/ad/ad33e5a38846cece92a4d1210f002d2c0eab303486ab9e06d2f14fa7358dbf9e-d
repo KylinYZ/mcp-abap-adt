@@ -1,0 +1,4 @@
+# test log
+open testdata\fuzz\FuzzDecodeParameter
+open testdata\fuzz\FuzzDecodeRecursiveClassic
+open testdata\fuzz\FuzzDecodeRecursiveParameter

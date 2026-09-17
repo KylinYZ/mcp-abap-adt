@@ -43,11 +43,12 @@ import { SafeAbapHandlers } from './handlers/SafeAbapHandlers.js';
 import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
 import { SafeAdvancedHandlers } from './handlers/SafeAdvancedHandlers.js';
 import { SafeQualityHandlers } from './handlers/SafeQualityHandlers.js';
+import { SafeActivationHandlers } from './handlers/SafeActivationHandlers.js';
 import {
-  RepositoryObjectCreationHandlers,
-  REPOSITORY_VALIDATION_CLEANUP_TOOL_NAMES
+  RepositoryObjectCreationHandlers
 } from './handlers/RepositoryObjectCreationHandlers.js';
 import { HighLevelReadHandlers } from './handlers/HighLevelReadHandlers.js';
+import { CdsAnalysisHandlers } from './handlers/CdsAnalysisHandlers.js';
 import { AbapChangeWorkflow } from './safe/AbapChangeWorkflow.js';
 import { AbapCreationResolver } from './safe/AbapCreationResolver.js';
 import { AbapObjectCreationWorkflow } from './safe/AbapObjectCreationWorkflow.js';
@@ -64,6 +65,8 @@ import { PackageChangeWorkflow } from './safe/PackageChangeWorkflow.js';
 import { RapOperationWorkflow } from './safe/RapOperationWorkflow.js';
 import { QualityCheckPlanStore } from './safe/QualityCheckPlanStore.js';
 import { QualityCheckWorkflow } from './safe/QualityCheckWorkflow.js';
+import { ObjectActivationPlanStore } from './safe/ObjectActivationPlanStore.js';
+import { ObjectActivationWorkflow } from './safe/ObjectActivationWorkflow.js';
 import { RepositoryObjectCreationRegistry } from './safe/RepositoryObjectCreationRegistry.js';
 import { RepositoryObjectCreationPlanStore } from './safe/RepositoryObjectCreationPlanStore.js';
 import { RepositoryObjectCreationWorkflow } from './safe/RepositoryObjectCreationWorkflow.js';
@@ -101,6 +104,39 @@ import { AdtHttpSm21Client } from './sm21/AdtHttpSm21Client.js';
 import { sm21ConfigFromEnvironment } from './sm21/config.js';
 import { selectProfileTools, isReadOnlyLegacyTool } from './config/ToolProfiles.js';
 import { assertToolCatalogClassified, toolOperationClass } from './config/ToolOperationPolicy.js';
+import { createCdsAnalysisClient } from './adt/CdsDependencyApi.js';
+import {
+  createSourceGrepClient
+} from './adt/SourceGrepApi.js';
+import {
+  createUnitCoverageClient
+} from './adt/UnitCoverageApi.js';
+import {
+  createApplicationLogClient
+} from './adt/ApplicationLogApi.js';
+import {
+  bindRunSqlToAdtQuery,
+  createCrossReferenceClient
+} from './adt/CrossReferenceApi.js';
+import { createContextAnalysisClient } from './adt/ContextCompressionApi.js';
+import { createUi5FilestoreClient } from './adt/Ui5FilestoreApi.js';
+import { createSpoolJobClient, bindSpoolJobQueryRunner } from './adt/SpoolJobApi.js';
+import { createMessageClassReadClient } from './adt/MessageClassReadApi.js';
+import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
+import { createI18nReadClient } from './adt/I18nReadApi.js';
+import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
+import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
+import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
+import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
+import { CrossReferenceHandlers } from './handlers/CrossReferenceHandlers.js';
+import { ContextAnalysisHandlers } from './handlers/ContextAnalysisHandlers.js';
+import { Ui5Handlers } from './handlers/Ui5Handlers.js';
+import { SpoolJobHandlers } from './handlers/SpoolJobHandlers.js';
+import { MessageClassReadHandlers } from './handlers/MessageClassReadHandlers.js';
+import { RevisionSourceHandlers } from './handlers/RevisionSourceHandlers.js';
+import { I18nReadHandlers } from './handlers/I18nReadHandlers.js';
+import { BoundaryCheckHandlers } from './handlers/BoundaryCheckHandlers.js';
+import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
 import { ClassicTableInspector } from './read/ClassicTableInspector.js';
@@ -133,8 +169,22 @@ export class AbapAdtServer extends Server {
   private safeDebugHandlers: SafeDebugHandlers;
   private safeAdvancedHandlers: SafeAdvancedHandlers;
   private safeQualityHandlers: SafeQualityHandlers;
+  private safeActivationHandlers: SafeActivationHandlers;
   private repositoryObjectCreationHandlers: RepositoryObjectCreationHandlers;
   private highLevelReadHandlers: HighLevelReadHandlers;
+  private cdsAnalysisHandlers: CdsAnalysisHandlers;
+  private sourceGrepHandlers: SourceGrepHandlers;
+  private unitCoverageHandlers: UnitCoverageHandlers;
+  private applicationLogHandlers: ApplicationLogHandlers;
+  private crossReferenceHandlers: CrossReferenceHandlers;
+  private contextAnalysisHandlers: ContextAnalysisHandlers;
+  private ui5Handlers: Ui5Handlers;
+  private spoolJobHandlers: SpoolJobHandlers;
+  private messageClassReadHandlers: MessageClassReadHandlers;
+  private revisionSourceHandlers: RevisionSourceHandlers;
+  private i18nReadHandlers: I18nReadHandlers;
+  private boundaryCheckHandlers: BoundaryCheckHandlers;
+  private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
   private authHandlers: AuthHandlers;
   private transportHandlers: TransportHandlers;
@@ -215,6 +265,7 @@ export class AbapAdtServer extends Server {
       sapUser: this.safetyPolicy.sapUser,
       systemRole: this.safetyPolicy.systemRole,
       toolProfile: this.safetyPolicy.toolProfile,
+      allowedNamespaces: [...this.safetyPolicy.allowedNamespaces],
       realDevValidationEnabled: this.safetyPolicy.realDevValidationEnabled,
       realDevValidationObjects: [...this.safetyPolicy.realDevValidationObjects],
       realDevValidationPrefix: this.safetyPolicy.realDevValidationPrefix,
@@ -258,8 +309,12 @@ export class AbapAdtServer extends Server {
     const readObjectResolver = this.sessionResilience.statelessReads
       ? new AbapObjectResolver(readClient)
       : objectResolver;
+    // dump 增值分析（groupRuntimeDumps/findSimilarDumps）与 readRuntimeDumps
+    // 共享同一个 RuntimeDumpReader（无状态，可安全复用）
+    const dumpReader = new RuntimeDumpReader(readClient);
+    this.dumpAnalysisHandlers = new DumpAnalysisHandlers(dumpReader);
     this.highLevelReadHandlers = new HighLevelReadHandlers(
-      new RuntimeDumpReader(readClient),
+      dumpReader,
       new ClassicTableInspector(readClient),
       new SystemInspector(readClient, {
         host: this.safetyPolicy.systemHost,
@@ -269,6 +324,41 @@ export class AbapAdtServer extends Server {
       }),
       new AbapMemberSourceReader(readClient, readObjectResolver)
     );
+    // CDS 依赖分析三工具（read.cds-analysis）：只读 ADT 能力，与 highLevelRead
+    // 相同复用 readClient（statelessReads 开启时走无状态克隆）的 AdtHTTP 会话。
+    this.cdsAnalysisHandlers = new CdsAnalysisHandlers(createCdsAnalysisClient(readClient.httpClient));
+    // Wave 3 分析四工具（grep/callees/applog 只读 + coverage 执行）：与 highLevelRead
+    // 相同复用 readClient 的 AdtHTTP 会话；getCallees 的交叉表查询经 bindRunSqlToAdtQuery
+    // 走 runQuery 的 datapreview 通道（decode=true，DIRECT 标志依赖解码）。
+    this.sourceGrepHandlers = new SourceGrepHandlers(createSourceGrepClient(readClient.httpClient));
+    this.unitCoverageHandlers = new UnitCoverageHandlers(createUnitCoverageClient(readClient.httpClient));
+    this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
+    this.crossReferenceHandlers = new CrossReferenceHandlers(
+      createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
+    );
+    // 依赖上下文四工具（codeintel.context）：只读客户端侧分析，SAP 交互仅有
+    // searchObject/objectStructure/getObjectSource 组成的 GET 取源链（串行执行），
+    // 与 highLevelRead 相同复用 readClient 的 AdtHTTP 会话。
+    this.contextAnalysisHandlers = new ContextAnalysisHandlers(createContextAnalysisClient(readClient));
+    // UI5/Fiori BSP 只读三工具（ui5.read）：filestore GET（列表/文件树/文件内容），
+    // 与 CDS 分析同型绑定 readClient 的 AdtHTTP 会话。
+    this.ui5Handlers = new Ui5Handlers(createUi5FilestoreClient(readClient.httpClient));
+    // SPOOL/后台作业只读二工具（diagnostics.spool-jobs 只读子集）：自由 SQL 通道
+    // 查询 TSP01/TST01/TBTCP/TBTCO（与 getCallees 的 bindRunSqlToAdtQuery 同底座，
+    // decode=true，补零标识依赖解码），逐次查询传入各自行数限额。
+    this.spoolJobHandlers = new SpoolJobHandlers(createSpoolJobClient(bindSpoolJobQueryRunner(readClient)));
+    // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET，
+    // 与 CDS 分析同型绑定 readClient 的 AdtHTTP 会话。
+    this.messageClassReadHandlers = new MessageClassReadHandlers(createMessageClassReadClient(readClient.httpClient));
+    // 版本源码只读工具（revisions.source）：quick search → revisions 清单 →
+    // 版本源码 GET 三段只读链；版本与源 URI 全部服务端解析，不接受任意 URL。
+    this.revisionSourceHandlers = new RevisionSourceHandlers(createRevisionSourceClient(readClient));
+    // i18n 按语言只读四工具（i18n.read 语言覆盖部分）：对象内容/数据元素标签/
+    // 文本池/双语对比，源 URL 由 objectType+objectName 服务端解析。
+    this.i18nReadHandlers = new I18nReadHandlers(createI18nReadClient(readClient));
+    // 包边界只读检查工具（analysis.boundaries 只读子集）：TADIR 枚举 + 源码
+    // 依赖提取 + TADIR 目标包反查，全部只读 SQL/GET。
+    this.boundaryCheckHandlers = new BoundaryCheckHandlers(createBoundaryCheckClient(readClient));
     // SM21 is read-only; it follows the stateless read rollout switch when enabled.
     this.sm21Handlers = new Sm21Handlers(new AdtHttpSm21Client(readClient.httpClient), sm21Config, readClient);
     const changePlans = new ChangePlanStore(
@@ -499,6 +589,26 @@ export class AbapAdtServer extends Server {
       runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
     });
 
+    // 受控对象激活工作流（关闭矩阵缺口 devtools.activate）：
+    // preview 只读收集未激活对象并冻结 plan；apply 经原生确认后在执行门内单次激活。
+    const activationPlans = new ObjectActivationPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
+    const activationWorkflow = new ObjectActivationWorkflow(
+      this.adtClient,
+      this.safetyPolicy,
+      activationPlans,
+      auditLogger
+    );
+    this.safeActivationHandlers = new SafeActivationHandlers(activationWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      applyConfirmed: activationPlanId => this.executionGate.run(() => activationWorkflow.apply(activationPlanId))
+    });
+
     this.focusedTaskHandlers = new FocusedTaskHandlers(
       (toolName, argumentsValue) => this.executionGate.run(() => this.dispatchTool(toolName, argumentsValue)),
       () => this.healthcheckResult()
@@ -604,13 +714,40 @@ export class AbapAdtServer extends Server {
       ...this.safeAdvancedHandlers.getTools(),
       ...this.repositoryObjectCreationHandlers.getTools(true)
     ];
-    // Cleanup tools are catalogued for policy completeness but never exposed outside validation.
-    const controlledAdvancedTools = completeControlledAdvancedTools.filter(tool => (
-      this.safetyPolicy.realDevValidationEnabled || !REPOSITORY_VALIDATION_CLEANUP_TOOL_NAMES.has(tool.name)
-    ));
+    const controlledAdvancedTools = completeControlledAdvancedTools;
     const qualityTools = this.safeQualityHandlers.getTools();
+    // 受控激活三工具：进入 development 分支与 workbench 显式名单的专属集合
+    const activationTools = this.safeActivationHandlers.getTools();
+    // CDS 依赖分析三工具：只读，进入 development/diagnostic-readonly/legacy-full
+    // 分支与 workbench 显式名单（business/operations/safe 不收录）
+    const cdsTools = this.cdsAnalysisHandlers.getTools();
     const sm21Tools = this.sm21Handlers?.getTools() || [];
-    const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools];
+    // Wave 3 只读分析三工具（grepPackage/grepObjects/getCallees/readApplicationLog，
+    // 共 4 个名字）+ 依赖上下文四工具（codeintel.context）+ UI5 只读三工具
+    //（ui5.read）+ SPOOL/作业只读二工具（diagnostics.spool-jobs 只读子集）
+    // + 消息类文本只读工具（read.message-class-texts）+ 版本源码只读工具
+    //（revisions.source）+ i18n 按语言只读四工具（i18n.read）+ 包边界只读
+    // 检查工具（analysis.boundaries 只读子集）：并入 runtimeTools 后由各
+    // profile 分支按既有规则收录（development/diagnostic-readonly/legacy-full
+    // 自动获得；business 名单不含；operations 名单显式追加 readApplicationLog）。
+    const analyticReadTools = [
+      ...this.sourceGrepHandlers.getTools(),
+      ...this.crossReferenceHandlers.getTools(),
+      ...this.applicationLogHandlers.getTools(),
+      ...this.dumpAnalysisHandlers.getTools(),
+      ...this.contextAnalysisHandlers.getTools(),
+      ...this.ui5Handlers.getTools(),
+      ...this.spoolJobHandlers.getTools(),
+      ...this.messageClassReadHandlers.getTools(),
+      ...this.revisionSourceHandlers.getTools(),
+      ...this.i18nReadHandlers.getTools(),
+      ...this.boundaryCheckHandlers.getTools()
+    ];
+    // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
+    // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
+    // 组合面与 diagnostic-readonly。
+    const coverageTools = this.unitCoverageHandlers.getTools();
+    const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools, ...analyticReadTools];
     const focusedTools = this.focusedTaskHandlers.getTools();
     const legacyTools = [
         ...this.authHandlers.getTools(),
@@ -651,8 +788,11 @@ export class AbapAdtServer extends Server {
     const completeCatalog = [
       ...safeTools,
       ...safeDebugTools,
-      ...completeControlledAdvancedTools,
+      ...controlledAdvancedTools,
       ...qualityTools,
+      ...activationTools,
+      ...cdsTools,
+      ...coverageTools,
       ...runtimeTools,
       ...focusedTools,
       ...legacyTools
@@ -667,7 +807,10 @@ export class AbapAdtServer extends Server {
       this.safetyPolicy.systemRole,
       controlledAdvancedTools,
       qualityTools,
-      focusedTools
+      focusedTools,
+      activationTools,
+      cdsTools,
+      coverageTools
     ).map(withCanonicalToolMetadata);
   }
 
@@ -696,8 +839,66 @@ export class AbapAdtServer extends Server {
         if (this.safetyPolicy.toolProfile !== 'safe' && this.highLevelReadHandlers.supports(toolName)) {
           return this.highLevelReadHandlers.handle(toolName, limitedArguments);
         }
+        // CDS 依赖分析三工具：全只读，与 highLevelRead 相同按"非 safe 即可派发"——
+        // diagnostic-readonly 也允许（三工具为 read-only 类，符合诊断入口定位）；
+        // safe profile 下 catalog 无三工具，前置成员检查已拒绝。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.dumpAnalysisHandlers.supports(toolName)) {
+          return this.dumpAnalysisHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.cdsAnalysisHandlers.supports(toolName)) {
+          return this.cdsAnalysisHandlers.handle(toolName, limitedArguments);
+        }
         if (this.safeQualityHandlers.supports(toolName)) {
           return this.safeQualityHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控激活链：profile/role 门控已由 assertToolOperationAllowed 前置把关，
+        // catalog 成员检查保证非 development/development-workbench profile 不可见。
+        if (this.safeActivationHandlers.supports(toolName)) {
+          return this.safeActivationHandlers.handle(toolName, limitedArguments);
+        }
+        // Wave 3 只读分析三工具（grep/callees/applog）：与 CDS 分析同型，
+        // safe 之外的全部 profile 分派；runUnitCoverage 是执行类工具，catalog
+        // 成员已限定 workbench/legacy-full，QAS/PRD 由入口策略拒绝。
+        if (this.safetyPolicy.toolProfile !== 'safe'
+          && (this.sourceGrepHandlers.supports(toolName)
+            || this.crossReferenceHandlers.supports(toolName)
+            || this.applicationLogHandlers.supports(toolName))) {
+          if (this.sourceGrepHandlers.supports(toolName)) return this.sourceGrepHandlers.handle(toolName, limitedArguments);
+          if (this.crossReferenceHandlers.supports(toolName)) return this.crossReferenceHandlers.handle(toolName, limitedArguments);
+          return this.applicationLogHandlers.handle(toolName, limitedArguments);
+        }
+        // 依赖上下文四工具（codeintel.context）与 UI5 只读三工具（ui5.read）：
+        // 全只读，与 Wave 3 分析同型，safe 之外的全部 profile 分派；
+        // catalog 成员已限定可见 profile。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.contextAnalysisHandlers.supports(toolName)) {
+          return this.contextAnalysisHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.ui5Handlers.supports(toolName)) {
+          return this.ui5Handlers.handle(toolName, limitedArguments);
+        }
+        // SPOOL/作业只读二工具（diagnostics.spool-jobs 只读子集）：全只读，
+        // 与上述分析工具同型分派；catalog 成员已限定可见 profile。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.spoolJobHandlers.supports(toolName)) {
+          return this.spoolJobHandlers.handle(toolName, limitedArguments);
+        }
+        // 消息类文本只读工具（read.message-class-texts）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.messageClassReadHandlers.supports(toolName)) {
+          return this.messageClassReadHandlers.handle(toolName, limitedArguments);
+        }
+        // 版本源码只读工具（revisions.source）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.revisionSourceHandlers.supports(toolName)) {
+          return this.revisionSourceHandlers.handle(toolName, limitedArguments);
+        }
+        // i18n 按语言只读四工具（i18n.read）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.i18nReadHandlers.supports(toolName)) {
+          return this.i18nReadHandlers.handle(toolName, limitedArguments);
+        }
+        // 包边界只读检查工具（analysis.boundaries）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.boundaryCheckHandlers.supports(toolName)) {
+          return this.boundaryCheckHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.unitCoverageHandlers.supports(toolName)) {
+          return this.unitCoverageHandlers.handle(toolName, limitedArguments);
         }
         if (this.repositoryObjectCreationHandlers.supports(toolName)) {
           return this.repositoryObjectCreationHandlers.handle(toolName, limitedArguments, signal);

@@ -37,6 +37,9 @@ Example MCP configuration:
 
 ### Source
 
+Requires Node.js 22.14+ (Node 18/20 are EOL and unsupported from 0.7.0; on
+Windows switch via nvm-windows using the repo `.nvmrc`).
+
 ```bash
 npm install
 npm run build

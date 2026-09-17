@@ -51,7 +51,7 @@ async function main() {
   await client.connect(transport);
   const tools = await client.listTools();
   const names = new Set(tools.tools.map(tool => tool.name));
-  assert(!names.has('previewRepositoryObjectCleanup'), 'cleanup tools are hidden when validation is disabled');
+  assert(names.has('previewRepositoryObjectCleanup'), 'cleanup tools remain available when validation is disabled');
 
   const capabilities = parse(await call('listRepositoryObjectCreationCapabilities')).capabilities || [];
   const writable = capabilities.filter(capability => capability.writable).map(capability => capability.objectKind).sort();

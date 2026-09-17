@@ -61,6 +61,7 @@ export interface RepositoryCreationContext {
   sapUser?: string;
   systemRole: string;
   toolProfile: ToolProfile;
+  allowedNamespaces?: string[];
   realDevValidationEnabled?: boolean;
   realDevValidationObjects?: string[];
   realDevValidationPrefix?: string;

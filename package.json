@@ -37,12 +37,16 @@
     "test:focused-real-dev:readonly": "node ./scripts/focused-real-dev-readonly-smoke.mjs",
     "test:focused-real-dev:preview": "node ./scripts/focused-real-dev-preview-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
+    "check:vsp-capability-parity": "node ./scripts/check-vsp-capability-parity.mjs --check",
     "check:repository-creation-coverage": "npm run build --silent && node ./scripts/check-repository-creation-coverage.mjs",
     "audit:eclipse-adt-creation": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/audit-eclipse-adt-creation.ps1",
     "build": "tsc -p tsconfig.json",
     "start": "node ./dist/index.js",
     "dev": "npx @modelcontextprotocol/inspector ./dist/index.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:cds-real-dev": "node ./scripts/cds-analysis-real-dev-smoke.mjs",
+    "test:activation-real-dev": "node ./scripts/object-activation-real-dev-smoke.mjs",
+    "test:wave3-analytics-real-dev": "node ./scripts/wave3-analytics-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",
@@ -70,7 +74,7 @@
     "url": "https://github.com/KylinYZ/mcp-abap-adt/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.14.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.1",

@@ -1,0 +1,4 @@
+# test log
+open testdata\fuzz\FuzzDecodeCharFields
+open testdata\fuzz\FuzzDecompressBlock
+open testdata\fuzz\FuzzDecodeRecords

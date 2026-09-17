@@ -1,0 +1,21 @@
+# test log
+getenv GOTMPDIR
+open C:\Users\068157\AppData\Local\Temp\TestHTTPSBackendTrustsOnlyTheNamedCertificate1117942038\001\ca.pem
+getenv HTTP_PROXY
+getenv http_proxy
+getenv HTTPS_PROXY
+getenv https_proxy
+getenv NO_PROXY
+getenv no_proxy
+getenv REQUEST_METHOD
+open C:\Users\068157\AppData\Local\Temp\TestHTTPSBackendTrustsOnlyTheNamedCertificate1117942038\001\ca.pem
+open C:\Users\068157\AppData\Local\Temp
+getenv GOTMPDIR
+open C:\Users\068157\AppData\Local\Temp\TestBackendCAFileMustHoldACertificate2129693602\001\junk.pem
+open C:\Users\068157\AppData\Local\Temp\TestBackendCAFileMustHoldACertificate2129693602\001\junk.pem
+stat C:\Users\068157\AppData\Local\Temp\TestBackendCAFileMustHoldACertificate2129693602
+open C:\Users\068157\AppData\Local\Temp\TestBackendCAFileMustHoldACertificate2129693602\002\absent
+open C:\Users\068157\AppData\Local\Temp
+getenv OPEN_RFC_ECLIPSE_ORACLE
+open testdata/eclipse-gateway-conversation.json
+open testdata\fuzz\FuzzDecodeCutFunctionRequest

@@ -30,12 +30,12 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 124],
-    ['diagnostic-readonly', 99],
-    ['legacy-full', 161],
-    ['development-workbench', 90],
+    ['development', 157],
+    ['diagnostic-readonly', 126],
+    ['legacy-full', 189],
+    ['development-workbench', 124],
     ['business-readonly', 18],
-    ['operations-readonly', 41]
+    ['operations-readonly', 46]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;
@@ -125,20 +125,22 @@ describe('tool catalog integrity and raw advanced role policy', () => {
     expect(handle).not.toHaveBeenCalled();
   });
 
-  it('exposes validation cleanup only while the bounded validation switch is complete', () => {
-    Object.assign(process.env, {
-      SAP_MCP_REAL_DEV_VALIDATION: 'true',
-      SAP_MCP_REAL_DEV_VALIDATION_OBJECTS: 'PROGRAM',
-      SAP_MCP_REAL_DEV_VALIDATION_PREFIX: 'ZV',
-      SAP_MCP_REAL_DEV_VALIDATION_PACKAGE: 'Z001',
-      SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT: 'S4HK900009'
-    });
+  it('exposes cleanup independently of the validation switch', () => {
     try {
-      for (const profile of ['development', 'development-workbench']) {
-        const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
-        expect(names).toEqual(expect.arrayContaining([
-          'previewRepositoryObjectCleanup', 'applyRepositoryObjectCleanup', 'getRepositoryObjectCleanupStatus'
-        ]));
+      Object.assign(process.env, {
+        SAP_MCP_REAL_DEV_VALIDATION_OBJECTS: 'PROGRAM',
+        SAP_MCP_REAL_DEV_VALIDATION_PREFIX: 'ZV',
+        SAP_MCP_REAL_DEV_VALIDATION_PACKAGE: 'Z001',
+        SAP_MCP_REAL_DEV_VALIDATION_TRANSPORT: 'S4HK900009'
+      });
+      for (const validation of ['true', 'false']) {
+        process.env.SAP_MCP_REAL_DEV_VALIDATION = validation;
+        for (const profile of ['development', 'development-workbench']) {
+          const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);
+          expect(names).toEqual(expect.arrayContaining([
+            'previewRepositoryObjectCleanup', 'applyRepositoryObjectCleanup', 'getRepositoryObjectCleanupStatus'
+          ]));
+        }
       }
       for (const profile of ['safe', 'diagnostic-readonly', 'legacy-full', 'business-readonly', 'operations-readonly']) {
         const names = (configureServer('DEV', profile) as any).toolCatalog.map((tool: { name: string }) => tool.name);

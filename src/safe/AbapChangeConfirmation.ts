@@ -119,9 +119,14 @@ export class AbapChangeConfirmation {
   }
 
   private formRequest(plan: ChangePlanView): ElicitRequestFormParams {
+    // class include 变更必须在确认消息中显式标注 include 粒度，防止把 include
+    // 写入误认为整类主源写入而误批准
+    const target = plan.object.classInclude
+      ? `${plan.object.objectName}（${plan.object.classInclude} include）`
+      : plan.object.objectName;
     return {
       mode: 'form',
-      message: `应用 ${plan.object.objectName} · 传输 ${plan.transportRequest} · +${plan.diffSummary.addedLines}/-${plan.diffSummary.removedLines}`,
+      message: `应用 ${target} · 传输 ${plan.transportRequest} · +${plan.diffSummary.addedLines}/-${plan.diffSummary.removedLines}`,
       requestedSchema: {
         type: 'object',
         properties: {

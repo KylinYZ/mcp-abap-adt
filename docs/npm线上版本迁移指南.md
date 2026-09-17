@@ -70,7 +70,7 @@ npm view @kylinyz/mcp-abap-abap-adt-api@0.6.0 bin
 | Profile | 工具数 |
 | --- | ---: |
 | `safe` | 7 |
-| `development` | 124 |
+| `development` | 127 |
 | `diagnostic-readonly` | 99 |
 | `legacy-full` | 161 |
 | `development-workbench` | 87 |

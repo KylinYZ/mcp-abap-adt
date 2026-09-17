@@ -1,0 +1,8 @@
+./classic_temporal.go
+./decimal_float.go
+./packed_decimal.go
+./unicode_scalar.go
+./classic_temporal_test.go
+./decimal_float_test.go
+./packed_decimal_test.go
+./unicode_scalar_test.go

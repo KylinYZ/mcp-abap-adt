@@ -58,6 +58,11 @@ export interface AuditEvent {
   qualityCheckKind?: string;
   qualityObjectCount?: number;
   qualityVariantHash?: string;
+  // 受控对象激活工作流（ObjectActivation）专用字段：
+  // planId 关联审计链；对象数量与载荷指纹支撑事后核对，不含任何对象 URI 明文。
+  activationPlanId?: string;
+  activationObjectCount?: number;
+  activationPayloadHash?: string;
 }
 
 export class AuditLogger {

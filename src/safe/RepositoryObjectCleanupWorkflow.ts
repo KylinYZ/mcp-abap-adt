@@ -30,7 +30,7 @@ export class RepositoryObjectCleanupWorkflow {
   ) {}
 
   async preview(request: Record<string, unknown>): Promise<Record<string, unknown>> {
-    this.assertValidationContext();
+    this.assertCleanupContext();
     const objectKind = String(request.objectKind || '').trim().toUpperCase() as RepositoryObjectKind;
     const objectName = repositoryName(request.name, 'name');
     const parentName = request.parentName === undefined ? undefined : repositoryName(request.parentName, 'parentName');
@@ -42,7 +42,7 @@ export class RepositoryObjectCleanupWorkflow {
     // A root SAP object type owns its same-name node; freeze child-first deletion server-side.
     if (objectKind === 'SAP_OBJECT_TYPE') {
       const nodeCapability = this.registry.findByAdtType('NONT/NOT', this.context);
-      if (nodeCapability && this.context.realDevValidationObjects?.includes('SAP_OBJECT_NODE_TYPE')) {
+      if (nodeCapability) {
         const node = await this.findExact(objectName, 'NONT/NOT');
         if (node) resources.push(await this.resolveResource('SAP_OBJECT_NODE_TYPE', objectName, 'NONT/NOT', node));
       }
@@ -67,7 +67,7 @@ export class RepositoryObjectCleanupWorkflow {
       resources,
       transportRequest: String(this.context.realDevValidationTransport || ''),
       dependencySummary: resources.map(resource => `${resource.objectKind} ${resource.objectName}`),
-      summary: `Delete validation object${resources.length === 1 ? '' : 's'} ${resources.map(resource => `${resource.objectKind} ${resource.objectName}`).join(' -> ')}.`
+      summary: `Delete SAP object${resources.length === 1 ? '' : 's'} ${resources.map(resource => `${resource.objectKind} ${resource.objectName}`).join(' -> ')}.`
     };
     const serialized = JSON.stringify(prepared);
     const plan = this.plans.create(this.context, prepared, {
@@ -89,12 +89,12 @@ export class RepositoryObjectCleanupWorkflow {
   }
 
   status(cleanupPlanId: string): RepositoryCleanupPlanView {
-    this.assertValidationContext();
+    this.assertCleanupContext();
     return this.plans.view(cleanupPlanId, this.context);
   }
 
   async apply(cleanupPlanId: string): Promise<Record<string, unknown>> {
-    this.assertValidationContext();
+    this.assertCleanupContext();
     const previewed = this.plans.view(cleanupPlanId, this.context);
     this.assertValidationIdentity(previewed.target.objectKind, previewed.target.objectName, previewed.target.parentName);
     const plan = this.plans.begin(cleanupPlanId, this.context);
@@ -159,26 +159,26 @@ export class RepositoryObjectCleanupWorkflow {
     }
   }
 
-  private assertValidationContext(): void {
-    if (this.context.realDevValidationEnabled !== true
-      || this.context.systemRole !== 'DEV'
+  private assertCleanupContext(): void {
+    if (this.context.systemRole !== 'DEV'
       || !['development', 'development-workbench'].includes(this.context.toolProfile)
-      || !this.context.realDevValidationPrefix
-      || !this.context.realDevValidationPackage
+      || !this.context.allowedNamespaces?.length
       || !this.context.realDevValidationTransport) {
-      throw new SafeAbapError('POLICY_DENIED', 'cleanup-policy', 'Repository cleanup is available only during bounded DEV validation.');
+      throw new SafeAbapError('POLICY_DENIED', 'cleanup-policy', 'Repository cleanup requires a DEV workbench, an allowed namespace, and an open transport.');
     }
   }
 
   private assertValidationIdentity(objectKind: RepositoryObjectKind, objectName: string, parentName?: string): void {
-    const prefix = String(this.context.realDevValidationPrefix || '');
+    const normalizedParent = parentName ? parentName.toUpperCase() : '';
+    const namespaceAllowed = (value: string) => (this.context.allowedNamespaces || []).some(namespace => value.startsWith(namespace));
+    const namespaceName = objectKind === 'DDIC_LOCK_OBJECT' && objectName.startsWith('E')
+      ? objectName.slice(1)
+      : objectName;
     const nameMatches = objectKind === 'FUNCTION_GROUP_INCLUDE'
-      ? Boolean(parentName?.startsWith(prefix) && objectName.startsWith('L'))
-      : objectKind === 'DDIC_LOCK_OBJECT'
-        ? objectName.startsWith(`E${prefix}`)
-        : objectName.startsWith(prefix);
-    if (!this.context.realDevValidationObjects?.includes(objectKind) || !nameMatches) {
-      throw new SafeAbapError('POLICY_DENIED', 'cleanup-policy', 'Cleanup accepts only the configured validation kinds and object-name prefix.');
+      ? Boolean(normalizedParent && namespaceAllowed(normalizedParent))
+      : namespaceAllowed(namespaceName);
+    if (!nameMatches) {
+      throw new SafeAbapError('POLICY_DENIED', 'cleanup-policy', 'Cleanup is restricted to SAP_MCP_ALLOWED_NAMESPACES.');
     }
   }
 
@@ -196,9 +196,8 @@ export class RepositoryObjectCleanupWorkflow {
     let packageName = String(result['adtcore:packageName'] || '').toUpperCase();
     if (objectKind === 'PACKAGE') {
       const packageDocument = await this.client.readControlledPackage(objectName);
-      if (packageDocument.name.toUpperCase() !== objectName
-        || String(packageDocument.parentPackageName || '').toUpperCase() !== this.context.realDevValidationPackage) {
-        throw new SafeAbapError('POLICY_DENIED', 'cleanup-package', 'The package is not a direct child of the configured validation package.');
+      if (packageDocument.name.toUpperCase() !== objectName) {
+        throw new SafeAbapError('STATE_DRIFT', 'cleanup-package', 'SAP returned a different package identity.');
       }
       const members = await this.client.searchObject(objectName, undefined, 200);
       const nonEmptyMembers = members.filter(item => (
@@ -209,8 +208,6 @@ export class RepositoryObjectCleanupWorkflow {
         throw new SafeAbapError('POLICY_DENIED', 'cleanup-package', 'The package is not empty.');
       }
       packageName = objectName;
-    } else if (packageName !== this.context.realDevValidationPackage) {
-      throw new SafeAbapError('POLICY_DENIED', 'cleanup-package', 'The object does not belong to the configured validation package.');
     }
     const objectUrl = result['adtcore:uri'];
     const structure = await this.client.objectStructure(objectUrl, 'active');
@@ -219,7 +216,7 @@ export class RepositoryObjectCleanupWorkflow {
       || String(metadata['adtcore:type'] || '').toUpperCase() !== adtType) {
       throw new SafeAbapError('STATE_DRIFT', 'cleanup-structure', 'SAP returned a different repository object identity.');
     }
-    const transportPackage = objectKind === 'PACKAGE' ? this.context.realDevValidationPackage : packageName;
+    const transportPackage = packageName;
     const info = await this.client.transportInfo(objectUrl, transportPackage, 'I');
     assertTransportOwnership(info, String(this.context.realDevValidationTransport || ''), objectName, objectKind, parentName);
     const details = await this.client.transportDetails(String(this.context.realDevValidationTransport || ''));
@@ -322,7 +319,7 @@ export class RepositoryObjectCleanupWorkflow {
       this.record(plan, 'OBJECT_LOCKED', true, `${resource.objectKind} ${resource.objectName}`);
     } catch (error) {
       if (error instanceof SafeAbapError) throw error;
-      throw new SafeAbapError('LOCK_FAILED', 'cleanup-lock', `Failed to lock the validation object: ${errorMessage(error)}`);
+      throw new SafeAbapError('LOCK_FAILED', 'cleanup-lock', `Failed to lock the SAP object: ${errorMessage(error)}`);
     }
 
     try {
@@ -342,7 +339,7 @@ export class RepositoryObjectCleanupWorkflow {
 
   private async assertAbsent(resource: RepositoryCleanupResource): Promise<void> {
     if (await this.findExact(resource.objectName, resource.adtType)) {
-      throw new SafeAbapError('VERIFICATION_FAILED', 'cleanup-absence', 'The deleted validation object is still present in SAP search.');
+      throw new SafeAbapError('VERIFICATION_FAILED', 'cleanup-absence', 'The deleted SAP object is still present in SAP search.');
     }
   }
 
@@ -461,13 +458,34 @@ function classifyTransportKeyGroup(
   const matching = entries.filter(entry => (
     keys.some(key => transportKeyMatches(entry, key))
   ));
-  const deletions = matching.filter(entry => String(entry['tm:obj_func'] || '').toUpperCase() === 'D');
-  if (deletions.length === 1) return 'DELETION_ENTRY_VERIFIED';
-  if (deletions.length === 0
-    && matching.length === 1
-    && String(matching[0]['tm:obj_func'] || '') === '') {
-    return 'NEUTRAL_ENTRIES_VERIFIED';
+  const relevant = matching.filter(entry => {
+    const operation = String(entry['tm:obj_func'] || '').toUpperCase();
+    return operation === 'D' || operation === '';
+  });
+  const operationsByKey = new Map<string, string[]>();
+  for (const entry of relevant) {
+    const key = [entry['tm:pgmid'], entry['tm:type'], entry['tm:name']]
+      .map(value => String(value || '').toUpperCase())
+      .join('|');
+    const operation = String(entry['tm:obj_func'] || '').toUpperCase() === 'D' ? 'D' : 'N';
+    const operations = operationsByKey.get(key) || [];
+    operations.push(operation);
+    operationsByKey.set(key, operations);
   }
+  const dispositions = [...operationsByKey.values()].map(operations => {
+    const deletionCount = operations.filter(operation => operation === 'D').length;
+    const neutralCount = operations.filter(operation => operation === 'N').length;
+    if (deletionCount > 1 || (deletionCount === 0 && neutralCount > 1)) {
+      throw new SafeAbapError(
+        'VERIFICATION_FAILED',
+        'cleanup-transport',
+        'The validation transport contains duplicate matching entries for one repository key.'
+      );
+    }
+    return operations.includes('D') ? 'D' : 'N';
+  });
+  if (dispositions.length > 0 && dispositions.every(item => item === 'D')) return 'DELETION_ENTRY_VERIFIED';
+  if (dispositions.length > 0 && dispositions.every(item => item === 'N')) return 'NEUTRAL_ENTRIES_VERIFIED';
   throw new SafeAbapError(
     'VERIFICATION_FAILED',
     'cleanup-transport',

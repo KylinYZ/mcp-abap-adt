@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "D:/MyDev/SAP/open-rfc-go/internal/cpic/cpic.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/internal/cpic/cpic.go",
+    "D:/MyDev/SAP/open-rfc-go/rfc/language.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/rfc/language.go",
+    "D:/MyDev/SAP/open-rfc-go/rfc/client.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/rfc/client.go",
+    "D:/MyDev/SAP/open-rfc-go/rfc/language_test.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/rfc/language_test.go",
+    "D:/MyDev/SAP/open-rfc-go/internal/cpic/logon_language_test.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/internal/cpic/logon_language_test.go",
+    "D:/MyDev/SAP/open-rfc-go/cmd/orfctool/orfctool.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/cmd/orfctool/orfctool.go",
+    "D:/MyDev/SAP/vibing-steampunk/pkg/saprfc/saprfc.go": "D:/MyDev/SAP/mcp-abap-abap-adt-api/rfc-language-fix/overlay/pkg/saprfc/saprfc.go"
+  }
+}

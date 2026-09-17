@@ -11,14 +11,17 @@ describe('RepositoryObjectCreationHandlers', () => {
     );
   }
 
-  it('exposes the stable five-tool surface with bounded metadata', () => {
+  it('exposes the bounded creation and cleanup tool surface', () => {
     const tools = handlers().getTools();
     expect(tools.map(tool => tool.name)).toEqual([
       'listRepositoryObjectCreationCapabilities',
       'describeRepositoryObjectCreation',
       'previewRepositoryObjectCreation',
       'applyRepositoryObjectCreation',
-      'getRepositoryObjectCreationStatus'
+      'getRepositoryObjectCreationStatus',
+      'previewRepositoryObjectCleanup',
+      'applyRepositoryObjectCleanup',
+      'getRepositoryObjectCleanupStatus'
     ]);
     for (const tool of tools) {
       expect(tool.inputSchema.additionalProperties).toBe(false);

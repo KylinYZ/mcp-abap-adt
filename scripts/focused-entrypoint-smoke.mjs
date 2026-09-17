@@ -35,7 +35,7 @@ try {
   const text = helpResponse.content?.find(item => item.type === 'text')?.text || '';
   const payload = JSON.parse(text);
   const actions = payload?.result?.actions || [];
-  const passed = names.length === 90
+  const passed = names.length === 93
     && names.includes('sap')
     && names.includes('sapDoctor')
     && actions.some(action => action.action === 'read')

@@ -1,0 +1,51 @@
+diff --git a/pkg/saprfc/saprfc.go b/pkg/saprfc/saprfc.go
+index a951abf..b0ba248 100644
+--- a/pkg/saprfc/saprfc.go
++++ b/pkg/saprfc/saprfc.go
+@@ -103,7 +103,10 @@ func Resolve(in Input) (Params, error) {
+ 		port = 3300 + n // the instance's gateway
+ 	}
+ 
+-	lang := rfcLanguageKey(firstNonEmpty(in.Language, "EN"))
++	lang := strings.TrimSpace(firstNonEmpty(in.Language, "EN"))
++	if lang == "" {
++		lang = "E"
++	}
+ 	// RFC logon may differ from the ADT logon: an explicit flag wins, then the
+ 	// system's rfc_user/rfc_password (which already fall back to SAP_USER/
+ 	// SAP_PASSWORD), then the ADT credentials for the same system.
+@@ -123,33 +126,6 @@ func Resolve(in Input) (Params, error) {
+ 	}, nil
+ }
+ 
+-func rfcLanguageKey(raw string) string {
+-	lang := strings.ToUpper(strings.TrimSpace(raw))
+-	switch lang {
+-	case "EN", "E":
+-		return "E"
+-	case "DE", "D":
+-		return "D"
+-	case "ZH", "1", "KO", "3", "TH", "2":
+-		return "E"
+-	case "JA", "J":
+-		return "J"
+-	case "ES", "S":
+-		return "S"
+-	case "FR", "F":
+-		return "F"
+-	case "IT", "I":
+-		return "I"
+-	case "PT", "P":
+-		return "P"
+-	default:
+-		if lang == "" {
+-			return "E"
+-		}
+-		return lang[:1]
+-	}
+-}
+-
+ // Open dials an RFC client for the resolved parameters.
+ func Open(ctx context.Context, p Params) (*rfc.Client, error) {
+ 	return OpenWithTimeout(ctx, p, 0)
+

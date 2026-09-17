@@ -64,7 +64,7 @@ export class RepositoryObjectCreationHandlers {
     return REPOSITORY_CREATION_TOOL_NAMES.has(toolName);
   }
 
-  getTools(includeValidationCleanup = this.context.realDevValidationEnabled === true): ToolDefinition[] {
+  getTools(includeValidationCleanup = true): ToolDefinition[] {
     const tools = [
       readOnlyTool(
         'listRepositoryObjectCreationCapabilities',
@@ -107,17 +107,17 @@ export class RepositoryObjectCreationHandlers {
       tools.push(
         readOnlyTool(
           'previewRepositoryObjectCleanup',
-          'Freeze one validation-only SAP DEV object cleanup after independently checking identity, package, transport, and dependencies.',
+          'Freeze one SAP DEV object cleanup after checking namespace, identity, transport, and dependencies.',
           cleanupPreviewSchema()
         ),
         mutatingTool(
           'applyRepositoryObjectCleanup',
-          'Open a separate native deletion confirmation and execute one validation-only cleanup plan exactly once.',
+          'Open a separate native deletion confirmation and execute one cleanup plan exactly once.',
           cleanupPlanIdSchema()
         ),
         localTool(
           'getRepositoryObjectCleanupStatus',
-          'Read local evidence and final status for one validation-only repository cleanup plan.',
+          'Read local evidence and final status for one repository cleanup plan.',
           cleanupPlanIdSchema()
         )
       );
@@ -164,9 +164,6 @@ export class RepositoryObjectCreationHandlers {
   }
 
   private requireCleanupWorkflow(): RepositoryCleanupWorkflowPort {
-    if (this.context.realDevValidationEnabled !== true) {
-      throw new SafeAbapError('POLICY_DENIED', 'cleanup-policy', 'Repository cleanup tools require the explicit DEV validation switch.');
-    }
     if (!this.cleanupWorkflow) throw new SafeConfigurationError();
     return this.cleanupWorkflow;
   }

@@ -6,6 +6,7 @@ import { INITIAL_REPOSITORY_CREATION_CAPABILITIES } from '../safe/repositoryCrea
 const validationContext = {
   systemHost: 'dev.example.test', client: '300', sapUser: 'TEST_USER',
   systemRole: 'DEV', toolProfile: 'development' as const,
+  allowedNamespaces: ['Z', 'Y'],
   realDevValidationEnabled: true,
   realDevValidationObjects: ['PROGRAM', 'SAP_OBJECT_TYPE', 'SAP_OBJECT_NODE_TYPE'],
   realDevValidationPrefix: 'ZV',
@@ -138,18 +139,10 @@ describe('RepositoryObjectCleanupWorkflow', () => {
     await expect(workflow.apply('cleanup-lock')).resolves.toMatchObject({ status: 'success' });
   });
 
-  it('fails closed when the validation switch, prefix, package, or transport evidence does not match', async () => {
+  it('fails closed when the allowed namespace or transport evidence does not match', async () => {
     const client = cleanupClient([{ name: 'ZOTHER', type: 'PROG/P', url: '/programs/zother' }]);
-    const disabled = new RepositoryObjectCleanupWorkflow(
-      client,
-      new RepositoryObjectCreationRegistry(INITIAL_REPOSITORY_CREATION_CAPABILITIES),
-      { ...validationContext, realDevValidationEnabled: false },
-      new RepositoryObjectCleanupPlanStore(60_000)
-    );
-    await expect(disabled.preview({ objectKind: 'PROGRAM', name: 'ZOTHER' })).rejects.toMatchObject({ code: 'POLICY_DENIED' });
-
     const enabled = cleanupWorkflow(client, 'cleanup-4');
-    await expect(enabled.preview({ objectKind: 'PROGRAM', name: 'ZOTHER' })).rejects.toMatchObject({
+    await expect(enabled.preview({ objectKind: 'PROGRAM', name: 'XOTHER' })).rejects.toMatchObject({
       code: 'POLICY_DENIED', stage: 'cleanup-policy'
     });
     expect(client.deleteObject).not.toHaveBeenCalled();
@@ -385,7 +378,10 @@ describe('RepositoryObjectCleanupWorkflow', () => {
     } as never);
     client.transportDetails.mockResolvedValue({
       'tm:status': 'modifiable',
-      objects: [{ 'tm:pgmid': 'LIMU', 'tm:type': 'REPS', 'tm:name': 'LZVFG13UXX', 'tm:obj_func': '' }],
+      objects: [
+        { 'tm:pgmid': 'LIMU', 'tm:type': 'FUNC', 'tm:name': 'ZVFM13', 'tm:obj_func': 'D' },
+        { 'tm:pgmid': 'LIMU', 'tm:type': 'REPS', 'tm:name': 'LZVFG13UXX', 'tm:obj_func': 'D' }
+      ],
       tasks: []
     } as never);
     const workflow = new RepositoryObjectCleanupWorkflow(
@@ -399,7 +395,7 @@ describe('RepositoryObjectCleanupWorkflow', () => {
       plan: { target: { transportIdentityAliases: [{ programId: 'LIMU', objectType: 'REPS', objectName: 'LZVFG13UXX' }] } }
     });
     await expect(workflow.apply('cleanup-fm-cts')).resolves.toMatchObject({
-      status: 'success', plan: { status: 'COMPLETED_LOCAL_ABSENCE', transportDisposition: 'NEUTRAL_ENTRIES_VERIFIED' }
+      status: 'success', plan: { status: 'COMPLETED', transportDisposition: 'DELETION_ENTRY_VERIFIED' }
     });
   });
 });

@@ -1,0 +1,3 @@
+./classicrfc.go
+./classicrfc_test.go
+./s4_classic_test.go

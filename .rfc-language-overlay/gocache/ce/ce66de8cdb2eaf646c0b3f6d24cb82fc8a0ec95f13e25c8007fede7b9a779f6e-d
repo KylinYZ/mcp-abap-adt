@@ -1,0 +1,12 @@
+./ddif.go
+./function_interface.go
+./metadata_get.go
+./parameter_index.go
+./recursive.go
+./structure_definition.go
+./ddif_test.go
+./fuzz_test.go
+./interface_definition_test.go
+./metadata_get_test.go
+./parameter_index_test.go
+./recursive_test.go

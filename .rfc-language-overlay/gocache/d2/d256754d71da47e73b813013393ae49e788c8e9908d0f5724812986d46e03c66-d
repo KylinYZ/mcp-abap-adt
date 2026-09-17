@@ -1,0 +1,4 @@
+# test log
+open testdata/s4_STFC_STRUCTURE.hex
+open testdata/s4_RFC_READ_TABLE.hex
+open testdata\fuzz\FuzzDecodeFunintRow

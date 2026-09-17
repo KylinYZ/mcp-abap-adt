@@ -97,6 +97,102 @@ describe('AbapObjectResolver', () => {
     expect(resolved.sourceUrl).toBe(sourceUrl);
   });
 
+  // —— class include 粒度解析（source.class-include 受控链）——
+
+  /** 构造带 main + 四种 include 条目的类 structure（sourceUri 用相对形态，覆盖 URL 归一化）。 */
+  function classStructureWithIncludes(objectUrl: string, includeTypes: string[]) {
+    const includes = ['main', ...includeTypes].map(type => ({
+      'abapsource:sourceUri': `source/${type}`,
+      'adtcore:changedAt': 0,
+      'adtcore:changedBy': 'DEVELOPER',
+      'adtcore:createdAt': 0,
+      'adtcore:createdBy': 'DEVELOPER',
+      'adtcore:name': 'ZCL_TEST',
+      'adtcore:type': 'CLAS/OC',
+      'adtcore:version': 'active',
+      'class:includeType': type,
+      links: []
+    }));
+    return {
+      objectUrl,
+      metaData: metadata('ZCL_TEST', 'CLAS/OC'),
+      includes
+    };
+  }
+
+  function classClient(structure: ReturnType<typeof classStructureWithIncludes>) {
+    return fakeClient({
+      searchObject: jest.fn().mockResolvedValue([{
+        'adtcore:name': 'ZCL_TEST',
+        'adtcore:type': 'CLAS/OC',
+        'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_test'
+      }]),
+      objectStructure: jest.fn().mockResolvedValue(structure)
+    });
+  }
+
+  it.each(['definitions', 'implementations', 'macros', 'testclasses'] as const)(
+    'resolves the %s class include as the writable source while locking the parent class',
+    async kind => {
+      const client = classClient(classStructureWithIncludes('/sap/bc/adt/oo/classes/zcl_test', [
+        'definitions', 'implementations', 'macros', 'testclasses'
+      ]));
+
+      const resolved = await new AbapObjectResolver(client).resolve('CLASS', 'ZCL_TEST', kind);
+      expect(resolved.sourceUrl).toBe(`/sap/bc/adt/oo/classes/zcl_test/source/${kind}`);
+      expect(resolved.classInclude).toBe(kind);
+      // include 没有独立锁/激活身份：锁与激活仍归属父类
+      expect(resolved.lockUrl).toBe('/sap/bc/adt/oo/classes/zcl_test');
+      expect(resolved.activationUrl).toBe('/sap/bc/adt/oo/classes/zcl_test');
+      expect(resolved.activationName).toBe('ZCL_TEST');
+    }
+  );
+
+  it('keeps the main-source resolution untouched when no classInclude hint is given', async () => {
+    const client = classClient(classStructureWithIncludes('/sap/bc/adt/oo/classes/zcl_test', ['definitions']));
+
+    const resolved = await new AbapObjectResolver(client).resolve('CLASS', 'ZCL_TEST');
+    expect(resolved.sourceUrl).toBe('/sap/bc/adt/oo/classes/zcl_test/source/main');
+    expect(resolved.classInclude).toBeUndefined();
+  });
+
+  it('rejects a missing testclasses include with a create-first hint', async () => {
+    const client = classClient(classStructureWithIncludes('/sap/bc/adt/oo/classes/zcl_test', ['definitions']));
+
+    await expect(new AbapObjectResolver(client).resolve('CLASS', 'ZCL_TEST', 'testclasses'))
+      .rejects.toMatchObject({
+        code: 'OBJECT_RESOLUTION_FAILED',
+        message: expect.stringContaining('createTestInclude')
+      });
+  });
+
+  it('rejects an include kind the class does not expose', async () => {
+    const client = classClient(classStructureWithIncludes('/sap/bc/adt/oo/classes/zcl_test', []));
+
+    await expect(new AbapObjectResolver(client).resolve('CLASS', 'ZCL_TEST', 'macros'))
+      .rejects.toMatchObject({
+        code: 'OBJECT_RESOLUTION_FAILED',
+        message: expect.stringContaining('does not expose a macros include')
+      });
+  });
+
+  it('rejects classInclude outside the four supported kinds', async () => {
+    const client = classClient(classStructureWithIncludes('/sap/bc/adt/oo/classes/zcl_test', ['definitions']));
+
+    await expect(new AbapObjectResolver(client).resolve('CLASS', 'ZCL_TEST', 'main'))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  it('rejects classInclude for non-CLASS object types', async () => {
+    const resolver = new AbapObjectResolver(classClient(classStructureWithIncludes('/x', ['definitions'])));
+
+    await expect(resolver.resolve('PROGRAM', 'ZPROG', 'definitions'))
+      .rejects.toMatchObject({
+        code: 'VALIDATION_FAILED',
+        message: expect.stringContaining('only valid for CLASS objects')
+      });
+  });
+
   it('resolves a function-group include without requesting a main-program context', async () => {
     const objectName = 'LZFG_SAP2EAMTOP';
     const objectUrl = '/sap/bc/adt/functions/groups/zfg_sap2eam/includes/lzfg_sap2eamtop';

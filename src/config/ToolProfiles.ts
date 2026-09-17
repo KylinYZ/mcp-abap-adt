@@ -31,6 +31,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'sap', 'sapDoctor',
   'inspectAbapObject', 'previewAbapChange', 'applyAbapChange', 'getAbapChangeStatus',
   'previewAbapObjectCreation', 'applyAbapObjectCreation', 'getAbapObjectCreationStatus',
+  'previewRepositoryObjectCleanup', 'applyRepositoryObjectCleanup', 'getRepositoryObjectCleanupStatus',
   'previewDebugOperation', 'applyDebugOperation', 'authorizeDebugSession', 'executeDebugCommand',
   'getDebugOperationStatus', 'revokeDebugSession', 'previewDebugVariableChange', 'applyDebugVariableChange',
   'previewDdicPropertyChange', 'applyDdicPropertyChange', 'previewPackageChange', 'applyPackageChange',
@@ -51,7 +52,33 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
   'previewQualityCheck', 'runQualityCheck', 'getQualityCheckStatus',
   'listRepositoryObjectCreationCapabilities', 'describeRepositoryObjectCreation',
-  'previewRepositoryObjectCreation', 'applyRepositoryObjectCreation', 'getRepositoryObjectCreationStatus'
+  'previewRepositoryObjectCreation', 'applyRepositoryObjectCreation', 'getRepositoryObjectCreationStatus',
+  // 受控对象激活链（devtools.activate 缺口）：workbench 面显式收录三工具
+  'previewObjectActivation', 'applyObjectActivation', 'getObjectActivationStatus',
+  // CDS 依赖分析三工具（read.cds-analysis）：只读诊断能力，workbench 面显式收录
+  'getCdsDependencies', 'getCdsImpactAnalysis', 'getCdsElementInfo',
+  // Wave 3 分析五工具：源码 grep/交叉引用/应用日志（只读）+ 覆盖率执行（other-mutation）
+  'grepPackage', 'grepObjects', 'getCallees', 'readApplicationLog', 'runUnitCoverage',
+  // dump 增值分析（diagnostics.dumps）：窗口内分组聚合与同类检索，只读
+  'groupRuntimeDumps', 'findSimilarDumps',
+  // 依赖上下文四工具（codeintel.context）：客户端侧压缩/解析/依赖/副作用分析，只读
+  'getDependencyContext', 'analyzeDependencies', 'parseAbapSource', 'analyzeSourceEffects',
+  // UI5/Fiori BSP 只读三工具（ui5.read）：filestore 列表/文件树/文件内容
+  'ui5ListApps', 'ui5GetApp', 'ui5GetFileContent',
+  // SPOOL/后台作业只读二工具（diagnostics.spool-jobs 只读子集）：自由 SQL 查询
+  'listSpoolRequests', 'listJobs',
+  // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET
+  'getMessages',
+  // 版本源码只读工具（revisions.source）：按版本标签/序号读取历史版本源码
+  'getRevisionSource',
+  // 版本对比只读工具（revisions.compare）：LCS unified diff + 增删行计数
+  'compareRevisions',
+  // i18n 按语言只读四工具（i18n.read）：对象内容/数据元素标签/文本池/双语对比
+  'getObjectContentInLanguage', 'getDataElementLabels', 'getTextPoolInLanguage', 'compareObjectLanguages',
+  // 包边界只读检查工具（analysis.boundaries 只读子集）：TADIR 枚举 + 依赖提取
+  'checkPackageBoundaries',
+  // 对象间源码对比（crud.compare-source）：双对象当前源码 LCS unified diff
+  'compareSourceObjects'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([
@@ -72,7 +99,13 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   'tracesList', 'tracesListRequests', 'tracesHitList', 'tracesDbAccess', 'tracesStatements',
   'debuggerListeners', 'debuggerStackTrace', 'debuggerVariables', 'debuggerChildVariables',
   'objectEnhancements', 'revisions', 'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent',
-  'rapGenGetUiConfig', 'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable'
+  'rapGenGetUiConfig', 'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
+  // 运维只读面追加应用日志读取（与 sm21Read 同级诊断）与 dump 增值分析
+  'readApplicationLog', 'groupRuntimeDumps', 'findSimilarDumps',
+  // 版本源码只读（与 revisions 清单同级的运维诊断：核对运行版本与历史差异）
+  'getRevisionSource',
+  // 版本对比只读（版本间 diff，运维核对运行版本变化）
+  'compareRevisions'
 ]);
 
 export function selectProfileTools(
@@ -84,19 +117,33 @@ export function selectProfileTools(
   systemRole = 'DEV',
   controlledAdvancedTools: ToolDefinition[] = [],
   qualityTools: ToolDefinition[] = [],
-  focusedTools: ToolDefinition[] = []
+  focusedTools: ToolDefinition[] = [],
+  activationTools: ToolDefinition[] = [],
+  cdsTools: ToolDefinition[] = [],
+  coverageTools: ToolDefinition[] = []
 ): ToolDefinition[] {
   let selected: ToolDefinition[];
   if (profile === 'safe') selected = safeTools;
-  else if (profile === 'development') selected = [...safeTools, ...safeDebugTools, ...runtimeTools, ...controlledAdvancedTools, ...readOnlyLegacyTools(legacyTools)];
+  else if (profile === 'development') selected = [
+    ...safeTools,
+    ...safeDebugTools,
+    ...runtimeTools,
+    ...controlledAdvancedTools,
+    ...activationTools,
+    ...cdsTools,
+    ...readOnlyLegacyTools(legacyTools)
+  ];
   else if (profile === 'diagnostic-readonly') {
+    // CDS 依赖分析属只读诊断能力，诊断入口同样收录（QAS/PRD 也可见）
     selected = [
       ...safeTools.filter(tool => tool.name === 'inspectAbapObject'),
       ...runtimeTools,
+      ...cdsTools,
       ...readOnlyLegacyTools(legacyTools)
     ];
   } else if (profile === 'legacy-full') {
-    const completeTools = [...safeTools, ...runtimeTools, ...legacyTools];
+    // 专家完整面同样包含 CDS 只读分析三工具
+    const completeTools = [...safeTools, ...runtimeTools, ...legacyTools, ...cdsTools, ...coverageTools];
     selected = systemRole === 'DEV'
       ? completeTools
       : completeTools.filter(tool => !isRawAdvancedMutationTool(tool.name));
@@ -107,6 +154,9 @@ export function selectProfileTools(
       ...controlledAdvancedTools,
       ...qualityTools,
       ...focusedTools,
+      ...activationTools,
+      ...cdsTools,
+      ...coverageTools,
       ...runtimeTools,
       ...legacyTools
     ];
@@ -116,13 +166,6 @@ export function selectProfileTools(
         ? BUSINESS_READONLY_TOOL_NAMES
         : OPERATIONS_READONLY_TOOL_NAMES;
     selected = explicitlyNamedTools(profile, completeTools, names);
-    if (profile === 'development-workbench') {
-      selected.push(...controlledAdvancedTools.filter(tool => (
-        tool.name === 'previewRepositoryObjectCleanup'
-        || tool.name === 'applyRepositoryObjectCleanup'
-        || tool.name === 'getRepositoryObjectCleanupStatus'
-      )));
-    }
   }
   return systemRole === 'DEV'
     ? selected

@@ -120,6 +120,7 @@ function normalizeContext(context: RepositoryCreationContext): RepositoryCreatio
     sapUser: String(context.sapUser || '').toUpperCase(),
     systemRole: String(context.systemRole || '').toUpperCase(),
     toolProfile: context.toolProfile,
+    allowedNamespaces: [...new Set((context.allowedNamespaces || []).map(item => String(item).toUpperCase()))].sort(),
     realDevValidationEnabled: context.realDevValidationEnabled === true,
     realDevValidationObjects: [...new Set((context.realDevValidationObjects || []).map(item => String(item).toUpperCase()))].sort(),
     realDevValidationPrefix: String(context.realDevValidationPrefix || '').toUpperCase(),

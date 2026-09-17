@@ -1,0 +1,6 @@
+./combi.go
+./lexer.go
+./lint.go
+./matcher.go
+./rules.go
+./statements.go

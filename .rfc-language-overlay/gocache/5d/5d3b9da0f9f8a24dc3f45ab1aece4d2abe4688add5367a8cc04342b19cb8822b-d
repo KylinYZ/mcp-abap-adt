@@ -1,0 +1,4 @@
+# test log
+open testdata\fuzz\FuzzDecodeFieldChain
+open testdata\fuzz\FuzzDecodeInitialLogonResponse
+open testdata\fuzz\FuzzDecodeFunctionResultFields

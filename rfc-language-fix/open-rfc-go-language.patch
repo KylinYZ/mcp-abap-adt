@@ -1,0 +1,214 @@
+diff --git a/internal/cpic/cpic.go b/internal/cpic/cpic.go
+index e437457..ed55ab4 100644
+--- a/internal/cpic/cpic.go
++++ b/internal/cpic/cpic.go
+@@ -196,7 +196,7 @@ func failStructure(rule, msg string, fields []StructuralField) error {
+ 
+ var (
+ 	digits3   = regexp.MustCompile(`^\d{3}$`)
+-	oneLetter = regexp.MustCompile(`^[A-Za-z]$`)
++	oneLetter = regexp.MustCompile(`^[A-Za-z0-9]$`)
+ 	asciiRE   = regexp.MustCompile(`^[\x20-\x7e]*$`)
+ )
+ 
+
+diff --git a/rfc/client.go b/rfc/client.go
+index 319a176..847e5e6 100644
+--- a/rfc/client.go
++++ b/rfc/client.go
+@@ -79,6 +79,11 @@ func Open(ctx context.Context, d Destination) (*Client, error) {
+ 	if d.Host == "" || d.User == "" {
+ 		return nil, fmt.Errorf("%w: Host and User are required", ErrProtocol)
+ 	}
++	language, err := normalizeLogonLanguage(d.Language)
++	if err != nil {
++		return nil, fmt.Errorf("%w: %v", ErrProtocol, err)
++	}
++	d.Language = language
+ 	openSession := func(ctx context.Context) (*lifecycle.Managed, error) {
+ 		sopts := client.SessionOptions{
+ 			Host:                     d.Host,
+
+diff --git a/cmd/orfctool/orfctool.go b/cmd/orfctool/orfctool.go
+index fdc2d67..bdfd47a 100644
+--- a/cmd/orfctool/orfctool.go
++++ b/cmd/orfctool/orfctool.go
+@@ -138,7 +138,7 @@ func OpenWithTimeout(ctx context.Context, name string, timeout time.Duration) (*
+ 		User:             sys.User,
+ 		Password:         sys.Password,
+ 		Ticket:           sys.Ticket,
+-		Language:         string([]rune(strings.ToUpper(lang))[0:1]),
++		Language:         lang,
+ 	})
+ 	if err != nil {
+ 		return nil, Options{}, err
+
+diff --git a/rfc/language.go b/rfc/language.go
+new file mode 100644
+--- /dev/null
++++ b/rfc/language.go
+@@ -0,0 +1,85 @@
++// SPDX-License-Identifier: Apache-2.0
++
++package rfc
++
++import (
++	"fmt"
++	"strings"
++)
++
++// isoToSAPLanguage mirrors open-rfc's archived ISO 639-1 to SAP language-key
++// table. The values are SAP's own single-character language keys, not ISO codes.
++var isoToSAPLanguage = map[string]string{
++	"AF": "a", "SQ": "뽑", "AG": "뢇", "AR": "A", "AZ": "뢚",
++	"BD": "룤", "BB": "룢", "BN": "룮", "BK": "룫", "BS": "룳",
++	"Z9": "&", "BG": "W", "CA": "c", "ZH": "1", "ZF": "M",
++	"KW": "뱗", "HR": "6", "Z1": "Z", "CS": "C", "DA": "K",
++	"NL": "N", "DM": "릭", "EN": "E", "6N": "둮", "ET": "9",
++	"FI": "U", "FR": "F", "3F": "덆", "DE": "D", "4G": "뎧",
++	"EL": "G", "HE": "B", "HI": "묩", "HU": "H", "IS": "b",
++	"IN": "뮎", "ID": "i", "IR": "뮒", "IT": "I", "JA": "J",
++	"KK": "뱋", "KO": "3", "LV": "Y", "LT": "X", "MK": "봋",
++	"MS": "7", "MV": "봖", "MO": "봏", "NI": "뵩", "NO": "O",
++	"OM": "뷍", "P1": "븑", "PL": "L", "PT": "P", "1P": "느",
++	"PK": "븫", "RO": "4", "RU": "R", "SA": "뽁", "SR": "0",
++	"SH": "d", "SK": "Q", "SL": "5", "ES": "S", "1X": "늘",
++	"SV": "V", "TA": "뾡", "TT": "뾴", "1Q": "늑", "2Q": "닱",
++	"TH": "2", "TR": "T", "TC": "뾣", "Z8": ";", "UK": "8",
++	"VI": "쁩",
++}
++
++var sapToISOLanguage = func() map[string]string {
++	out := make(map[string]string, len(isoToSAPLanguage))
++	for iso, sap := range isoToSAPLanguage {
++		out[sap] = iso
++	}
++	return out
++}()
++
++// LanguageIsoToSap converts an ISO language code (for example "ZH" or
++// "en-US") to SAP's internal one-character language key ("1" for Chinese).
++func LanguageIsoToSap(language string) (string, error) {
++	trimmed := strings.TrimSpace(language)
++	if trimmed == "" {
++		return "", fmt.Errorf("language must be a non-empty string")
++	}
++	iso := strings.ToUpper(trimmed)
++	if strings.ContainsAny(iso, "-_") {
++		iso = strings.SplitN(iso, "-", 2)[0]
++		iso = strings.SplitN(iso, "_", 2)[0]
++	}
++	if len(iso) != 2 {
++		return "", fmt.Errorf("language ISO code not found: %s", language)
++	}
++	sap, ok := isoToSAPLanguage[iso]
++	if !ok {
++		return "", fmt.Errorf("language ISO code not found: %s", language)
++	}
++	return sap, nil
++}
++
++// LanguageSapToIso converts SAP's internal one-character language key to its
++// archived ISO language code.
++func LanguageSapToIso(language string) (string, error) {
++	if language == "" {
++		return "", fmt.Errorf("SAP language must be a non-empty string")
++	}
++	iso, ok := sapToISOLanguage[language]
++	if !ok {
++		return "", fmt.Errorf("language SAP code not found: %s", language)
++	}
++	return iso, nil
++}
++
++// normalizeLogonLanguage keeps already-valid SAP keys and converts ISO input.
++// This mirrors node-rfc/NCO behavior: callers may pass either "ZH" or "1".
++func normalizeLogonLanguage(language string) (string, error) {
++	trimmed := strings.TrimSpace(language)
++	if trimmed == "" {
++		return "E", nil
++	}
++	if _, ok := sapToISOLanguage[trimmed]; ok {
++		return trimmed, nil
++	}
++	return LanguageIsoToSap(trimmed)
++}
+diff --git a/rfc/language_test.go b/rfc/language_test.go
+new file mode 100644
+--- /dev/null
++++ b/rfc/language_test.go
+@@ -0,0 +1,34 @@
++package rfc
++
++import "testing"
++
++func TestLanguageIsoToSap(t *testing.T) {
++	cases := []struct{ in, want string }{
++		{"de", "D"}, {"ZH", "1"}, {"en-US", "E"}, {"KO", "3"}, {"TH", "2"},
++	}
++	for _, c := range cases {
++		got, err := LanguageIsoToSap(c.in)
++		if err != nil || got != c.want {
++			t.Fatalf("LanguageIsoToSap(%q) = %q, %v; want %q", c.in, got, err, c.want)
++		}
++	}
++}
++
++func TestLanguageSapToIso(t *testing.T) {
++	got, err := LanguageSapToIso("1")
++	if err != nil || got != "ZH" {
++		t.Fatalf("LanguageSapToIso(%q) = %q, %v; want ZH", "1", got, err)
++	}
++}
++
++func TestNormalizeLogonLanguage(t *testing.T) {
++	cases := []struct{ in, want string }{
++		{"ZH", "1"}, {"1", "1"}, {"EN", "E"}, {"E", "E"}, {"", "E"},
++	}
++	for _, c := range cases {
++		got, err := normalizeLogonLanguage(c.in)
++		if err != nil || got != c.want {
++			t.Fatalf("normalizeLogonLanguage(%q) = %q, %v; want %q", c.in, got, err, c.want)
++		}
++	}
++}
+diff --git a/internal/cpic/logon_language_test.go b/internal/cpic/logon_language_test.go
+new file mode 100644
+--- /dev/null
++++ b/internal/cpic/logon_language_test.go
+@@ -0,0 +1,35 @@
++package cpic
++
++import (
++	"bytes"
++	"testing"
++)
++
++func TestEncodesNumericSAPLanguageKey(t *testing.T) {
++	seed := uint32(1)
++	encoded, err := EncodeInitialLogonRequest(InitialLogonRequestInput{
++		Client: "001", User: "RFCUSR", Password: "secret", Language: "1",
++		ClientAddress: "127.0.0.1", PartnerHostName: "host.example.test", Destination: "127.0.0.1",
++		ProgramName: "open-rfc", SessionID: make([]byte, 16), PasswordSeed: &seed,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	decoded, err := DecodeInitialLogonRequest(encoded)
++	if err != nil {
++		t.Fatal(err)
++	}
++	found := false
++	for _, f := range decoded.Fields {
++		if f.Tag == uint16(TagLanguage) {
++			found = true
++			if f.ByteLength != 1 {
++				t.Fatalf("language length = %d, want 1", f.ByteLength)
++			}
++		}
++	}
++	if !found {
++		t.Fatal("language field not found")
++	}
++	_ = bytes.MinRead
++}

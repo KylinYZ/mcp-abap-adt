@@ -267,6 +267,47 @@ describe('server guardrail integration helpers', () => {
     expect(order).toEqual(['repository-apply']);
   });
 
+  it('keeps object-activation confirmation outside the SAP gate without self-deadlocking', async () => {
+    // 回归测试：applyObjectActivation 曾未豁免外层 gate，确认后的 applyConfirmed
+    // 再次 gate.run 在 concurrency=1 下永远排队，真机表现为客户端 60s 超时且
+    // 审计无 OBJECT_ACTIVATION_CONFIRMED。豁免后确认等待在外、apply 独占内槽。
+    const gate = new ToolExecutionGate(1, 2);
+    let acceptConfirmation!: () => void;
+    const confirmation = new Promise<void>(resolve => { acceptConfirmation = resolve; });
+    const order: string[] = [];
+    const execute = (
+      toolName: string,
+      dispatch: () => Promise<unknown>
+    ) => executeGuardedToolCall(
+      toolName,
+      {},
+      guardrails,
+      gate,
+      usesSapExecutionGate(toolName),
+      dispatch,
+      value => value,
+      errorResult
+    );
+
+    const apply = execute('applyObjectActivation', async () => {
+      await confirmation;
+      return gate.run(async () => {
+        order.push('activation-apply');
+        return { status: 'SUCCEEDED' };
+      });
+    });
+    await Promise.resolve();
+    await expect(execute(
+      'getObjectActivationStatus',
+      async () => ({ status: 'PREVIEWED' })
+    )).resolves.toEqual({ status: 'PREVIEWED' });
+    expect(order).toEqual([]);
+
+    acceptConfirmation();
+    await expect(apply).resolves.toEqual({ status: 'SUCCEEDED' });
+    expect(order).toEqual(['activation-apply']);
+  });
+
   it.each([
     ['applyAbapChange', false],
     ['getAbapChangeStatus', false],
@@ -286,6 +327,11 @@ describe('server guardrail integration helpers', () => {
     ['getRepositoryObjectCleanupStatus', false],
     ['runQualityCheck', false],
     ['getQualityCheckStatus', false],
+    // 受控激活 apply 在确认层内部再次经过 executionGate，必须豁免外层 gate
+    //（否则 maxConcurrentTools=1 时自我死锁，真机已复现 60s 客户端超时）
+    ['applyObjectActivation', false],
+    ['getObjectActivationStatus', false],
+    ['previewObjectActivation', true],
     ['healthcheck', false],
     ['sap', false],
     ['sapDoctor', false],

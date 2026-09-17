@@ -1,0 +1,6 @@
+./ddif.go
+./function_interface.go
+./metadata_get.go
+./parameter_index.go
+./recursive.go
+./structure_definition.go
