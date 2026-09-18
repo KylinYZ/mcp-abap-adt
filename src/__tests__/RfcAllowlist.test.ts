@@ -10,11 +10,34 @@ import { createDefaultFmAllowlist, DEFAULT_READONLY_FM_ALLOWLIST, FmAllowlist } 
 import { isRfcError, RfcError } from '../rfc/errors';
 
 describe('RfcAllowlist default gating', () => {
-  it('starts with the minimal default allowlist', () => {
+  it('starts with the controlled default allowlist (probe/read/metadata/search/auth-simulation)', () => {
     const allowlist = createDefaultFmAllowlist();
-    expect(allowlist.size).toBe(3);
-    expect(allowlist.entries()).toEqual(['RFC_PING', 'RFC_READ_TABLE', 'RFC_SYSTEM_INFO']);
-    expect(DEFAULT_READONLY_FM_ALLOWLIST).toEqual(['RFC_SYSTEM_INFO', 'RFC_PING', 'RFC_READ_TABLE']);
+    expect(allowlist.size).toBe(7);
+    expect(allowlist.entries()).toEqual([
+      'RFC_FUNCTION_SEARCH',
+      'RFC_GET_FUNCTION_INTERFACE',
+      'RFC_METADATA_GET',
+      'RFC_PING',
+      'RFC_READ_TABLE',
+      'RFC_SIMULATE_AUTH_CHECK',
+      'RFC_SYSTEM_INFO'
+    ]);
+    expect(DEFAULT_READONLY_FM_ALLOWLIST).toEqual([
+      'RFC_SYSTEM_INFO',
+      'RFC_PING',
+      'RFC_READ_TABLE',
+      'RFC_GET_FUNCTION_INTERFACE',
+      'RFC_METADATA_GET',
+      'RFC_FUNCTION_SEARCH',
+      'RFC_SIMULATE_AUTH_CHECK'
+    ]);
+  });
+
+  it('allows the rfc generalization-round metadata RFMs', () => {
+    const allowlist = createDefaultFmAllowlist();
+    for (const name of ['RFC_GET_FUNCTION_INTERFACE', 'RFC_METADATA_GET', 'RFC_FUNCTION_SEARCH', 'RFC_SIMULATE_AUTH_CHECK']) {
+      expect(allowlist.isAllowed(name)).toBe(true);
+    }
   });
 
   it('allows FM names inside the whitelist case-insensitively', () => {
@@ -57,7 +80,7 @@ describe('RfcAllowlist extension', () => {
     expect(allowlist.isAllowed('Z_MY_READONLY_FM')).toBe(true);
     // 默认条目仍然保留。
     expect(allowlist.isAllowed('RFC_PING')).toBe(true);
-    expect(allowlist.size).toBe(4);
+    expect(allowlist.size).toBe(8);
   });
 
   it('normalizes extension entries to upper case', () => {
@@ -67,7 +90,7 @@ describe('RfcAllowlist extension', () => {
 
   it('deduplicates entries', () => {
     const allowlist = new FmAllowlist(['RFC_PING', 'RFC_PING']);
-    expect(allowlist.size).toBe(3);
+    expect(allowlist.size).toBe(7);
   });
 
   it('rejects malformed extension entries instead of widening silently', () => {

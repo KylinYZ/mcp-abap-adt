@@ -6,9 +6,15 @@
  * 这是禁止「调用任意 FM 通用入口」的第一道硬门。
  *
  * 业务规则：
- * - 默认白名单保持最小集合：RFC_SYSTEM_INFO / RFC_PING / RFC_READ_TABLE，
- *   均为 SAP 标准只读 FM（系统信息、连通性探测、表读取）。
- * - 允许注入扩展条目（未来按 profile 分层放开），但默认不开放；
+ * - 默认白名单是受控最小集合，全部为无副作用的 SAP 标准系统 RFM：
+ *   探测/指纹（RFC_SYSTEM_INFO / RFC_PING）、表读取（RFC_READ_TABLE）、
+ *   接口元数据（RFC_GET_FUNCTION_INTERFACE / RFC_METADATA_GET）、
+ *   FM 检索（RFC_FUNCTION_SEARCH）、权限仿真（RFC_SIMULATE_AUTH_CHECK，
+ *   只读模拟不做授权变更）。
+ * - 扩充条目的准入标准：SAP 标准交付、无副作用（纯读取/仿真）、
+ *   名称稳定；新增必须在本注释记录理由，禁止为业务自定义 RFM 开口子
+ *   （那是 callRfm 白名单扩展注入的受控路径，不走默认集合）。
+ * - 允许注入扩展条目（按 profile 分层放开），但默认不开放；
  *   扩展条目同样必须通过 FM 命名校验。
  * - FM 名统一大写比较（SAP 对象名大小写不敏感的约定）。
  */
@@ -16,8 +22,17 @@
 import { RfcError } from './errors';
 import { isValidFmName } from './interface';
 
-/** 默认只读白名单（最小集合，故意不随需求随意扩张）。 */
-export const DEFAULT_READONLY_FM_ALLOWLIST: readonly string[] = ['RFC_SYSTEM_INFO', 'RFC_PING', 'RFC_READ_TABLE'];
+/** 默认只读白名单（受控最小集合，故意不随需求随意扩张）。 */
+export const DEFAULT_READONLY_FM_ALLOWLIST: readonly string[] = [
+  'RFC_SYSTEM_INFO',
+  'RFC_PING',
+  'RFC_READ_TABLE',
+  // rfc.remote-enabled.call/describe 泛化轮（2026-09-18）扩充的只读元数据/探测 RFM：
+  'RFC_GET_FUNCTION_INTERFACE', // FM 接口元数据读取（describe 通道；open-rfc 内部同源调用）
+  'RFC_METADATA_GET',           // 元数据提供者 FM（basXML 侧接口元数据，describe 备用通道）
+  'RFC_FUNCTION_SEARCH',        // 按名检索 remote-enabled FM（rfc.search 语义，只读）
+  'RFC_SIMULATE_AUTH_CHECK'     // 权限检查仿真（只读模拟，不产生授权变更；授权探测基础）
+];
 
 /**
  * 只读 FM 白名单。

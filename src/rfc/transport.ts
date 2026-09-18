@@ -20,12 +20,20 @@ export interface RfcTransportInvokeRequest {
   readonly signal?: AbortSignal;
 }
 
-/** FM 参数的结构化最小视图（与具体 RFC 库解耦：仅参数名 + 方向类）。 */
+/** FM 参数的结构化视图（与具体 RFC 库解耦：参数名/方向类必填，类型细节可选）。 */
 export interface AdapterFunctionParameter {
   /** 参数名（大写，如 QUERY_TABLE / USE_ET_DATA_4_RETURN）。 */
   readonly parameterName: string
   /** 方向类：I=导入 E=导出 C=变更 T=表（RFC_GET_FUNCTION_INTERFACE 口径）。 */
   readonly parameterClass: string
+  /** ABAP 基本类型码（exid，如 C/I/N/D/P/h/u/v）；元数据不可得时缺省。 */
+  readonly parameterExid?: string
+  /** 关联 DDIC 类型名（结构/表类型；深层字段按名另经 DDIC 元数据查询）。 */
+  readonly associatedType?: string
+  /** 内部长度（字节）；深层/变长类型可为 0。 */
+  readonly internalLength?: number
+  /** 是否可选参数（false = 调用时必填的导入/变更参数）。 */
+  readonly optional?: boolean
 }
 
 /** FM 接口的结构化最小视图（供上层做按系统能力的载荷适配）。 */

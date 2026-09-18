@@ -1343,18 +1343,31 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本项目无 RFC 网关依赖，任意 remote-enabled FM 调用尚无任务路径；2026-09-17 规划修订：阶段 1 传输基座定为本地 open-rfc（TypeScript classic RFC 客户端，npm open-rfc@0.2.3，与 VSP 侧 open-rfc-go 同源同协议），不再自研传输适配器。",
-        "liftCondition": "rfc-transport-spike 阶段 1 以 open-rfc Client 为传输执行器、复用 src/rfc 既有门控（FmAllowlist 只读白名单、接口/编解码/超时模型）落地；前置：open-rfc 要求 Node ^22.14/^24 而本项目 engines>=18，需先完成运行时兼容评估与连接参数来源（由 ADT 系统配置推导）评审。"
+        "status": "EQUIVALENT",
+        "taskPath": [
+          "callRfm"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench",
+          "diagnostic-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "callRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：受控只读 RFM 调用——allowlist 硬门（默认 7 个 SAP 标准无副作用 RFM：探测/指纹/表读取/接口元数据/FM 检索/权限仿真；白名单外 RF_CALL_NOT_ALLOWED 且拒绝发生在任何网络往返之前，message 携带当前白名单）→ 载荷透传（顶层参数键大小写归一）→ invokeFmCall 超时/取消链。真机：RFC_SYSTEM_INFO 指纹（RFCSI_EXPORT.RFCSYSID=S4H，裸 RFM 透传保真）、describe 输出驱动 RFC_FUNCTION_SEARCH 组参调用闭环、RFC_READ_TABLE 透传读回 ET_DATA 2 行、白名单外/非法名双负例拒绝。与 VSP 的差异：VSP 面向任意 remote-enabled FM；本项目把安全面收窄为只读 allowlist，业务自定义 RFM 经构造注入扩展（按部署分层放开）。RFC_SIMULATE_AUTH_CHECK 结果的语义化呈现为后续轮次。",
+        "liftCondition": ""
       },
       "priority": "P0",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "rfc-transport-spike"
+      "nextMilestone": ""
     },
     {
       "id": "rfc.remote-enabled.describe",
@@ -1371,18 +1384,31 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本项目无 RFC 网关依赖，FM 接口描述尚无 RFC 协议级实现；2026-09-17 规划修订：阶段 1 传输基座定为本地 open-rfc（npm open-rfc@0.2.3，与 VSP 侧 open-rfc-go 同源同协议），其 RFC_METADATA_GET 元数据读取可与 src/rfc/interface 的接口模型衔接生成 JSON Schema。",
-        "liftCondition": "rfc-transport-spike 阶段 1 经 open-rfc RFC_METADATA_GET 读元数据并映射到 src/rfc/interface 输出 JSON Schema；前置同 rfc.remote-enabled.call（Node 引擎兼容评估、连接参数来源评审）。"
+        "status": "EQUIVALENT",
+        "taskPath": [
+          "describeRfm"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench",
+          "diagnostic-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "describeRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：FM 接口元数据 → 参数级结构化描述（方向/ABAP 类型码/关联 DDIC 类型/长度/可选性）+ 仅导入与变更参数构造的轻量 inputSchema（callRfm 组参输入面）+ allowlisted 提示。元数据通道复用 TransportAdapter.getFunctionInterface（OpenRfcTransport 委托 open-rfc Client.getFunctionInterface，RFC_METADATA_GET/RFC_GET_FUNCTION_INTERFACE 同源），describe 不执行目标 FM（真机断言 invoke 零调用）。真机：RFC_READ_TABLE 11 参数（含 S/4 增强形态 USE_ET_DATA_4_RETURN/ET_DATA，与元数据实测交叉印证）。与 VSP 的差异：VSP 经 RFC_METADATA_GET 返回完整接口；本实现输出参数级描述+轻量 inputSchema，表/结构行形状以 associatedType 引用（经 DDIC 元数据工具另查），不递归展开。",
+        "liftCondition": ""
       },
       "priority": "P0",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "rfc-transport-spike"
+      "nextMilestone": ""
     },
     {
       "id": "rfc.remote-enabled.discovery",

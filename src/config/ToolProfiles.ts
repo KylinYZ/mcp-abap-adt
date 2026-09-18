@@ -86,11 +86,12 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL 文档 +
   // IMG 检索
   'getAbapDocumentation', 'searchImgActivities',
-  // RFC 探测（rfc.remote-enabled.discovery 直链）：SOAP-RFC 上的 RFC_PING +
-  // RFC_SYSTEM_INFO 系统指纹
+  // RFC 直链四工具（rfc.remote-enabled.discovery/read-table/call/describe）：
+  // 探测指纹、只读表读取、FM 接口描述、受控只读 RFM 调用
   'probeRfcSystem',
-  // RFC_READ_TABLE 只读表读取（rfc.remote-enabled.read-table）
-  'readRfcTable'
+  'readRfcTable',
+  'describeRfm',
+  'callRfm'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

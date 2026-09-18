@@ -30,19 +30,16 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| P0 | 4 | 15 | 0 | 2 | 0 | 0 | 21 |
+| P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
 | P1 | 3 | 13 | 3 | 4 | 2 | 0 | 25 |
 | P2 | 0 | 10 | 7 | 3 | 5 | 0 | 25 |
-| 合计 | 7 | 38 | 10 | 9 | 7 | 0 | 71 |
+| 合计 | 7 | 40 | 10 | 7 | 7 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**45/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**47/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
-| id | 任务 | VSP surface | 后续里程碑 |
-| --- | --- | --- | --- |
-| `rfc.remote-enabled.call` | 通过 classic RFC 直连调用任意 remote-enabled 函数模块 | SAP(action=rfc, target="<FM>", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT） | rfc-transport-spike |
-| `rfc.remote-enabled.describe` | 描述 remote-enabled 函数模块接口（JSON Schema） | SAP(action=rfc, target="<FM>", params={op:describe}) | rfc-transport-spike |
+（无）
 
 ## 逐行矩阵
 
@@ -116,8 +113,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `rfc.remote-enabled.call` | 通过 classic RFC 直连调用任意 remote-enabled 函数模块 | SAP(action=rfc, target="<FM>", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT） | GAP | P0 | （无） | （无） | （无） |
-| `rfc.remote-enabled.describe` | 描述 remote-enabled 函数模块接口（JSON Schema） | SAP(action=rfc, target="<FM>", params={op:describe}) | GAP | P0 | （无） | （无） | （无） |
+| `rfc.remote-enabled.call` | 通过 classic RFC 直连调用任意 remote-enabled 函数模块 | SAP(action=rfc, target="<FM>", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT） | EQUIVALENT | P0 | `callRfm` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `rfc.remote-enabled.describe` | 描述 remote-enabled 函数模块接口（JSON Schema） | SAP(action=rfc, target="<FM>", params={op:describe}) | EQUIVALENT | P0 | `describeRfm` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `rfc.remote-enabled.discovery` | RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索 | SAP(action=rfc, params={op:info\|ping\|probe\|search}) | EQUIVALENT | P1 | `inspectSapSystem`、`searchObject`、`packageSearchHelp`、`probeRfcSystem` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `rfc.helper-bridge` | 经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座 | debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座 | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 | `rfc.remote-enabled.read-table` | 经 RFC 直读 DDIC 表（fields/where/top） | SAP(action=rfc, target="<TABLE>", params={op:read_table,fields,where,top}) | EQUIVALENT | P1 | `tableContents`、`runQuery`、`describeClassicTable`、`readRfcTable` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |

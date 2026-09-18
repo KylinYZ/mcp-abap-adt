@@ -249,3 +249,13 @@
 - 本地门禁全绿：Jest 153 suites / 1430 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check；临时探针五件已清理。
 - 矩阵：rfc.remote-enabled.read-table UNVERIFIED → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=38、PARTIAL=10、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 45/71。证据：docs/evidence/read-table-real-dev-verified.md。
 - 遗留：无系统残留。下一 RFC 轮次候选：rfc.remote-enabled.call/describe（callRfm 泛化，两个 P0 GAP）、RFC_SIMULATE_AUTH_CHECK 授权模拟。
+
+## 2026-09-18 轮（二十一）：rfc.remote-enabled.call/describe 双 P0 GAP 关闭——对齐 47/71
+
+- 本轮工作（优先级清单 P0 项）：callRfm 泛化落地为两个只读工具——`describeRfm`（FM 接口元数据 → 参数级结构化描述 + 仅导入/变更参数的轻量 inputSchema + allowlisted 提示；复用 TransportAdapter.getFunctionInterface，结构化视图扩展类型细节字段；describe 不执行目标 FM）与 `callRfm`（受控只读 RFM 调用：allowlist 硬门 → 载荷透传（顶层键大小写归一）→ invokeFmCall 超时/取消链；RFC 域错误带原因透出）。
+- 安全设计（所有者授权 P0 后的本轮决策）：默认只读 allowlist 3 → 7（新增 RFC_GET_FUNCTION_INTERFACE/RFC_METADATA_GET/RFC_FUNCTION_SEARCH/RFC_SIMULATE_AUTH_CHECK，准入标准写入注释：SAP 标准交付、无副作用、名称稳定；业务自定义 RFM 不走默认集合，经构造注入扩展）。白名单外拒绝发生在任何网络往返之前（真机断言 invoke 零触达）。
+- 真机验证（scripts/rfc-call-describe-real-dev-smoke.mjs，全程只读）：describeRfm RFC_READ_TABLE 11 参数（含 S/4 增强形态 USE_ET_DATA_4_RETURN/ET_DATA，交叉印证上轮元数据实测）；describe→call 组参闭环（RFC_FUNCTION_SEARCH 发现 FUNCNAME 后驱动 callRfm）；RFC_SYSTEM_INFO 指纹 RFCSI_EXPORT.RFCSYSID=S4H（裸 RFM 透传保真）；RFC_READ_TABLE 透传读回 ET_DATA 2 行；白名单外/非法名双负例拒绝。SMOKE OK。
+- 本地门禁全绿：Jest 153 suites / 1440 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：rfc.remote-enabled.call 与 rfc.remote-enabled.describe GAP → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=40、PARTIAL=10、GAP=7、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 47/71。证据：docs/evidence/rfc-call-describe-real-dev-verified.md。
+- 接线同步：ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=166、diagnostic-readonly=135、legacy-full=198、development-workbench=133）+ AGENTS.md 基线（153/1440）。
+- 遗留：无系统残留。RFC_SIMULATE_AUTH_CHECK 已入白名单（结果语义化呈现为后续轮次）；剩余 GAP 7 行（debug.amdp-adt、report.run/async/variants、ui5.write、crud.clone-object、transport.merge-move）与 PARTIAL 10 行按优先级清单推进。

@@ -186,7 +186,16 @@ export class OpenRfcTransport implements TransportAdapter {
     if (!this.opened) {
       throw new RfcTransportError('getFunctionInterface before connect (open-rfc transport)', undefined, 'RFC_TRANSPORT_CLOSED');
     }
-    let iface: { parameters?: ReadonlyArray<{ parameterName?: unknown; parameterClass?: unknown }> };
+    let iface: {
+      parameters?: ReadonlyArray<{
+        parameterName?: unknown
+        parameterClass?: unknown
+        exid?: unknown
+        tableName?: unknown
+        internalLength?: unknown
+        optional?: unknown
+      }>
+    };
     try {
       iface = (await this.client.getFunctionInterface(functionName)) as typeof iface;
     } catch (error) {
@@ -197,7 +206,12 @@ export class OpenRfcTransport implements TransportAdapter {
     return {
       parameters: (iface.parameters ?? []).map(parameter => ({
         parameterName: String(parameter.parameterName ?? ''),
-        parameterClass: String(parameter.parameterClass ?? '')
+        parameterClass: String(parameter.parameterClass ?? ''),
+        // 类型细节字段可选透传（describeRfm 的输出素材；探测路径只用名字/方向）
+        parameterExid: parameter.exid === undefined || parameter.exid === null ? undefined : String(parameter.exid),
+        associatedType: parameter.tableName === undefined || parameter.tableName === null ? undefined : String(parameter.tableName),
+        internalLength: typeof parameter.internalLength === 'number' ? parameter.internalLength : undefined,
+        optional: typeof parameter.optional === 'boolean' ? parameter.optional : undefined
       }))
     };
   }

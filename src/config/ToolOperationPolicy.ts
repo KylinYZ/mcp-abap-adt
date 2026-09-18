@@ -128,10 +128,13 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 知识查询只读二工具（矩阵 diagnostics.knowledge-queries 行子集）：
   // DOKIL/DOKTL 文档读取 + IMG 活动检索；fm_test_data/cluster_read 不在子集
   'getAbapDocumentation', 'searchImgActivities',
-  // RFC 探测（rfc.remote-enabled.discovery 直链）：无副作用系统 RFM
+  // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
+  // 无副作用系统 RFM 探测、只读表读取、FM 接口元数据描述、受控只读 RFM 调用
+  //（callRfm 的安全面由协议层只读 allowlist 硬门收窄，白名单外一律拒绝）
   'probeRfcSystem',
-  // RFC_READ_TABLE 只读表读取（rfc.remote-enabled.read-table）
-  'readRfcTable'
+  'readRfcTable',
+  'describeRfm',
+  'callRfm'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

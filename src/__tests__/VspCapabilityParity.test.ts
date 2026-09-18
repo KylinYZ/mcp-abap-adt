@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { AbapAdtServer } from '../index';
 import { isToolAllowedForSystemRole } from '../config/ToolOperationPolicy';
+import { DEFAULT_READONLY_FM_ALLOWLIST } from '../rfc/allowlist';
 
 // 矩阵真源以文件读取（tsconfig 未开 resolveJsonModule，且 docs 在编译根之外）
 const MATRIX_PATH = path.resolve(__dirname, '../../docs/evidence/vsp-capability-parity-matrix.json');
@@ -171,8 +172,9 @@ describe('VSP capability parity matrix anti-regression', () => {
   });
 
   it('requires a next milestone on every P0 gap so unowned holes cannot linger', () => {
+    // P0 GAP 已全部关闭（第 2026-09-18 轮 callRfm 泛化）；红线保持：
+    // 未来任何新 P0 GAP 必须携带 nextMilestone，不得出现无主缺口
     const p0Gaps = rows.filter(row => row.priority === 'P0' && row.mcp.status === 'GAP');
-    expect(p0Gaps.length).toBeGreaterThan(0);
     for (const row of p0Gaps) expect(row.nextMilestone).toBeTruthy();
   });
 
@@ -182,14 +184,24 @@ describe('VSP capability parity matrix anti-regression', () => {
     }
   });
 
-  it('never marks arbitrary RFC capability as supported while no RFC transport exists', () => {
-    // 防误标红线：RFC 数据面（call/describe）必须是 GAP；helper bridge 必须是显式限制
-    for (const id of ['rfc.remote-enabled.call', 'rfc.remote-enabled.describe']) {
+  it('keeps the rfc data plane allowlist-gated now that the transport exists', () => {
+    // 防回退红线（2026-09-18 callRfm 泛化后改写）：RFC 数据面已 EQUIVALENT，
+    // 但"任意 FM 调用"永不开口——call/describe 必须有任务路径且真机验证，
+    // 默认 allowlist 只能含 SAP 标准只读系统 RFM（RFC_* 前缀），禁止业务
+    // 自定义/Z* FM 静默混入默认集合
+    for (const [id, tool] of [
+      ['rfc.remote-enabled.call', 'callRfm'],
+      ['rfc.remote-enabled.describe', 'describeRfm']
+    ] as const) {
       const row = rows.find(item => item.id === id);
       expect(row).toBeDefined();
-      expect(row?.mcp.status).toBe('GAP');
-      expect(row?.mcp.taskPath).toEqual([]);
+      expect(row?.mcp.status).toBe('EQUIVALENT');
+      expect(row?.mcp.taskPath).toContain(tool);
+      expect(row?.evidence).toContain('real-dev-verified');
       expect(row?.priority).toBe('P0');
+    }
+    for (const entry of DEFAULT_READONLY_FM_ALLOWLIST) {
+      expect(entry.startsWith('RFC_')).toBe(true);
     }
     const bridge = rows.find(item => item.id === 'rfc.helper-bridge');
     expect(bridge?.mcp.status).toBe('INTENTIONAL_RESTRICTION');
