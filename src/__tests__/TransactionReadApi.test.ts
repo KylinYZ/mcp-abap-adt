@@ -35,7 +35,9 @@ describe('getTransaction (VSP GetTransaction 语义，TSTC/TSTCT 通道)', () =>
     const runner = runnerMock([{ TCODE: 'SE38', PGMNA: 'SAPMS38M', TTEXT: 'ABAP Editor' }]);
     const result = await getTransaction(runner, { transaction: ' se38 ', language: 'en' });
     expect(runner.calls[0]).toBe("SELECT tcode, pgmna FROM tstc WHERE tcode = 'SE38'");
-    expect(runner.calls[1]).toBe("SELECT ttext FROM tstct WHERE sprsl = 'EN' AND tcode = 'SE38'");
+    // SPRSL 是 1 位 SAP 内部语言键：2 位 ISO 字面量（'EN'）超列宽会被
+    // datapreview 拒（真机实测 400）——查询前必须转内部键（en→e）
+    expect(runner.calls[1]).toBe("SELECT ttext FROM tstct WHERE sprsl = 'E' AND tcode = 'SE38'");
     expect(result.transaction).toBe('SE38');
     expect(result.program).toBe('SAPMS38M');
     expect(result.description).toBe('ABAP Editor');

@@ -129,6 +129,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // DOKIL/DOKTL 文档读取 + IMG 活动检索 + IMG 活动详情（路径递归）；
   // fm_test_data/cluster_read 不在子集
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
+  // 传输历史只读二工具（矩阵 analysis.history 行子集）：E071/E070 自由 SQL
+  //（真机复测可用）；VSP 图引擎类 impact/boundaries 不在子集
+  'getCrHistory', 'getCoChange',
   // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
   // 无副作用系统 RFM 探测、只读表读取、FM 接口元数据描述、受控只读 RFM 调用
   //（callRfm 的安全面由协议层只读 allowlist 硬门收窄，白名单外一律拒绝）

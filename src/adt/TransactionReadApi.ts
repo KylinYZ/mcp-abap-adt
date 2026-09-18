@@ -1,4 +1,5 @@
 import { normalizeRepositoryName } from './CrossReferenceApi.js'
+import { sapInternalLanguageKey } from './KnowledgeQueriesApi.js'
 
 /**
  * ============================================================================
@@ -85,14 +86,17 @@ export async function getTransaction(
   const program = cell(tcodeRows[0], 'PGMNA')
 
   // TSTCT：多语言描述（独立查询：TSTC 存在但无该语言描述时 description 缺失）。
-  // 专用 DEV 实测（2026-09-17）：datapreview 对 TSTCT 的数据读取一律
-  // Internal server error（表结构可 describe），属环境级限制——查询失败容错
+  // 关键修正（2026-09-18）：TSTCT.SPRSL 是 1 位 SAP 内部语言键——2 位 ISO
+  // 字面量（'EN'）超出列宽会直接 400（真机实测；第十七轮记录的"TSTCT
+  // datapreview 受限"实为此因 + 会话查询预算耗尽的叠加假象）。查询前经
+  // sapInternalLanguageKey 转内部键（EN→E、DE→D、ZH→1）。查询失败仍容错
   // 为"描述缺失 + note"，不让它拖垮 program 主语义。
   let description: string | undefined
   let note: string | undefined
   try {
+    const sprsl = sapInternalLanguageKey(language, capability)
     const textRows = (await runQuery(
-      `SELECT ttext FROM tstct WHERE sprsl = '${language}' AND tcode = ${tcodeLiteral}`,
+      `SELECT ttext FROM tstct WHERE sprsl = '${sprsl}' AND tcode = ${tcodeLiteral}`,
       1
     )).values ?? []
     description = textRows.length > 0 ? cell(textRows[0], 'TTEXT') || undefined : undefined

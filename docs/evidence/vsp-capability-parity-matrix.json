@@ -392,7 +392,7 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "EQUIVALENT",
         "taskPath": [
           "getTransaction"
         ],
@@ -407,7 +407,7 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "getTransaction 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/transaction-read-real-dev-verified.md）：SE38 → 程序 RSABAPPROGRAM 正确返回；描述通道受环境级限制——VSP 的 vit/wb TRAN 端点在该 DEV 无映射，替代通道 TSTCT 的 datapreview 数据读取也一律 Internal server error（表结构可 describe），因此描述容错为缺失 + note 标注（记 PARTIAL 的原因）；不存在事务码/非法名字/非法语言键参数层拒绝。liftCondition：TSTCT 预览限制解除或找到替代描述通道后可评估 EQUIVALENT。",
+        "restrictionReason": "getTransaction 已在真实 DEV 端到端验证（2026-09-18 复测晋级，证据 docs/evidence/transaction-read-real-dev-verified.md）：SE38 → 程序 RSABAPPROGRAM + 描述 \"ABAP Editor\"（EN/DE 双语言）真实返回。第十七轮记录的\"TSTCT datapreview 受限\"实为两层假象的叠加：① TSTCT.SPRSL 是 1 位 SAP 内部语言键，2 位 ISO 字面量（'EN'）超出列宽被 datapreview 拒（真机实测 400）——已修复为查询前经 sapInternalLanguageKey 转内部键（EN→E、DE→D、ZH→1），与知识查询同表；② datapreview 按会话查询预算（约 19 次）耗尽型失败（详见 img-activity 证据）。VSP 的 vit/wb TRAN 端点在该 DEV 无映射的差异保持（本实现走 TSTC/TSTCT 自由 SQL）。",
         "liftCondition": ""
       },
       "priority": "P2",
@@ -1655,12 +1655,12 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
+        "status": "INTENTIONAL_RESTRICTION",
         "taskPath": [],
         "profiles": [],
         "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
       },
       "priority": "P1",
       "evidence": [
@@ -1684,12 +1684,12 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
+        "status": "INTENTIONAL_RESTRICTION",
         "taskPath": [],
         "profiles": [],
         "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
       },
       "priority": "P1",
       "evidence": [
@@ -1713,12 +1713,12 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
+        "status": "INTENTIONAL_RESTRICTION",
         "taskPath": [],
         "profiles": [],
         "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
       },
       "priority": "P1",
       "evidence": [
@@ -2168,7 +2168,9 @@
         "status": "PARTIAL",
         "taskPath": [
           "revisions",
-          "transportInfo"
+          "transportInfo",
+          "getCrHistory",
+          "getCoChange"
         ],
         "profiles": [
           "development",
@@ -2182,8 +2184,8 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "版本历史与传输信息查询覆盖部分历史场景；共同变更/影响面/边界分析无等价。cr_history 通道实测受限（2026-09-17）：E071/E070 的 datapreview 数据读取一律 Internal server error（表结构可查），自由 SQL 历史分析在该 DEV 不可用；VSP 同走 E070A/E071 SQL 亦受同等限制。",
-        "liftCondition": "co-change 分析任务完成只读实现后晋级。"
+        "restrictionReason": "cr_history 与 co_change 子集已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/transport-history-real-dev-verified.md）：getCrHistory 对 ZVCL_CAMPAIGN 返回任务 S4HK900010 → 请求 S4HK900009 层级、用户/日期，E070A CR 属性未配置记 notes；getCoChange 返回同请求共现对象频次排行（实测发现锁对象 ENQU EZVLOCK3 等真实共现）。第十八轮记录的 E071/E070 \"datapreview 受限\"实为会话查询预算耗尽假象（详见 img-activity 证据），复测即正常。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/loads/graph_stats 等图引擎类分析（需 pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
+        "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [

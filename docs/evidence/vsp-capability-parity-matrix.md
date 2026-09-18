@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 3 | 13 | 3 | 4 | 2 | 0 | 25 |
-| P2 | 0 | 10 | 7 | 3 | 5 | 0 | 25 |
-| 合计 | 7 | 40 | 10 | 7 | 7 | 0 | 71 |
+| P1 | 3 | 13 | 3 | 1 | 5 | 0 | 25 |
+| P2 | 0 | 11 | 6 | 3 | 5 | 0 | 25 |
+| 合计 | 7 | 41 | 9 | 4 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**47/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**48/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -60,7 +60,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `read.table-contents` | 读取透明表数据内容与即席 OpenSQL 查询 | SAP(action=read, target="TABL_CONTENTS ...") + focused GetTable/GetTableContents/RunQuery | EQUIVALENT | P0 | `describeClassicTable`、`tableContents`、`runQuery` | development, development-workbench, business-readonly, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.cds-analysis` | 读取 CDS 依赖树、反向影响分析与元素元数据 | SAP(action=read, target="CDS_DEPS\|CDS_IMPACT\|CDS_ELEMENTS ...") + focused GetCDSDependencies/GetCDSImpactAnalysis/GetCDSElementInfo | EQUIVALENT | P1 | `getCdsDependencies`、`getCdsImpactAnalysis`、`getCdsElementInfo` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.coverage` | 运行单元测试并读取行级代码覆盖率 | SAP(action=read, target="COVERAGE ...") + focused GetCodeCoverage | EQUIVALENT | P1 | `runUnitCoverage` | development-workbench, legacy-full | DEV |
-| `read.transaction` | 读取事务码元数据 | SAP(action=read, target="TRAN ...") | PARTIAL | P2 | `getTransaction` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `read.transaction` | 读取事务码元数据 | SAP(action=read, target="TRAN ...") | EQUIVALENT | P2 | `getTransaction` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `read.message-class-texts` | 读取消息类文本（SE91）与 MSAG 对象内容 | SAP(action=read, target="MSAG ...") + focused GetMessages | EQUIVALENT | P2 | `getMessages` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
 ### search
@@ -132,9 +132,9 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `report.run` | 执行 ABAP 报表（带参数/变体）并捕获 ALV 输出 | SAP(action=debug, target="RUN_REPORT") + focused RunReport（ZADT_VSP WebSocket 底座） | GAP | P1 | （无） | （无） | （无） |
-| `report.async` | 后台执行报表并轮询取回异步结果 | SAP(action=debug, target="RUN_REPORT_ASYNC\|GET_ASYNC_RESULT") + focused RunReportAsync/GetAsyncResult | GAP | P1 | （无） | （无） | （无） |
-| `report.variants` | 列出报表变体 | SAP(action=debug, target="GET_VARIANTS") + focused GetVariants；analyze type=variants | GAP | P1 | （无） | （无） | （无） |
+| `report.run` | 执行 ABAP 报表（带参数/变体）并捕获 ALV 输出 | SAP(action=debug, target="RUN_REPORT") + focused RunReport（ZADT_VSP WebSocket 底座） | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
+| `report.async` | 后台执行报表并轮询取回异步结果 | SAP(action=debug, target="RUN_REPORT_ASYNC\|GET_ASYNC_RESULT") + focused RunReportAsync/GetAsyncResult | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
+| `report.variants` | 列出报表变体 | SAP(action=debug, target="GET_VARIANTS") + focused GetVariants；analyze type=variants | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 | `report.text-elements` | 读写程序文本池/文本元素 | SAP(action=debug, target="GET_TEXT_ELEMENTS\|SET_TEXT_ELEMENTS") + focused Get/SetTextElements | PARTIAL | P2 | `getTextElements` | development, development-workbench, business-readonly, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
 ### diagnostics
@@ -155,7 +155,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `analysis.callgraph` | 调用图/调用者/被调用者分析与静态-动态对比 | SAP(action=analyze, params={type:call_graph\|callers\|callees\|analyze_call_graph\|compare_call_graphs\|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution | EQUIVALENT | P0 | `usageReferences`、`usageReferenceSnippets`、`typeHierarchy`、`getCallees` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.boundaries` | 包边界违规检查（clean core） | SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries | EQUIVALENT | P2 | `checkPackageBoundaries` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
-| `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | PARTIAL | P2 | `revisions`、`transportInfo` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
+| `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | PARTIAL | P2 | `revisions`、`transportInfo`、`getCrHistory`、`getCoChange` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 
 ### git
 
@@ -225,6 +225,12 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
   解除条件：仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。
 - **`debug.amdp-helper`**（P1）：AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。
   解除条件：专用 DEV + 明确授权 + helper 前置检查通过并完成独立风险评审后单独评估。
+- **`report.run`**（P1）：所有者早期决策（2026-09-16 轮记录"report 写为 RESTRICTION 方向"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。
+  解除条件：所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。
+- **`report.async`**（P1）：所有者早期决策（2026-09-16 轮记录"report 写为 RESTRICTION 方向"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。
+  解除条件：所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。
+- **`report.variants`**（P1）：所有者早期决策（2026-09-16 轮记录"report 写为 RESTRICTION 方向"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。
+  解除条件：所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。
 - **`analysis.lint`**（P2）：abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。
   解除条件：出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。
 - **`install.zadt-vsp`**（P2）：本项目不自动在 SAP 端安装/部署对象；helper 部署属于有业务副作用的系统变更。

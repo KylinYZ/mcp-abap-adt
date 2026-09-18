@@ -86,6 +86,8 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 知识查询只读三工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
   // 文档 + IMG 检索 + IMG 活动详情（路径递归）
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
+  // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
+  'getCrHistory', 'getCoChange',
   // RFC 直链四工具（rfc.remote-enabled.discovery/read-table/call/describe）：
   // 探测指纹、只读表读取、FM 接口描述、受控只读 RFM 调用
   'probeRfcSystem',

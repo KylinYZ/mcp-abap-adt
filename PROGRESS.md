@@ -270,3 +270,14 @@
 - 矩阵：knowledge-queries 维持 PARTIAL 但边界收窄（img_activity 闭环；剩余 fm_test_data/cluster_read 需 S/2 集群解析器约 2.2k 行移植，独立工程轮候选；真机已确认 datapreview 可回传 CLUSTD hex 串，通道可行）。现状 MCP_SUPERSET=7、EQUIVALENT=40、PARTIAL=10、GAP=7、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 47/71。证据：docs/evidence/img-activity-real-dev-verified.md。
 - 接线同步：ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=167、diagnostic-readonly=136、legacy-full=199、development-workbench=134）+ AGENTS.md 基线（153/1446）。
 - 遗留：无系统残留。下轮候选：① S/2 集群解析器工程轮（fm_test_data/cluster_read，关知识查询最后缺口）；② datapreview 会话预算加固（ADT 客户端会话重置，需评审）；③ 写方向工作流批次（set-description 起步，需授权）。
+
+## 2026-09-18 轮（二十三）：预算假象收获期——read.transaction 晋级 + analysis.history 核心闭环 + report.* 矩阵保真
+
+- 预算发现的红利兑现：新会话重测第十七/十八轮判"环境受限"的表——TSTCT/E071/E070 datapreview 全部正常。进一步定位 TSTCT 的真缺陷：SPRSL 是 1 位内部语言键，2 位 ISO 字面量（'EN'）超出列宽被 datapreview 拒（实测 400）。修复：getTransaction 查询前经 sapInternalLanguageKey 转内部键（与知识查询同表）。
+- read.transaction 复测晋级 EQUIVALENT：SE38 → RSABAPPROGRAM + 描述 "ABAP Editor"（EN/DE 真实返回）；负例保持参数层拒绝。SMOKE OK。
+- analysis.history 核心子集落地（TransportHistoryApi + TransportHistoryHandlers，新处理器接入 index.ts）：`getCrHistory`（E071 R3TR+LIMU → E070 任务→请求层级+用户/日期；E070A CR 属性未配置记 notes）与 `getCoChange`（同请求共现频次排行，VSP 图引擎的简化口径，notes 声明"线索非结论"）。真机：ZVCL_CAMPAIGN 任务 S4HK900010→请求 S4HK900009/用户 068157；共现 5 条真实对象（含锁对象 ENQU EZVLOCK3，与代码事实吻合）。SMOKE OK。边界收窄：剩余为 impact/boundaries/graph_stats 等图引擎类。
+- 矩阵保真：report.run/async/variants GAP → INTENTIONAL_RESTRICTION（所有者早期已定 RESTRICTION 方向，等价读能力由 spool-jobs/text-elements 覆盖），GAP 桶 7 → 4。
+- 本地门禁全绿：Jest 154 suites / 1455 tests、build、coverage、parity、git diff --check。
+- 矩阵现状：MCP_SUPERSET=7、EQUIVALENT=41、PARTIAL=9、GAP=4、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 48/71。证据：docs/evidence/transport-history-real-dev-verified.md。
+- 接线同步：ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=169、diagnostic-readonly=138、legacy-full=201、development-workbench=136）+ AGENTS.md 基线（154/1455）。
+- 遗留：无系统残留。剩余 GAP 4 行全为写方向或环境前置（clone-object、merge-move、amdp-adt、ui5.write）；PARTIAL 9 行中可推进项为知识查询集群解析器工程轮（fm_test_data/cluster_read）与写方向受控工作流批次（均需授权/大轮）。

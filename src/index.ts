@@ -128,6 +128,7 @@ import { createBoundaryCheckClient } from './adt/BoundaryCheckApi.js';
 import { createTransactionReadClient } from './adt/TransactionReadApi.js';
 import { createInstallDiagnosticsClient } from './adt/InstallDiagnosticsApi.js';
 import { createKnowledgeQueriesClient } from './adt/KnowledgeQueriesApi.js';
+import { createTransportHistoryClient } from './adt/TransportHistoryApi.js';
 import { RfcProbeHandlers } from './handlers/RfcProbeHandlers.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
@@ -143,6 +144,7 @@ import { BoundaryCheckHandlers } from './handlers/BoundaryCheckHandlers.js';
 import { TransactionReadHandlers } from './handlers/TransactionReadHandlers.js';
 import { InstallDiagnosticsHandlers } from './handlers/InstallDiagnosticsHandlers.js';
 import { KnowledgeQueriesHandlers } from './handlers/KnowledgeQueriesHandlers.js';
+import { TransportHistoryHandlers } from './handlers/TransportHistoryHandlers.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
@@ -194,6 +196,7 @@ export class AbapAdtServer extends Server {
   private transactionReadHandlers: TransactionReadHandlers;
   private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
   private knowledgeQueriesHandlers: KnowledgeQueriesHandlers;
+  private transportHistoryHandlers: TransportHistoryHandlers;
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
@@ -389,6 +392,9 @@ export class AbapAdtServer extends Server {
     // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
     // 文档 + IMG 自定义活动/文件夹检索，自由 SQL 只读。
     this.knowledgeQueriesHandlers = new KnowledgeQueriesHandlers(createKnowledgeQueriesClient(readClient));
+    // 传输历史只读二工具（analysis.history 子集）：E071/E070 自由 SQL（真机
+    // 复测可用——早前"受限"为 datapreview 会话预算耗尽的叠加假象）。
+    this.transportHistoryHandlers = new TransportHistoryHandlers(createTransportHistoryClient(readClient));
     // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：open-rfc 直连
     // SAP 网关（node:net，无 SDK），连接参数由既有 ADT 环境推导（主机/
     // client/凭据同源，实例号经 RFC_SYSNR 覆盖，缺省 '01' 与专用 DEV
@@ -790,6 +796,7 @@ export class AbapAdtServer extends Server {
       ...this.transactionReadHandlers.getTools(),
       ...this.installDiagnosticsHandlers.getTools(),
       ...this.knowledgeQueriesHandlers.getTools(),
+      ...this.transportHistoryHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
@@ -957,6 +964,10 @@ export class AbapAdtServer extends Server {
         // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.knowledgeQueriesHandlers.supports(toolName)) {
           return this.knowledgeQueriesHandlers.handle(toolName, limitedArguments);
+        }
+        // 传输历史只读二工具（analysis.history 子集）：全只读，同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.transportHistoryHandlers.supports(toolName)) {
+          return this.transportHistoryHandlers.handle(toolName, limitedArguments);
         }
         // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.rfcProbeHandlers.supports(toolName)) {
