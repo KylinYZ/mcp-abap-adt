@@ -44,7 +44,7 @@ describe('RfcProbeHandlers tool catalog', () => {
   it('publishes one uniquely named read-only tool', () => {
     const handlers = handlerWith(adapterMock({}));
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['probeRfcSystem']);
+    expect(tools.map(t => t.name)).toEqual(['probeRfcSystem', 'readRfcTable']);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true

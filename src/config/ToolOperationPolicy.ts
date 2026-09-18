@@ -129,7 +129,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // DOKIL/DOKTL 文档读取 + IMG 活动检索；fm_test_data/cluster_read 不在子集
   'getAbapDocumentation', 'searchImgActivities',
   // RFC 探测（rfc.remote-enabled.discovery 直链）：无副作用系统 RFM
-  'probeRfcSystem'
+  'probeRfcSystem',
+  // RFC_READ_TABLE 只读表读取（rfc.remote-enabled.read-table）
+  'readRfcTable'
 ]);
 
 const SOURCE_MUTATION_TOOL_NAMES = new Set([

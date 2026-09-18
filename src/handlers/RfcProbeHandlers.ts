@@ -6,6 +6,7 @@ import { normalizeRfcConnectionParams, type RfcConnectionParams } from '../rfc/c
 import { RfcError } from '../rfc/errors.js';
 import { RfcConnectionPool } from '../rfc/pool.js';
 import type { TransportAdapter } from '../rfc/transport.js';
+import { readRfcTable } from '../rfc/read-table-adapter.js';
 import { OpenRfcTransport, rfcParamsFromEnvironment } from '../rfc/open-rfc-transport.js';
 
 /**
@@ -35,7 +36,7 @@ import { OpenRfcTransport, rfcParamsFromEnvironment } from '../rfc/open-rfc-tran
  */
 
 /** 本处理器认领的工具名。 */
-const RFC_PROBE_TOOL_NAMES = new Set(['probeRfcSystem']);
+const RFC_PROBE_TOOL_NAMES = new Set(['probeRfcSystem', 'readRfcTable']);
 
 type RfcProbeToolDefinition = ToolDefinition & {
   annotations: {
@@ -110,8 +111,17 @@ export class RfcProbeHandlers {
     } as Record<string, unknown>;
   }
 
-  /** 只读工具定义（无入参）。 */
+  /** 只读工具定义（probeRfcSystem 无入参 + readRfcTable 带表/列过滤）。 */
   getTools(): RfcProbeToolDefinition[] {
+    const readOnly: Pick<RfcProbeToolDefinition, 'annotations' | '_meta'> = {
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      },
+      _meta: { operationClass: 'read-only tenant', approvalRequired: false }
+    };
     return [
       {
         name: 'probeRfcSystem',
@@ -122,13 +132,44 @@ export class RfcProbeHandlers {
           additionalProperties: false,
           properties: {}
         },
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          idempotentHint: true,
-          openWorldHint: true
+        ...readOnly
+      },
+      {
+        name: 'readRfcTable',
+        description:
+          'Read rows from a DDIC table or view over the direct RFC link (RFC_READ_TABLE): WHERE clause with single-quote escaping, column projection, row-count limit. Gated to the read-only FM allowlist. Read-only.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            table: {
+              type: 'string',
+              description: 'Target DDIC table or view name, e.g. T001.',
+              minLength: 1,
+              maxLength: 30
+            },
+            whereClause: {
+              type: 'string',
+              description: "WHERE clause (e.g. \"BUKRS = '1000'\"); single quotes are escaped automatically.",
+              optional: true
+            },
+            fields: {
+              type: 'array',
+              description: 'Column names to read; empty reads all columns.',
+              items: { type: 'string' },
+              optional: true
+            },
+            maxRows: {
+              type: 'number',
+              description: 'Maximum rows to return; default 100, cap 1000.',
+              minimum: 1,
+              maximum: 1000,
+              optional: true
+            }
+          },
+          required: ['table']
         },
-        _meta: { operationClass: 'read-only tenant', approvalRequired: false }
+        ...readOnly
       }
     ];
   }
@@ -155,6 +196,29 @@ export class RfcProbeHandlers {
           systemInfo = { status: 'error', detail: error instanceof Error ? error.message.slice(0, 200) : String(error) };
         }
         return success({ ping, systemInfo });
+      }
+      if (toolName === 'readRfcTable') {
+        const table = typeof argumentsValue?.table === 'string' ? argumentsValue.table.trim().toUpperCase() : '';
+        if (!table || table.length > 30 || !/^[A-Z0-9_/]+$/.test(table)) {
+          throw invalid(
+            `${toolName} requires table: a non-empty DDIC table name of at most 30 characters matching [A-Z0-9_/].`
+          );
+        }
+        const whereClause = typeof argumentsValue?.whereClause === 'string' ? argumentsValue.whereClause.trim() : undefined;
+        const fieldsRaw = Array.isArray(argumentsValue?.fields) ? argumentsValue.fields : undefined;
+        const fields = fieldsRaw?.map(f => String(f ?? '').trim().toUpperCase()).filter(f => f !== '');
+        const maxRows = typeof argumentsValue?.maxRows === 'number' && Number.isFinite(argumentsValue.maxRows)
+          ? Math.min(Math.max(Math.floor(argumentsValue.maxRows), 1), 1000)
+          : undefined;
+        return success(await readRfcTable(
+          await this.adapter(),
+          {
+            table,
+            ...(whereClause ? { whereClause } : {}),
+            ...(fields && fields.length > 0 ? { fields } : {}),
+            ...(maxRows !== undefined ? { maxRows } : {})
+          }
+        ));
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown RFC probe tool: ${toolName}`);
     } catch (error) {

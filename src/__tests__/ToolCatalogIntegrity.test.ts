@@ -30,10 +30,10 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 163],
-    ['diagnostic-readonly', 132],
-    ['legacy-full', 195],
-    ['development-workbench', 130],
+    ['development', 164],
+    ['diagnostic-readonly', 133],
+    ['legacy-full', 196],
+    ['development-workbench', 131],
     ['business-readonly', 18],
     ['operations-readonly', 46]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {

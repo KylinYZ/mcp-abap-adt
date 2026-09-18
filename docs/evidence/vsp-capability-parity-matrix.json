@@ -2818,16 +2818,16 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "UNVERIFIED",
         "taskPath": [
           "tableContents",
           "runQuery",
-          "describeClassicTable"
+          "describeClassicTable",
+          "readRfcTable"
         ],
         "profiles": [
           "development",
           "development-workbench",
-          "business-readonly",
           "diagnostic-readonly",
           "legacy-full"
         ],
@@ -2836,14 +2836,15 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "读表任务可经 ADT OpenSQL 完成；无 RFC 协议直读（字段选择/where/top 语义对齐需逐项核对）。2026-09-17 规划修订：RFC 直读基座定为本地 open-rfc，其 RFC_READ_TABLE 调用面在默认只读白名单内。",
-        "liftCondition": "rfc-transport-spike 阶段 1（open-rfc 基座）落地后评估是否保留双通道；前置同 rfc.remote-enabled.call（Node 引擎兼容评估）。"
+        "restrictionReason": "rfc.remote-enabled.read-table 已实施 readRfcTable（open-rfc 直链 + RFC_READ_TABLE）：表名白名单（≤30 DDIC 名）、WHERE 子句注入防线（控制字符/分号/换行拒绝 + 单引号翻倍）、列投影（FIELDS 白名单）、ROWCOUNT 上限 1000。TSTCT 同类 datapreview 受限不影响本通道（走 open-rfc 直链网关 3301）。真机端到端验证未跑，暂不晋级。",
+        "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation"
       ],
-      "nextMilestone": ""
+      "nextMilestone": "read-table-real-dev-smoke"
     }
   ]
 }

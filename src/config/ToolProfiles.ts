@@ -88,7 +88,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'getAbapDocumentation', 'searchImgActivities',
   // RFC 探测（rfc.remote-enabled.discovery 直链）：SOAP-RFC 上的 RFC_PING +
   // RFC_SYSTEM_INFO 系统指纹
-  'probeRfcSystem'
+  'probeRfcSystem',
+  // RFC_READ_TABLE 只读表读取（rfc.remote-enabled.read-table）
+  'readRfcTable'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([
