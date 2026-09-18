@@ -12,7 +12,7 @@
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
 - profile 目录：`safe=7`、`development=164`、`diagnostic-readonly=133`、`legacy-full=196`、`development-workbench=131`、`business-readonly=18`、`operations-readonly=48`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
-- 自动化基线：149 个 Jest suites、1422 个 tests（2026-09-18）。
+- 自动化基线：153 个 Jest suites、1430 个 tests（2026-09-18）。
 - 运行时要求：Node.js >=22.14.0（`.nvmrc` 为 22；Node 18/20 已 EOL，自 0.7.0 起不再支持——为 RFC 基座 open-rfc 的支持合同对齐）。
 
 ## 开发与验证

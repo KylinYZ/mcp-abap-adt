@@ -8,7 +8,17 @@ import {
  * RFC_READ_TABLE 只读表读取（rfc.remote-enabled.read-table 直链路线）。
  *
  * 经 RFC_READ_TABLE（SAP 标准只读 RFM，allowlist 默认白名单内）读取 DDIC
- * 表/视图数据：DATA 行按 DELIMITER 切分为列值数组。
+ * 表/视图数据。按系统接口能力双路径解析（真机实测 2026-09-18）：
+ *
+ * - S/4 增强 RFM（接口含 USE_ET_DATA_4_RETURN/ET_DATA）：经典 DATA 回填路径
+ *   已死（不带开关时 DATA/FIELDS/ET_DATA 全空），必须设 USE_ET_DATA_4_RETURN
+ *   ='X'，数据经 ET_DATA[].LINE（按 DELIMITER '|' 分列）返回；FIELDS 仅在
+ *   调用方投影时回传列目录。
+ * - 经典 RFM（旧系统，接口无该参数）：不能发该开关（open-rfc 请求侧按元
+ *   数据校验，未知参数直接拒发 unknown parameter），数据经 DATA[].WA 返回。
+ *
+ * 能力探测经 TransportAdapter.getFunctionInterface（可选能力）按适配器缓存；
+ * 未实现该能力的适配器（Loopback/测试桩）一律走经典路径。
  */
 
 export { buildReadTablePayload, validateToken } from './read-table.js';
@@ -27,6 +37,32 @@ function asRowArray(value: unknown): Array<Record<string, unknown>> {
   return value.filter((item): item is Record<string, unknown> =>
     typeof item === 'object' && item !== null
   );
+}
+
+/**
+ * USE_ET_DATA_4_RETURN 能力探测缓存（按适配器实例）。
+ * 缓存探测 Promise：并发调用共享一次元数据往返；探测失败的 Promise 不缓存，
+ * 下次调用重新探测（瞬态元数据故障不永久封锁）。
+ */
+const etDataCapableAdapters = new WeakMap<TransportAdapter, Promise<boolean>>();
+
+/**
+ * 探测目标系统的 RFC_READ_TABLE 是否为 S/4 增强形态（含 USE_ET_DATA_4_RETURN
+ * 导入参数）。探测失败按传输级错误抛出（连接池据此剔除），不静默降级——
+ * 静默降级会在增强系统上得到"0 行成功"的假阴性。
+ */
+async function supportsEtDataReturn(adapter: TransportAdapter): Promise<boolean> {
+  if (typeof adapter.getFunctionInterface !== 'function') return false;
+  const cached = etDataCapableAdapters.get(adapter);
+  if (cached !== undefined) return cached;
+  const probe = adapter.getFunctionInterface('RFC_READ_TABLE')
+    .then(iface => iface.parameters.some(p => p.parameterName === 'USE_ET_DATA_4_RETURN'))
+    .catch((error: unknown) => {
+      etDataCapableAdapters.delete(adapter);
+      throw error;
+    });
+  etDataCapableAdapters.set(adapter, probe);
+  return probe;
 }
 
 /** readRfcTable 的输入。 */
@@ -66,14 +102,24 @@ export async function readRfcTable(
     .map(f => validateToken(f, capability, 'fields entry', 30));
 
   const { payload, table } = buildReadTablePayload(input, capability);
+  // S/4 增强形态必须显式要走 ET_DATA 回填（否则经典 DATA 路径全空返回）
+  const readTablePayload: Record<string, unknown> = { ...(payload as Record<string, unknown>) };
+  const etDataMode = await supportsEtDataReturn(adapter);
+  if (etDataMode) {
+    readTablePayload.USE_ET_DATA_4_RETURN = 'X';
+  }
   const invokeResult = await adapter.invoke({
     functionName: 'RFC_READ_TABLE',
-    payload: payload as Readonly<Record<string, unknown>>
+    payload: readTablePayload
   });
 
-  // RFC_READ_TABLE 输出：DATA 表（WA 列 = DELIMITER 分隔的整行文本）、
-  // FIELDS 表（实际读取的列定义——FIELDNAME 列名）
-  const dataRows = asRowArray(invokeResult.tables['DATA']).map(row => String(row['WA'] ?? ''));
+  // RFC_READ_TABLE 输出（按路径分派）：
+  // - 增强：ET_DATA[].LINE = DELIMITER '|' 分隔的整行文本；FIELDS 仅投影时回传
+  // - 经典：DATA[].WA = DELIMITER 分隔的整行文本；FIELDS 为实际读取的列定义
+  const sourceTable = etDataMode ? 'ET_DATA' : 'DATA';
+  const sourceColumn = etDataMode ? 'LINE' : 'WA';
+  const dataRows = asRowArray(invokeResult.tables[sourceTable])
+    .map(row => String(row[sourceColumn] ?? ''));
   const declaredFields = asRowArray(invokeResult.tables['FIELDS'])
     .map(row => String(row['FIELDNAME'] ?? '').trim())
     .filter(Boolean);
@@ -81,7 +127,7 @@ export async function readRfcTable(
     ? fields.length
     : (declaredFields.length > 0 ? declaredFields.length : 0);
   const parsed = dataRows.map(row => {
-    const cells = row.split('~~');
+    const cells = row.split('|');
     while (columnCount > 0 && cells.length < columnCount) cells.push('');
     return cells.slice(0, Math.max(columnCount, cells.length));
   });

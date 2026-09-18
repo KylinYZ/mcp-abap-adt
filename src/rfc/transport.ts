@@ -20,6 +20,19 @@ export interface RfcTransportInvokeRequest {
   readonly signal?: AbortSignal;
 }
 
+/** FM 参数的结构化最小视图（与具体 RFC 库解耦：仅参数名 + 方向类）。 */
+export interface AdapterFunctionParameter {
+  /** 参数名（大写，如 QUERY_TABLE / USE_ET_DATA_4_RETURN）。 */
+  readonly parameterName: string
+  /** 方向类：I=导入 E=导出 C=变更 T=表（RFC_GET_FUNCTION_INTERFACE 口径）。 */
+  readonly parameterClass: string
+}
+
+/** FM 接口的结构化最小视图（供上层做按系统能力的载荷适配）。 */
+export interface AdapterFunctionInterface {
+  readonly parameters: readonly AdapterFunctionParameter[]
+}
+
 /**
  * 传输适配器接口（所有 RFC 通信的底层抽象）。
  *
@@ -30,12 +43,15 @@ export interface RfcTransportInvokeRequest {
  * - `close`：关闭连接；关闭后的 invoke 必须抛 code=RFC_TRANSPORT_CLOSED。
  * - `lastActivity`：最近一次成功活动的 epoch 毫秒；null 表示尚无活动，
  *   供连接池/诊断判断连接新鲜度。
+ * - `getFunctionInterface`（可选）：查询 FM 接口元数据。未实现（如
+ *   Loopback）表示元数据通道不可用，上层按保守经典路径处理。
  */
 export interface TransportAdapter {
   connect(signal?: AbortSignal): Promise<void>;
   invoke(request: RfcTransportInvokeRequest): Promise<FmCallResult>;
   close(): Promise<void>;
   lastActivity(): number | null;
+  getFunctionInterface?(functionName: string): Promise<AdapterFunctionInterface>;
 }
 
 /* ---------------------------------------------------------------------------

@@ -237,3 +237,15 @@
 - 矩阵：rfc.remote-enabled.discovery PARTIAL → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=37、PARTIAL=11、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 44/71。证据：docs/evidence/rfc-probe-real-dev-verified.md。
 - 接线同步：index.ts + ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=164、diagnostic-readonly=133、legacy-full=196、workbench=131、operations=48）+ AGENTS.md 基线（149/1435）。
 - 遗留：无系统残留。下轮候选：rfc.remote-enabled.call/read-table（open-rfc 底座已通，callRfm 泛化 + RFC_READ_TABLE 白名单内表读取）、RFC_SIMULATE_AUTH_CHECK 授权探测（open-rfc 支持）。
+
+## 2026-09-18 轮（二十）：rfc.remote-enabled.read-table 晋级 EQUIVALENT——UNVERIFIED 清零，open-rfc 阻塞解除
+
+- 背景与授权：所有者确认 open-rfc（D:\MyDev\SAP\open-rfc，kylin_dev 分支）为其自维护 fork，库的问题可直接修复维护；本轮按方案 ①（本项目侧接线）解除 read-table 阻塞。
+- 修复一（决策门）：open-rfc 对含 TABLES 参数的调用要求显式递归序列化器观测（否则 live-decision-required 拒发）。OpenRfcTransport 构造缺省注入 classic-xRFC 观测策略（profile abap-7.58 + observation classic-xrfc/classic-xrfc；部署级断言：经典 RFC 直链无 basXML 协商，仅限可信内网 DEV），构造 options 可覆盖；单测 OpenRfcTransportPolicy.test.ts（3 例）锁接线契约。
+- 修复二（DELIMITER）：RFC_READ_TABLE 的 DELIMITER 为 CHAR1，open-rfc 按元数据宽度校验，双字符 ~~ 被拒；改回 VSP 同款单字符 |（列值含 | 串列为 VSP 同款已知限制）。
+- 修复三（WHERE 引号）：OPTIONS TEXT 由 RFM 内部作为动态 Open SQL 片段执行，此前单引号翻倍触发 ABAP DB_Error（SAIS）；改为原样透传，注入防线保留（控制字符/分号/换行拒绝 + 表名/列名白名单 + 72 字符上限）。此前注释"VSP sqlQuote 语义"系误记——VSP readtable.go 实际不转义引号，本轮核对源码澄清。
+- 系统形态适配（真机发现）：该 S/4 DEV 的 RFC_READ_TABLE 被 SAP 增强（USE_ET_DATA_4_RETURN 导入参数 + ET_DATA 导出表 SDTI_RESULT_TAB），不带开关时经典 DATA 回填全空；且 open-rfc 请求侧按元数据校验参数名，旧系统发开关会 unknown parameter 拒发。适配为能力探测双路径：TransportAdapter 新增可选 getFunctionInterface（OpenRfcTransport 委托 open-rfc Client 同名方法，仅保留参数名/方向类结构视图），read-table-adapter 探测 USE_ET_DATA_4_RETURN 存在则带开关并从 ET_DATA[].LINE 解析，否则经典 DATA[].WA；探测按适配器 WeakMap 缓存，失败如实抛出且不缓存（静默降级会产生"0 行成功"假阴性）。单测 ReadRfcTableEtData.test.ts（5 例）。
+- 真机验证（scripts/read-table-real-dev-smoke.mjs，全程只读）：T001 全量 10 行、WHERE 过滤（该 client 300 无 BUKRS=1000，0 行属正确行为）、列投影 [["0001","SAP SE"],["0003","SAP US (IS-HT-SW)"]]、注入负例参数层拒绝。SMOKE OK。
+- 本地门禁全绿：Jest 153 suites / 1430 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check；临时探针五件已清理。
+- 矩阵：rfc.remote-enabled.read-table UNVERIFIED → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=38、PARTIAL=10、GAP=9、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 45/71。证据：docs/evidence/read-table-real-dev-verified.md。
+- 遗留：无系统残留。下一 RFC 轮次候选：rfc.remote-enabled.call/describe（callRfm 泛化，两个 P0 GAP）、RFC_SIMULATE_AUTH_CHECK 授权模拟。

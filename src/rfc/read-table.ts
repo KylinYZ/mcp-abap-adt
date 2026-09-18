@@ -8,9 +8,11 @@
  *   返回 DATA 行（WA 按 DELIMITER 切分为列值）。
  *
  * 与 VSP 的差异（如实声明）：
- *   - VSP 的 DELIMITER='|' 但列值含 '|' 时会串列——本实现改用 '~~' 双波浪
- *     分隔并在解析时按首个分隔串切分（VSP 的 '|'+按位置切列同样受此困扰，
- *     属已知限制的保守处理）。
+ *   - DELIMITER 保持 VSP 同款单字符 '|'（RFC_READ_TABLE 的 DELIMITER 参数为
+ *     CHAR1，open-rfc 按元数据宽度严格校验，双字符分隔串会被拒发——真机
+ *     实测 "DELIMITER does not fit its classic CHAR width"）。列值含 '|' 时
+ *     会串列，与 VSP 的已知限制一致（当前无更宽分隔符可用；解析时按列数
+ *     补齐/截断做保守处理）。
  *   - 本实现运行在 open-rfc 直链传输上（TransportAdapter），受 allowlist
  *     只读门控约束（RFC_READ_TABLE 在默认白名单内）。
  *
@@ -63,10 +65,16 @@ export function validateToken(value: unknown, capability: string, label: string,
 }
 
 /**
- * WHERE 子句的安全化处理（VSP readtable.go L94-100 语义 + 注入防线）：
+ * WHERE 子句的安全化处理（OPTIONS TEXT 是动态 Open SQL WHERE 片段）：
  * - 拒绝换行/控制字符（阻断 OPTIONS 行逃逸——RFM 内部按行拼 SELECT WHERE）；
- * - 单引号翻倍（SQL 字面量转义，同 VSP sqlQuote）；
- * - 长度上限 72×行数由 RFM 内部决定，这里按单字段 72 字符防线收紧。
+ * - 拒绝分号（阻断语句边界混淆）；
+ * - 长度上限 72 字符（OPTIONS-TEXT 字段宽；VSP splitWhereClause 同宽度口径，
+ *   其超宽按空格切多行的行为不移植——本工具保持单行限制，超限即拒）。
+ * - 单引号按原样透传、不翻倍：OPTIONS 文本由 RFM 内部作为 Open SQL 片段执行，
+ *   字面量引号必须保持调用方写法（`BUKRS = '1000'`）；翻倍会触发 ABAP 侧
+ *   DB_Error（真机实测）。注入面评估：WHERE 只影响调用方点名的单张只读表的
+ *   行筛选，标识符类注入已被表名/列名白名单阻断，语句注入已被分号/控制字符
+ *   拒绝阻断（与 VSP 直传 TEXT 的暴露面一致）。
  */
 export function sanitizeWhereClause(value: unknown, capability: string): string {
   const raw = String(value ?? '').trim()
@@ -83,8 +91,7 @@ export function sanitizeWhereClause(value: unknown, capability: string): string 
       `${capability}: whereClause contains line breaks, semicolons or control characters and is rejected.`
     )
   }
-  // 单引号翻倍（经典 SQL 字面量转义）
-  return raw.replace(/'/g, "''")
+  return raw
 }
 
 /** 构建 RFC_READ_TABLE 的调用载荷（VSP readtable.go L28-49 同构）。 */
@@ -92,7 +99,9 @@ export function buildReadTablePayload(input: ReadRfcTableInput, capability: stri
   const table = validateToken(input?.table, capability, 'table', 30)
   const payload: Record<string, unknown> = {
     QUERY_TABLE: table,
-    DELIMITER: '~~'
+    // DELIMITER 是 CHAR1（真机实测 open-rfc 元数据宽度校验拒绝双字符 '~~'），
+    // 只能单字符：取 VSP 同款 '|'，列值含 '|' 的串列风险为已知限制
+    DELIMITER: '|'
   }
   const maxRows = Math.min(Math.max(Math.floor(Number(input?.maxRows ?? 100)) || 100, 1), 1000)
   payload.ROWCOUNT = maxRows

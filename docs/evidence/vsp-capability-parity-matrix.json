@@ -2818,7 +2818,7 @@
         ]
       },
       "mcp": {
-        "status": "UNVERIFIED",
+        "status": "EQUIVALENT",
         "taskPath": [
           "tableContents",
           "runQuery",
@@ -2836,15 +2836,16 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "rfc.remote-enabled.read-table 已实施 readRfcTable（open-rfc 直链 + RFC_READ_TABLE）：表名白名单（≤30 DDIC 名）、WHERE 子句注入防线（控制字符/分号/换行拒绝 + 单引号翻倍）、列投影（FIELDS 白名单）、ROWCOUNT 上限 1000。TSTCT 同类 datapreview 受限不影响本通道（走 open-rfc 直链网关 3301）。真机端到端验证未跑，暂不晋级。",
+        "restrictionReason": "readRfcTable 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/read-table-real-dev-verified.md）：open-rfc 直链调用 RFC_READ_TABLE——T001 全量 10 行、WHERE 过滤（该 client 无 BUKRS=1000，0 行属正确行为）、列投影（BUKRS/BUTXT）、注入负例参数层拒绝。三项真机缺陷已修复并有单测：① open-rfc 递归序列化器决策门（OpenRfcTransport 缺省注入 classic-xRFC 观测策略，options 可覆盖）；② DELIMITER 为 CHAR1，双字符分隔串被拒，改回 VSP 同款单字符 |；③ WHERE 引号按原样透传（OPTIONS TEXT 是动态 Open SQL 片段，翻倍触发 ABAP DB_Error；此前注释中的 VSP sqlQuote 系误记）。另适配 S/4 增强形态：该 DEV 的 RFC_READ_TABLE 含 USE_ET_DATA_4_RETURN/ET_DATA（经典 DATA 回填已死），经 TransportAdapter.getFunctionInterface（新增可选传输能力）探测双路径并按适配器缓存，旧系统不发开关。已知限制：DELIMITER 单字符下列值含 | 会串列（VSP 同面）；增强系统无投影时不回传 FIELDS 列目录。",
         "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
         "source-audit",
-        "automation"
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "read-table-real-dev-smoke"
+      "nextMilestone": ""
     }
   ]
 }
