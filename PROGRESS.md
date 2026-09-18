@@ -259,3 +259,14 @@
 - 矩阵：rfc.remote-enabled.call 与 rfc.remote-enabled.describe GAP → EQUIVALENT（evidence + real-dev-verified）。现状 MCP_SUPERSET=7、EQUIVALENT=40、PARTIAL=10、GAP=7、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 47/71。证据：docs/evidence/rfc-call-describe-real-dev-verified.md。
 - 接线同步：ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=166、diagnostic-readonly=135、legacy-full=198、development-workbench=133）+ AGENTS.md 基线（153/1440）。
 - 遗留：无系统残留。RFC_SIMULATE_AUTH_CHECK 已入白名单（结果语义化呈现为后续轮次）；剩余 GAP 7 行（debug.amdp-adt、report.run/async/variants、ui5.write、crud.clone-object、transport.merge-move）与 PARTIAL 10 行按优先级清单推进。
+
+## 2026-09-18 轮（二十二）：img_activity 闭环 + 重大环境发现——datapreview 按会话查询预算
+
+- 本轮工作（P2 清单项）：知识查询第三只读工具 `getImgActivity`——单个 IMG 活动完整详情：基础行（CUS_IMGACH）+ 按语言文本（CUS_IMGACT）+ 菜单路径（TNODEIMGR 引用 → TNODEIMG 向上递归带环检测 + TNODEIMGT 文本，根在前排序）+ HY 文档容错（复用文档正文通道）。VSP IMGActivity/imgPaths/imgPathOf 移植；递归不用 JOIN（实测 `AS r` 别名被该环境拒），辅助信息逐项容错降级为 notes；`maxRefs`（1..20）有界入参控制查询量。
+- 真机验证（scripts/img-activity-real-dev-smoke.mjs，全程只读）：负例（ZZZZ9NOPE InvalidParams / 注入参数层拒绝）→ 回归（Anlage* DE 命中 10 节点，与第十七轮一致）→ 详情（APOC_C_FORMV 事务码 S_ER9_68000005，路径 "Statutory Reporting > Certificate of Creditable Withholding Tax Report"；带空格 docu_id 容错降级）。SMOKE OK。
+- **重大环境发现：datapreview 按会话查询预算（约 19 次）**。二分探针实测：同一 ADT 会话第 ~20 次查询起持续失败直至新会话；单次 getImgActivity 详情恰耗 ~19 次。历史上多轮"瞬时失败"（第十七轮 CUS_IMGACH、read.transaction 的 TSTCT/E071/E070 受限、第九轮 81s UNKNOWN_OUTCOME）大概率即此机制而非表级限制。处置：知识查询层不做失败重试（重试白烧预算，单测锁定）；maxRefs/smoke 顺序控制预算；候选加固项（需所有者评审）——ADT 客户端会话重置机制，可一次性解决全部 datapreview 工具的长会话可用性。
+- report.text-elements 差距核实（本轮完成）：读面已覆盖，剩余差距为文本池受控写入链（setTextElements 为 legacy-full 专家原子工具）——归入写方向批次，需设计评审授权。
+- 本地门禁全绿：Jest 153 suites / 1446 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：knowledge-queries 维持 PARTIAL 但边界收窄（img_activity 闭环；剩余 fm_test_data/cluster_read 需 S/2 集群解析器约 2.2k 行移植，独立工程轮候选；真机已确认 datapreview 可回传 CLUSTD hex 串，通道可行）。现状 MCP_SUPERSET=7、EQUIVALENT=40、PARTIAL=10、GAP=7、INTENTIONAL_RESTRICTION=7、UNVERIFIED=0，对齐 47/71。证据：docs/evidence/img-activity-real-dev-verified.md。
+- 接线同步：ToolProfiles（workbench +1）+ ToolOperationPolicy（read-only +1）+ ToolCatalogIntegrity 计数（development=167、diagnostic-readonly=136、legacy-full=199、development-workbench=134）+ AGENTS.md 基线（153/1446）。
+- 遗留：无系统残留。下轮候选：① S/2 集群解析器工程轮（fm_test_data/cluster_read，关知识查询最后缺口）；② datapreview 会话预算加固（ADT 客户端会话重置，需评审）；③ 写方向工作流批次（set-description 起步，需授权）。

@@ -125,9 +125,10 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 安装前置只读发现（矩阵 install.diagnostics 行）：只读 discovery，
   // 不做任何安装动作（安装属 INTENTIONAL_RESTRICTION 行）
   'checkInstallPrerequisites',
-  // 知识查询只读二工具（矩阵 diagnostics.knowledge-queries 行子集）：
-  // DOKIL/DOKTL 文档读取 + IMG 活动检索；fm_test_data/cluster_read 不在子集
-  'getAbapDocumentation', 'searchImgActivities',
+  // 知识查询只读三工具（矩阵 diagnostics.knowledge-queries 行子集）：
+  // DOKIL/DOKTL 文档读取 + IMG 活动检索 + IMG 活动详情（路径递归）；
+  // fm_test_data/cluster_read 不在子集
+  'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
   // 无副作用系统 RFM 探测、只读表读取、FM 接口元数据描述、受控只读 RFM 调用
   //（callRfm 的安全面由协议层只读 allowlist 硬门收窄，白名单外一律拒绝）

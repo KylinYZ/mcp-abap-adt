@@ -20,8 +20,8 @@ import { normalizeRepositoryName } from './CrossReferenceApi.js'
  *      （tcode 经 CUS_IMGACH 单表二次查询补齐）。
  *
  * 已知边界（notes 如实返回）：
- *   - fm_test_data（函数模块测试数据）、cluster_read（簇数据）、img_activity
- *     的完整详情（IMG 路径递归）不在本子集内。
+ *   - fm_test_data（函数模块测试数据）、cluster_read（簇数据）不在本子集内
+ *     （两者需要 S/2 集群二进制解析器，独立子系统）。
  *
  * 业务规则：
  *   - 全部只读 SELECT；文本入参（docObject/docClass/text）经引号转义与
@@ -205,7 +205,7 @@ export async function getAbapDocumentation(
   const mode = input?.mode === 'index' ? 'index' : 'content'
   const maxLines = normalizeMaxLines(input?.maxLines)
   const notes = [
-    'subset: fm_test_data, cluster_read and the full img_activity path recursion are not part of this tool'
+    'subset: fm_test_data and cluster_read are not part of this tool (they need the S/2 cluster reader)'
   ]
   const objectLiteral = quoteText(docObject, capability)
   const sapLangLiteral = quoteText(sapLang, capability)
@@ -290,7 +290,7 @@ export async function searchImgActivities(
   const likeLiteral = quoteText(like, capability)
   const sapLangLiteral = quoteText(sapLang, capability)
   const notes: string[] = [
-    'subset: img_activity full detail (path recursion) is not part of this tool'
+    'subset: use getImgActivity for the full detail of one activity (paths, documentation)'
   ]
   const nodes: ImgSearchNode[] = []
 
@@ -354,13 +354,190 @@ export async function searchImgActivities(
   return { text, language, nodes, count: nodes.length, notes }
 }
 
+/** getImgActivity 的输入。 */
+export interface GetImgActivityInput {
+  /** IMG 活动技术名（CUS_IMGACH.ACTIVITY，如 APOC_C_FORMV）。 */
+  activity: string
+  /** 语言（1-2 位字母，默认 EN）：影响活动文本/节点文本/文档语言。 */
+  language?: string
+  /**
+   * 最多展开的 IMG 引用节点数（1..20，默认 20 对齐 VSP imgPaths 的上限）。
+   * datapreview 有按会话的查询预算（实测约 19 次）；路径递归每个引用节点
+   * 消耗约 2×深度 次查询——预算紧张的会话可调小本值。
+   */
+  maxRefs?: number
+}
+
+/** getImgActivity 的返回（VSP pkg/adt/docs.go IMGActivity L107-143 同构）。 */
+export interface GetImgActivityResult {
+  activity: string
+  language: string
+  /** 活动描述文本（CUS_IMGACT，按语言；缺失时缺省）。 */
+  text?: string
+  /** 关联事务码（CUS_IMGACH.TCODE；缺失时缺省）。 */
+  transaction?: string
+  /** 文档对象（CUS_IMGACH.DOCU_ID，HY 类；缺失时缺省）。 */
+  docObject?: string
+  /** 从 IMG 根到该活动的菜单路径（根在前，" > " 连接；可能多条）。 */
+  paths: string[]
+  /** HY 文档正文（有 docObject 且文档存在时附；截断随 notes）。 */
+  documentation?: { version: number; lines: DocumentationLine[] }
+  notes: string[]
+}
+
+/** IMG 引用节点查询上限（对齐 VSP imgPaths L220 的 20 条）。 */
+const IMG_REFERENCE_LIMIT = 20
+
+/** IMG 树向上递归的最大深度（对齐 VSP imgPathOf L241 的 12 层防环）。 */
+const IMG_PATH_MAX_DEPTH = 12
+
+/**
+ * 读取一个 IMG 自定义活动的完整详情（VSP img_activity 语义移植）：
+ * 基础（CUS_IMGACH）+ 按语言文本（CUS_IMGACT）+ 菜单路径（TNODEIMGR 引用 →
+ * TNODEIMG 向上递归 + TNODEIMGT 按语言文本）+ HY 文档（复用文档正文通道）。
+ * 与 VSP 的差异：路径递归不用 JOIN（datapreview 兼容口径，逐级两次单表
+ * 查询）；文本/文档缺失均容错为缺省字段并记 notes，不让辅助信息拖垮主语义。
+ */
+export async function getImgActivity(
+  runQuery: KnowledgeQueryRunner,
+  input: GetImgActivityInput
+): Promise<GetImgActivityResult> {
+  const capability = 'getImgActivity'
+  const activity = validateToken(input?.activity, capability, 'activity', 40)
+  const language = validateLanguage(input?.language, capability)
+  const sapLang = sapInternalLanguageKey(language, capability)
+  const activityLiteral = quoteText(activity, capability)
+  const sapLangLiteral = quoteText(sapLang, capability)
+  const notes: string[] = []
+
+  // 1. 基础行：活动必须存在（CUS_IMGACH 是活动的权威登记表）
+  const baseRows = (await runQuery(
+    `SELECT activity, tcode, docu_id FROM cus_imgach WHERE activity = ${activityLiteral}`,
+    1
+  )).values ?? []
+  if (baseRows.length === 0) {
+    throw new Error(`${capability}: IMG activity ${activity} does not exist.`)
+  }
+  const transaction = cellText(baseRows[0], 'TCODE')
+  const docObject = cellText(baseRows[0], 'DOCU_ID')
+
+  // 2. 按语言文本（CUS_IMGACT；缺失容错）
+  let text: string | undefined
+  try {
+    const textRows = (await runQuery(
+      `SELECT text FROM cus_imgact WHERE activity = ${activityLiteral} AND spras = ${sapLangLiteral}`,
+      1
+    )).values ?? []
+    if (textRows.length > 0) text = cellText(textRows[0], 'TEXT')
+  } catch {
+    notes.push('activity text unavailable: reading CUS_IMGACT failed on this system')
+  }
+
+  // 3. 菜单路径：TNODEIMGR 找引用节点 → 逐节点向上递归拼路径
+  const maxRefs = Math.min(Math.max(Math.floor(Number(input?.maxRefs ?? IMG_REFERENCE_LIMIT)) || IMG_REFERENCE_LIMIT, 1), IMG_REFERENCE_LIMIT)
+  let refRows: Record<string, unknown>[]
+  try {
+    refRows = (await runQuery(
+      `SELECT node_id FROM tnodeimgr WHERE ref_object = ${activityLiteral}`
+      + ` AND ( ref_type = 'COBJ' OR ref_type = 'ACTI' )`,
+      maxRefs
+    )).values ?? []
+  } catch {
+    refRows = []
+    notes.push('menu paths unavailable: reading TNODEIMGR failed on this system')
+  }
+  const paths: string[] = []
+  for (const refRow of refRows.slice(0, maxRefs)) {
+    const nodeId = cellText(refRow, 'NODE_ID')
+    if (!nodeId) continue
+    try {
+      const path = await imgPathOf(runQuery, nodeId, sapLangLiteral)
+      if (path !== '') paths.push(path)
+    } catch {
+      notes.push(`menu path for node ${nodeId.slice(0, 12)}... unavailable: the tree walk failed`)
+    }
+  }
+  paths.sort((left, right) => left.localeCompare(right))
+
+  // 4. HY 文档（docu_id 为 HY 类文档对象；缺失/读取失败容错）
+  let documentation: GetImgActivityResult['documentation']
+  if (docObject !== '') {
+    try {
+      const doc = await getAbapDocumentation(runQuery, {
+        docClass: 'HY', docObject, language, maxLines: 200
+      })
+      documentation = { version: doc.version ?? 0, lines: doc.lines ?? [] }
+      if (doc.truncated) notes.push('documentation truncated to 200 lines')
+    } catch (error) {
+      notes.push(`documentation unavailable: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  return {
+    activity,
+    language,
+    ...(text !== undefined ? { text } : {}),
+    ...(transaction !== '' ? { transaction } : {}),
+    ...(docObject !== '' ? { docObject } : {}),
+    paths,
+    ...(documentation !== undefined ? { documentation } : {}),
+    notes
+  }
+}
+
+/**
+ * 从一个 IMG 节点向上递归拼菜单路径（VSP imgPathOf L238-256 语义）：逐级取
+ * parent_id 与按语言文本（两次单表查询替代 VSP 的 JOIN——datapreview 兼容
+ * 口径），文本按"根在前"收集，深度 ≤12 且带环检测；返回 " > " 连接的路径串，
+ * 全链无文本时为空串（调用方跳过）。
+ */
+async function imgPathOf(
+  runQuery: KnowledgeQueryRunner,
+  startNodeId: string,
+  sapLangLiteral: string
+): Promise<string> {
+  const texts: string[] = []
+  const seen = new Set<string>()
+  let nodeId = startNodeId
+  for (let depth = 0; nodeId !== '' && depth < IMG_PATH_MAX_DEPTH && !seen.has(nodeId); depth += 1) {
+    seen.add(nodeId)
+    const nodeLiteral = quoteText(nodeId, 'getImgActivity')
+    const rows = (await runQuery(
+      `SELECT parent_id FROM tnodeimg WHERE node_id = ${nodeLiteral}`,
+      1
+    )).values ?? []
+    if (rows.length === 0) break
+    // 节点文本按语言单独取（缺失容错——部分 S/4 新节点不入文本表）
+    try {
+      const textRows = (await runQuery(
+        `SELECT text FROM tnodeimgt WHERE node_id = ${nodeLiteral} AND spras = ${sapLangLiteral}`,
+        1
+      )).values ?? []
+      if (textRows.length > 0) {
+        const text = cellText(textRows[0], 'TEXT')
+        if (text !== '') texts.unshift(text)
+      }
+    } catch {
+      // 文本表读取失败不中断路径主干（parent 链优先）
+    }
+    nodeId = cellText(rows[0], 'PARENT_ID')
+  }
+  return texts.join(' > ')
+}
+
 /** 处理器注入用的窄客户端接口。 */
 export interface KnowledgeQueriesClient {
   getAbapDocumentation(input: GetAbapDocumentationInput): Promise<GetAbapDocumentationResult>
   searchImgActivities(input: SearchImgActivitiesInput): Promise<SearchImgActivitiesResult>
+  getImgActivity(input: GetImgActivityInput): Promise<GetImgActivityResult>
 }
 
-/** 把 runQuery 通道绑定成处理器可注入的窄客户端（decode 由绑定固定为 true）。 */
+/**
+ * 把 runQuery 通道绑定成处理器可注入的窄客户端（decode 由绑定固定为 true）。
+ * 注意（专用 DEV 实测）：datapreview 有按会话的查询预算（约 19 次，耗尽后
+ * 本会话持续报错直至新会话），因此本层不做失败重试——重试会进一步消耗
+ * 预算；长会话的调用方应控制单工具的查询量（如 getImgActivity 的 maxRefs）。
+ */
 export function createKnowledgeQueriesClient(client: {
   runQuery(sqlQuery: string, rowNumber?: number, decode?: boolean): Promise<{ values?: Record<string, unknown>[] }>
 }): KnowledgeQueriesClient {
@@ -368,6 +545,7 @@ export function createKnowledgeQueriesClient(client: {
     (await client.runQuery(sql, rowLimit, true)) ?? { values: [] }
   return {
     getAbapDocumentation: input => getAbapDocumentation(runner, input),
-    searchImgActivities: input => searchImgActivities(runner, input)
+    searchImgActivities: input => searchImgActivities(runner, input),
+    getImgActivity: input => getImgActivity(runner, input)
   }
 }

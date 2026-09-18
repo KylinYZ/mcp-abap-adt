@@ -4,22 +4,24 @@ import type { KnowledgeQueriesClient } from '../adt/KnowledgeQueriesApi.js';
 
 /**
  * ============================================================================
- * 知识查询只读二工具 MCP 处理器（关闭能力矩阵缺口
- * diagnostics.knowledge-queries 的 documentation + img_search 子集）
+ * 知识查询只读三工具 MCP 处理器（diagnostics.knowledge-queries 行：
+ * documentation + img_search + img_activity 子集）
  * ============================================================================
  *
- * 暴露两个只读工具（数据源为 SAP 文档/IMG 表的自由 SQL SELECT）：
+ * 暴露三个只读工具（数据源为 SAP 文档/IMG 表的自由 SQL SELECT）：
  *   - getAbapDocumentation：ABAP 文档正文或索引（DOKIL/DOKTL）
  *   - searchImgActivities：IMG 自定义活动与文件夹文本检索（CUS_IMGACT/
  *     CUS_IMGACH/TNODEIMGT）
+ *   - getImgActivity：单个 IMG 活动完整详情——基础/文本/菜单路径递归
+ *     （TNODEIMGR 引用 → TNODEIMG 向上走链 + TNODEIMGT 文本）/HY 文档
  *
  * 业务规则：
  *   - 只读工具（readOnlyHint=true、destructiveHint=false、approvalRequired=false；
  *     _meta.operationClass='read-only tenant'）。
- *   - 边界（notes 随结果返回）：fm_test_data、cluster_read、img_activity 完整
- *     详情（路径递归）不在本子集内。
+ *   - 边界（notes 随结果返回）：fm_test_data、cluster_read（S/2 集群读取）
+ *     不在本子集内（独立子系统）。
  *   - 文本入参处理器层做长度预检，API 层引号转义 + 控制字符拒绝（纵深防御）。
- *   - 底层异常统一脱敏为 InternalError。
+ *   - "不存在"类错误按 InvalidParams 透出；底层异常统一脱敏为 InternalError。
  */
 
 /** 与 CrossReferenceHandlers 一致的只读工具定义强类型。 */
@@ -37,7 +39,7 @@ type KnowledgeToolDefinition = ToolDefinition & {
 };
 
 /** 本处理器认领的工具名。 */
-const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities']);
+const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity']);
 
 export class KnowledgeQueriesHandlers {
   /**
@@ -136,6 +138,37 @@ export class KnowledgeQueriesHandlers {
           required: ['text']
         },
         ...readOnly
+      },
+      {
+        name: 'getImgActivity',
+        description:
+          'Read the full detail of one SAP IMG (customizing) activity: base row (CUS_IMGACH), its description text in a language (CUS_IMGACT), the IMG menu paths to it (TNODEIMGR references walked up through TNODEIMG with TNODEIMGT texts), and its HY documentation when present. Auxiliary pieces degrade to notes instead of failing the read. Read-only.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            activity: {
+              type: 'string',
+              description: "The activity's technical name from img_search (CUS_IMGACH.ACTIVITY), e.g. APOC_C_FORMV.",
+              minLength: 1,
+              maxLength: 40
+            },
+            language: {
+              type: 'string',
+              description: 'SAP language key (1-2 letters, default EN).',
+              optional: true
+            },
+            maxRefs: {
+              type: 'number',
+              description: 'Maximum IMG reference nodes to expand into paths (each costs a few queries; the datapreview channel has a per-session budget). Default 20.',
+              minimum: 1,
+              maximum: 20,
+              optional: true
+            }
+          },
+          required: ['activity']
+        },
+        ...readOnly
       }
     ];
   }
@@ -184,12 +217,24 @@ export class KnowledgeQueriesHandlers {
           ...(limit !== undefined ? { limit } : {})
         }));
       }
+      if (toolName === 'getImgActivity') {
+        const activity = typeof argumentsValue?.activity === 'string' ? argumentsValue.activity.trim().toUpperCase() : '';
+        if (!activity || activity.length > 40 || !/^[A-Z0-9_/]+$/.test(activity)) {
+          throw invalid(
+            `${toolName} requires activity: the technical name of an IMG activity of at most 40`
+            + ' characters matching [A-Z0-9_/].'
+          );
+        }
+        const language = this.language(toolName, argumentsValue);
+        const maxRefs = this.boundedNumber(toolName, argumentsValue.maxRefs, 'maxRefs', 1, 20);
+        return success(await this.knowledgeQueries.getImgActivity({ activity, language, ...(maxRefs !== undefined ? { maxRefs } : {}) }));
+      }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown knowledge-queries tool: ${toolName}`);
     } catch (error) {
       if (error instanceof McpError) throw error;
-      // "文档不存在"对调用方有排查价值，按 InvalidParams 透出；其余脱敏。
+      // "不存在"类错误对调用方有排查价值，按 InvalidParams 透出；其余脱敏。
       const message = error instanceof Error ? error.message : String(error);
-      if (/documentation for .* in language/.test(message)) {
+      if (/documentation for .* in language/.test(message) || /IMG activity .* does not exist/.test(message)) {
         throw new McpError(ErrorCode.InvalidParams, message);
       }
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);

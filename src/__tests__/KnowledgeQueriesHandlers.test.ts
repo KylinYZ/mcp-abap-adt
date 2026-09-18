@@ -15,15 +15,18 @@ function clientMock(): KnowledgeQueriesClient {
     })),
     searchImgActivities: jest.fn(async () => ({
       text: 'x', language: 'EN', nodes: [], count: 0, notes: []
+    })),
+    getImgActivity: jest.fn(async () => ({
+      activity: 'X1', language: 'EN', paths: [], notes: []
     }))
   };
 }
 
 describe('KnowledgeQueriesHandlers tool catalog', () => {
-  it('publishes two uniquely named read-only tools', () => {
+  it('publishes three uniquely named read-only tools', () => {
     const handlers = new KnowledgeQueriesHandlers(clientMock());
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['getAbapDocumentation', 'searchImgActivities']);
+    expect(tools.map(t => t.name)).toEqual(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity']);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true
@@ -36,6 +39,7 @@ describe('KnowledgeQueriesHandlers tool catalog', () => {
     const handlers = new KnowledgeQueriesHandlers(clientMock());
     expect(handlers.supports('getAbapDocumentation')).toBe(true);
     expect(handlers.supports('searchImgActivities')).toBe(true);
+    expect(handlers.supports('getImgActivity')).toBe(true);
     expect(handlers.supports('getMessages')).toBe(false);
   });
 });
@@ -52,9 +56,11 @@ describe('KnowledgeQueriesHandlers dispatch and validation', () => {
     });
     await handlers.handle('searchImgActivities', { text: ' anlage ', language: 'de', limit: 9999 });
     expect(client.searchImgActivities).toHaveBeenCalledWith({ text: 'anlage', language: 'DE', limit: 100 });
+    await handlers.handle('getImgActivity', { activity: ' apoc_c_formv ', language: 'en', maxRefs: 5 });
+    expect(client.getImgActivity).toHaveBeenCalledWith({ activity: 'APOC_C_FORMV', language: 'EN', maxRefs: 5 });
   });
 
-  it('rejects missing/over-long docClass/docObject/text and bad mode', async () => {
+  it('rejects missing/over-long docClass/docObject/text/activity and bad mode', async () => {
     const handlers = new KnowledgeQueriesHandlers(clientMock());
     await expect(handlers.handle('getAbapDocumentation', { docObject: 'ZDE' }))
       .rejects.toMatchObject({ code: ErrorCode.InvalidParams });
@@ -67,6 +73,10 @@ describe('KnowledgeQueriesHandlers dispatch and validation', () => {
     await expect(handlers.handle('searchImgActivities', {}))
       .rejects.toMatchObject({ code: ErrorCode.InvalidParams });
     await expect(handlers.handle('searchImgActivities', { text: 'x'.repeat(61) }))
+      .rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    await expect(handlers.handle('getImgActivity', {}))
+      .rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    await expect(handlers.handle('getImgActivity', { activity: "Z';--" }))
       .rejects.toMatchObject({ code: ErrorCode.InvalidParams });
   });
 

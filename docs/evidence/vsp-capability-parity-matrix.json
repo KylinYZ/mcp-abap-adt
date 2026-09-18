@@ -1926,7 +1926,8 @@
         "status": "PARTIAL",
         "taskPath": [
           "getAbapDocumentation",
-          "searchImgActivities"
+          "searchImgActivities",
+          "getImgActivity"
         ],
         "profiles": [
           "development",
@@ -1939,7 +1940,7 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "documentation/img_search 子集已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/knowledge-queries-real-dev-verified.md）：getAbapDocumentation 对标准元素 LANGU 索引 5 条（DE/TX 跨类跨语言）+ 正文 13 行（U1 标题、格式码、最新版本）；searchImgActivities 检索 Anlage* 命中 10 节点（活动+文件夹）；注入样本安全处理。语言键经 ISO→SAP 内部码转换（VSP spras 同表，DOKTL/IMG 表均为 1 位内部键）。CUS_IMGACH 数据读取在该 DEV 受 datapreview 限制（tcode 容错为缺失+notes）。fm_test_data/cluster_read/img_activity 路径递归仍不在子集（notes 标注），故记 PARTIAL 而非 EQUIVALENT。",
+        "restrictionReason": "documentation/img_search/img_activity 子集已在真实 DEV 端到端验证（2026-09-17 documentation/img_search、2026-09-18 img_activity，证据 docs/evidence/img-activity-real-dev-verified.md）：getImgActivity 对 APOC_C_FORMV 返回基础行/事务码（S_ER9_68000005）/菜单路径（TNODEIMGR 引用 → TNODEIMG 向上递归 + TNODEIMGT 按语言文本，路径串根在前排序）；文本/文档/路径逐项容错降级为 notes；带空格 docu_id 等异常经 token 校验容错。与 VSP 的差异：路径递归不用 JOIN（datapreview 兼容口径，逐级两次单表查询）；maxRefs 有界入参控制查询量。重要环境发现（本轮实测）：datapreview 有按会话的查询预算（约 19 次，耗尽后本会话持续报错直至新会话）——历史上多轮的瞬时失败（CUS_IMGACH/TSTCT/E071 等）大概率即此机制，非表级限制；知识查询层据此不做失败重试（重试白烧预算）。剩余缺口：fm_test_data 与 cluster_read 需要 S/2 集群二进制解析器（VSP pkg/datacluster 约 2.2k 行 + sapcompress），属独立工程轮。",
         "liftCondition": ""
       },
       "priority": "P2",
