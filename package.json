@@ -1,6 +1,6 @@
 {
   "name": "abap-ai-workbench-mcp",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "mcpName": "io.github.kylinyz/abap-ai-workbench-mcp",
   "main": "dist/index.js",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "dist",
     "!dist/__tests__",
+    ".env.example",
     "docs/evidence/repository-creation-maturity-evidence.json",
     "docs/evidence/repository-creation-ddic-domain-real-dev-verified.md",
     "docs/evidence/repository-creation-data-element-real-dev-verified.md",
@@ -89,7 +90,7 @@
     "html-entities": "^2.5.2",
     "io-ts": "^2.2.21",
     "io-ts-reporters": "^2.0.1",
-    "open-rfc": "file:D:/MyDev/SAP/open-rfc",
+    "open-rfc": "^0.2.3",
     "sprintf-js": "^1.1.3"
   },
   "devDependencies": {

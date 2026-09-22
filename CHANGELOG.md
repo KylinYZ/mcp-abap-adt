@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-22
+- Include `.env.example` in the npm package (the `files` allowlist omitted it, so 0.8.0/0.8.1 shipped without the configuration field reference). Copy it to a private path outside any repository and point `SAP_MCP_ENV_FILE` at it.
+
 ## [0.8.1] - 2026-09-22
 - Rename the npm package from `@kylinyz/mcp-abap-abap-adt-api` to `abap-ai-workbench-mcp` (unscoped, shorter, MCP-explicit). The MCP server identity, bin name, `mcpName`, and `server.json` registry id move with it. Install with `npx -y abap-ai-workbench-mcp@0.8.1`; the old package name is deprecated and points to the new one.
 - Keep the server-compatible MCP server name in client configs unchanged in behavior; update the config key to taste. Repository URL and upstream attribution are unchanged.
