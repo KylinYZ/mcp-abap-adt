@@ -46,7 +46,8 @@
     "prepublishOnly": "npm run build",
     "test:cds-real-dev": "node ./scripts/cds-analysis-real-dev-smoke.mjs",
     "test:activation-real-dev": "node ./scripts/object-activation-real-dev-smoke.mjs",
-    "test:wave3-analytics-real-dev": "node ./scripts/wave3-analytics-real-dev-smoke.mjs"
+    "test:wave3-analytics-real-dev": "node ./scripts/wave3-analytics-real-dev-smoke.mjs",
+    "test:clone-real-dev": "node ./scripts/clone-object-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",
