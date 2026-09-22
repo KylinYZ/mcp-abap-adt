@@ -1,12 +1,12 @@
-[English](README.md) | [完整中文使用指南](docs/使用指南.md)
+[English](README.md) | [完整中文使用指南](docs/使用指南.md) | [Agent 自动安装提示词](docs/agent-setup-prompt.md)
 
-# ABAP-ADT-API MCP 服务
+# ABAP AI Workbench MCP 服务
 
-`@kylinyz/mcp-abap-abap-adt-api` 是面向 SAP 团队的 AI 原生 ABAP 工作台：开发人员优先，业务顾问其次，运维人员兜底。默认 `focused` 入口借鉴 `vibing-steampunk` 的 Focused/Expert 思路，先展示能完成日常工作的开发能力；需要完整低层 ADT 面时再显式使用 `expert`。完整 ADT 客户端内置在 `src/adt/`，运行时不依赖外部 `abap-adt-api` 包。
+`abap-ai-workbench-mcp` 是面向 SAP 团队的 AI 原生 ABAP 工作台：开发人员优先，业务顾问其次，运维人员兜底。默认 `focused` 入口借鉴 `vibing-steampunk` 的 Focused/Expert 思路，先展示能完成日常工作的开发能力；需要完整低层 ADT 面时再显式使用 `expert`。完整 ADT 客户端内置在 `src/adt/`，运行时不依赖外部 `abap-adt-api` 包。
 
 ## 当前版本
 
-- 版本 `0.6.0`，npm 包为 `@kylinyz/mcp-abap-abap-adt-api@0.6.0`。
+- 版本 `0.6.0`，npm 包为 `abap-ai-workbench-mcp@0.8.1`。
 - 代码仓库：[`KylinYZ/mcp-abap-adt`](https://github.com/KylinYZ/mcp-abap-adt)。
 - 始终使用带作用域的包名；不带作用域的包属于上游独立项目。
 - 角色入口：`focused` / `developer`（90 个开发工具）、`business`（18 个只读工具）、`operations`（41 个只读工具）、`expert`（161 个兼容工具）。旧 profile 名称继续支持，完整目录见[产品定位](docs/产品定位.md)。
@@ -18,7 +18,7 @@
 ### npm（推荐）
 
 ```bash
-npx -y @kylinyz/mcp-abap-abap-adt-api@0.6.0
+npx -y abap-ai-workbench-mcp@0.8.1
 ```
 
 MCP 配置示例：
@@ -26,9 +26,9 @@ MCP 配置示例：
 ```json
 {
   "mcpServers": {
-    "mcp-abap-abap-adt-api": {
+    "abap-ai-workbench-mcp": {
       "command": "npx",
-      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.6.0"],
+      "args": ["-y", "abap-ai-workbench-mcp@0.8.1"],
       "env": { "SAP_MCP_ENV_FILE": "D:\\path\\to\\sap-dev.env" }
     }
   }
@@ -75,6 +75,7 @@ QAS、PRD、缺失和未知系统角色无论 Profile 都只能执行本地/只�
 ## 文档地图
 
 - [`docs/使用指南.md`](docs/使用指南.md)：中文安装、配置、工具清单、安全操作、故障处理和验证边界。
+- [`docs/agent-setup-prompt.md`](docs/agent-setup-prompt.md)：整段复制给任意 AI agent 即可自动完成本 MCP 服务的安装与配置。
 - [`docs/evidence/repository-validation-campaign-matrix.md`](docs/evidence/repository-validation-campaign-matrix.md)：31 类对象当前状态。
 - [`docs/evidence/repository-creation-productionization-handoff.md`](docs/evidence/repository-creation-productionization-handoff.md)：精简交接和下一步。
 - [`PROGRESS.md`](PROGRESS.md)：当前进度摘要。

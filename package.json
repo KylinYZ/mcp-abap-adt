@@ -1,10 +1,10 @@
 {
-  "name": "@kylinyz/mcp-abap-abap-adt-api",
-  "version": "0.8.0",
-  "mcpName": "io.github.kylinyz/mcp-abap-abap-adt-api",
+  "name": "abap-ai-workbench-mcp",
+  "version": "0.8.1",
+  "mcpName": "io.github.kylinyz/abap-ai-workbench-mcp",
   "main": "dist/index.js",
   "bin": {
-    "mcp-abap-abap-adt-api": "dist/index.js"
+    "abap-ai-workbench-mcp": "dist/index.js"
   },
   "files": [
     "dist",
@@ -21,7 +21,8 @@
     "docs/evidence/repository-creation-function-group-include-real-dev-verified.md",
     "docs/evidence/repository-creation-function-module-real-dev-verified.md",
     "docs/evidence/repository-creation-wave3-cds-service-chdo-validation.md",
-    "third-party"
+    "third-party",
+    "docs/agent-setup-prompt.md"
   ],
   "scripts": {
     "test": "jest",
@@ -55,7 +56,7 @@
     "abap",
     "sap",
     "adt",
-    "abap-adt-api",
+    "abap-ai-workbench",
     "mcp",
     "model-context-protocol"
   ],

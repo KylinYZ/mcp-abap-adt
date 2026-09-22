@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-22
+- Rename the npm package from `@kylinyz/mcp-abap-abap-adt-api` to `abap-ai-workbench-mcp` (unscoped, shorter, MCP-explicit). The MCP server identity, bin name, `mcpName`, and `server.json` registry id move with it. Install with `npx -y abap-ai-workbench-mcp@0.8.1`; the old package name is deprecated and points to the new one.
+- Keep the server-compatible MCP server name in client configs unchanged in behavior; update the config key to taste. Repository URL and upstream attribution are unchanged.
+
 ## [0.8.0] - 2026-09-22
 - VSP capability alignment advances from 39/71 to 51/71 (`MCP_SUPERSET=10`, `EQUIVALENT=41`, `PARTIAL=8`, `GAP=2`, `INTENTIONAL_RESTRICTION=10`, `UNVERIFIED=0`), with every promotion backed by real-DEV evidence under `docs/evidence/`.
 - Add the classic-RFC transport layer on `open-rfc` (no NW RFC SDK): read-only `probeRfcSystem`, `readRfcTable` (with S/4-enhanced `RFC_READ_TABLE` dual-path adaptation), `describeRfm`, and `callRfm` behind a read-only FM allowlist — closing both P0 RFC gaps.

@@ -243,8 +243,8 @@ export class AbapAdtServer extends Server {
   constructor(passwordOverride?: string) {
     super(
       {
-        name: "mcp-abap-abap-adt-api",
-        version: "0.4.0",
+        name: "abap-ai-workbench-mcp",
+        version: "0.8.1",
       },
       {
         capabilities: {

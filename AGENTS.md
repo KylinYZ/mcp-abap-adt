@@ -8,7 +8,7 @@
 新用户入口与能力分层见 `docs/产品定位.md`；不要把兼容 profile 名称重新写成产品入口。
 ## 当前发布与事实基线
 
-- 当前版本：`0.8.0`；npm 包：`@kylinyz/mcp-abap-abap-adt-api@0.8.0`。
+- 当前版本：`0.8.0`；npm 包：`abap-ai-workbench-mcp@0.8.1`。
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
 - profile 目录：`safe=7`、`development=179`、`diagnostic-readonly=139`、`legacy-full=202`、`development-workbench=146`、`business-readonly=18`、`operations-readonly=48`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
@@ -41,7 +41,7 @@ npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-a
 - `src/safe/`：安全策略、计划、确认、成熟度证据和受控工作流。
 - `src/config/`、`src/lib/`：配置、profile、执行门控、限流、缓存和日志。
 - `src/handlers/`：MCP 工具处理器；低层写入不得绕过 profile 边界。
-- `docs/使用指南.md`：中文安装、接入、工具和运维权威指南。
+- `docs/使用指南.md`：中文安装、接入、工具和运维权威指南；`docs/agent-setup-prompt.md` 是发给 agent 的自动安装配置提示词。
 - `docs/evidence/`：真实 DEV 证据、成熟度 manifest 和当前创建矩阵。
 - `PROGRESS.md`、`BLOCKED.md`：精简状态与阻塞索引；历史细节留在证据/CHANGELOG。
 - `.env.example`：配置字段示例；不得提交真实 `.env` 或凭据。

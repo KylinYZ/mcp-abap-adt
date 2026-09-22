@@ -1,12 +1,12 @@
-[简体中文](README.zh-CN.md) | [中文 usage guide](docs/使用指南.md)
+[简体中文](README.zh-CN.md) | [中文 usage guide](docs/使用指南.md) | [Agent setup prompt](docs/agent-setup-prompt.md)
 
-# ABAP-ADT-API MCP Server
+# ABAP AI Workbench MCP
 
-`@kylinyz/mcp-abap-abap-adt-api` is an AI-native ABAP workbench for SAP teams. Developers are the primary users, followed by business consultants and operations. The default `focused` entry point follows the Focused/Expert model used by `vibing-steampunk`: expose the practical daily surface first, and keep the complete low-level ADT surface for explicit expert use. It embeds the ADT client under `src/adt/`, so the runtime does not depend on the external `abap-adt-api` package.
+`abap-ai-workbench-mcp` is an AI-native ABAP workbench for SAP teams. Developers are the primary users, followed by business consultants and operations. The default `focused` entry point follows the Focused/Expert model used by `vibing-steampunk`: expose the practical daily surface first, and keep the complete low-level ADT surface for explicit expert use. It embeds the ADT client under `src/adt/`, so the runtime does not depend on the external `abap-adt-api` package.
 
 ## Current release
 
-- Version `0.8.0`, published as `@kylinyz/mcp-abap-abap-adt-api@0.8.0`.
+- Version `0.8.0`, published as `abap-ai-workbench-mcp@0.8.1`.
 - Repository: [`KylinYZ/mcp-abap-adt`](https://github.com/KylinYZ/mcp-abap-adt).
 - The unscoped upstream package is a separate project; always use the scoped name.
 - Role entry points: `focused`/`developer` (146 development tools), `business` (18 read-only tools), `operations` (48 read-only tools), and `expert` (202 compatibility tools). Legacy profile names remain supported; see [`docs/产品定位.md`](docs/产品定位.md).
@@ -18,7 +18,7 @@
 ### npm (recommended)
 
 ```bash
-npx -y @kylinyz/mcp-abap-abap-adt-api@0.8.0
+npx -y abap-ai-workbench-mcp@0.8.1
 ```
 
 Example MCP configuration:
@@ -26,9 +26,9 @@ Example MCP configuration:
 ```json
 {
   "mcpServers": {
-    "mcp-abap-abap-adt-api": {
+    "abap-ai-workbench-mcp": {
       "command": "npx",
-      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.8.0"],
+      "args": ["-y", "abap-ai-workbench-mcp@0.8.1"],
       "env": { "SAP_MCP_ENV_FILE": "C:\\path\\to\\sap-dev.env" }
     }
   }
@@ -79,6 +79,7 @@ Copy `.env.example` to a private environment file and set at least `SAP_URL`, `S
 ## Documentation map
 
 - [`docs/使用指南.md`](docs/使用指南.md): Chinese installation, configuration, tool catalog, safe operations, troubleshooting, and verification boundaries.
+- [`docs/agent-setup-prompt.md`](docs/agent-setup-prompt.md): copy-paste prompt that lets any AI agent install and configure this MCP server automatically.
 - [`docs/evidence/repository-validation-campaign-matrix.md`](docs/evidence/repository-validation-campaign-matrix.md): current 31-kind status.
 - [`docs/evidence/repository-creation-productionization-handoff.md`](docs/evidence/repository-creation-productionization-handoff.md): concise handoff and next actions.
 - [`PROGRESS.md`](PROGRESS.md): current progress summary.
