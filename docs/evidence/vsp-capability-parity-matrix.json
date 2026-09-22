@@ -2430,26 +2430,28 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "MCP_SUPERSET",
         "taskPath": [
-          "renameEvaluate",
-          "renamePreview",
-          "renameExecute"
+          "previewControlledRename",
+          "applyControlledRename",
+          "getControlledRenameStatus"
         ],
         "profiles": [
-          "legacy-full"
+          "development",
+          "development-workbench"
         ],
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "重命名仅有专家原子 evaluate/preview/execute 链；无受控工作流。",
-        "liftCondition": "受控重命名任务纳入计划后晋级。"
+        "restrictionReason": "受控对象重命名一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/rename-controlled-real-dev-smoke.mjs，sap-demo）：preview 只读读源快照+声明改名冻结（按对象类型精确锚定，拒绝 VSP 全文 ReplaceAll 误伤面）→ 单确认两步执行：克隆工作流落地新对象（受控创建链保证）+ 受控清理链删除旧对象 → readback 逐字一致 → absence 零残留。防御语义：创建失败绝不触碰旧对象；删除侧失败时缺席复核（按状态码判定，兼容 ADT 客户端 err 字段与本地化消息）证实旧对象已不在则收敛 SUCCEEDED，否则 PARTIAL_RENAME 保留现场。比 VSP RenameObject 多 immutable plan、重放拒绝、原生确认与失败补偿。",
+        "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "rename-controlled-write"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
+      ]
     },
     {
       "id": "ui5.read",

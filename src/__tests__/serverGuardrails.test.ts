@@ -335,6 +335,10 @@ describe('server guardrail integration helpers', () => {
     // 外层 gate（否则 maxConcurrentTools=1 自我死锁）；status 是纯本地读取同豁免
     ['applyCloneObject', false],
     ['getCloneObjectStatus', false],
+    // 受控重命名 apply 在确认后委托克隆工作流+受控清理链（两层确认层均自持
+    // executionGate），同样豁免外层 gate；status 纯本地读取同豁免
+    ['applyControlledRename', false],
+    ['getControlledRenameStatus', false],
     ['previewObjectActivation', true],
     ['healthcheck', false],
     ['sap', false],

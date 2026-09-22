@@ -65,6 +65,8 @@ export interface AuditEvent {
   activationPayloadHash?: string;
   // 受控对象克隆工作流（CloneObject）专用字段：planId 关联审计链。
   clonePlanId?: string;
+  // 受控对象重命名工作流（RenameControlled）专用字段：planId 关联审计链。
+  renamePlanId?: string;
 }
 
 export class AuditLogger {

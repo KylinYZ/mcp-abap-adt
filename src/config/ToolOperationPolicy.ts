@@ -44,6 +44,14 @@ export const CONTROLLED_CLONE_TOOL_NAMES = new Set([
   'getCloneObjectStatus'
 ]);
 
+// 受控对象重命名链（refactor.rename 一站式工作流）：单确认两步（克隆新对象
+// +受控删除旧对象），与受控创建/清理/克隆同面的 DEV 受控 profiles 专属链。
+export const CONTROLLED_RENAME_TOOL_NAMES = new Set([
+  'previewControlledRename',
+  'applyControlledRename',
+  'getControlledRenameStatus'
+]);
+
 /**
  * 受控对象激活工具集合（关闭矩阵缺口 devtools.activate）。
  * 三个工具构成完整受控链：preview（只读收集+冻结 plan）→
@@ -61,7 +69,7 @@ const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
   'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
-  'getObjectActivationStatus', 'getCloneObjectStatus'
+  'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -116,6 +124,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 受控对象克隆 preview（crud.clone-object 一站式）：只读预检（源码快照+
   // 本地声明改名），不触碰写路径
   'previewCloneObject',
+  // 受控对象重命名 preview（refactor.rename 一站式）：只读预检（源码快照+
+  // 本地声明改名），不触碰写路径
+  'previewControlledRename',
   // 消息类文本只读工具（矩阵 read.message-class-texts 行）：messageclass 资源
   // GET，可选 sap-language 语言覆盖；文本写入方向（i18n.write）不开放
   'getMessages',
@@ -191,7 +202,10 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'applyDescriptionChange',
   // 受控对象克隆 apply（crud.clone-object 一站式）：委托受控创建链的 repository
   // 写入，单确认单执行
-  'applyCloneObject'
+  'applyCloneObject',
+  // 受控对象重命名 apply（refactor.rename 一站式）：单确认两步（克隆新对象+
+  // 受控删除旧对象），委托受控创建链与受控清理链
+  'applyControlledRename'
 ]);
 
 const QUALITY_EXECUTION_TOOL_NAMES = new Set([
@@ -225,6 +239,7 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_ACTIVATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_CLONE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  if (CONTROLLED_RENAME_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
@@ -294,6 +309,17 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled object clone requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控对象重命名链（refactor.rename 一站式）：仅 DEV + development/
+  // development-workbench。apply 单确认两步（克隆新对象+受控删除旧对象），
+  // 确认与执行门控已内建，不进入 legacy-full 专家面。
+  if (CONTROLLED_RENAME_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled object rename requires DEV development or development-workbench profile.'
     );
   }
   if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)

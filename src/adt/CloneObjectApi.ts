@@ -78,6 +78,8 @@ export function renameCloneDeclarations(
 /**
  * 读取克隆源对象当前源码（只读；错误由调用方按 UNKNOWN/VALIDATION 语义归类）。
  * 返回原始文本（与受控创建链 setObjectSource 的 text/plain 契约一致）。
+ * 非 2xx 抛出的错误携带 status 属性（缺席复核等调用方按状态码分类，消息
+ * 文本可能本地化不可靠——真机实测出现过中文"没有找到角色"）。
  */
 export async function readCloneSource(
   http: CloneHttp,
@@ -89,7 +91,9 @@ export async function readCloneSource(
     headers: { Accept: 'text/plain' }
   });
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(`Reading source of ${name} returned HTTP ${response.status}.`);
+    const error = new Error(`Reading source of ${name} returned HTTP ${response.status}.`);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
   return response.body;
 }

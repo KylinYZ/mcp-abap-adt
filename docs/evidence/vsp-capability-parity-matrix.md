@@ -32,10 +32,10 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
 | P1 | 3 | 13 | 4 | 0 | 5 | 0 | 25 |
-| P2 | 2 | 11 | 5 | 2 | 5 | 0 | 25 |
-| 合计 | 9 | 41 | 9 | 2 | 10 | 0 | 71 |
+| P2 | 3 | 11 | 4 | 2 | 5 | 0 | 25 |
+| 合计 | 10 | 41 | 8 | 2 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**50/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**51/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -182,7 +182,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `refactor.rename` | 对象/元素重命名（评估、预览、执行） | SAP(action=system\|edit, params={fileType:rename}) | PARTIAL | P2 | `renameEvaluate`、`renamePreview`、`renameExecute` | legacy-full | DEV |
+| `refactor.rename` | 对象/元素重命名（评估、预览、执行） | SAP(action=system\|edit, params={fileType:rename}) | MCP_SUPERSET | P2 | `previewControlledRename`、`applyControlledRename`、`getControlledRenameStatus` | development, development-workbench | DEV |
 
 ### ui5
 

@@ -38,6 +38,11 @@ export function usesSapExecutionGate(toolName: string): boolean {
     // getCloneObjectStatus 是纯本地 plan 读取，与同构 status 工具一并豁免。
     && toolName !== 'applyCloneObject'
     && toolName !== 'getCloneObjectStatus'
+    // 受控重命名：apply 在原生确认后先委托克隆工作流再委托受控清理链（两层
+    // 确认层内部均自持 executionGate），与受控激活/克隆同豁免防自我死锁；
+    // getControlledRenameStatus 是纯本地 plan 读取，同豁免。
+    && toolName !== 'applyControlledRename'
+    && toolName !== 'getControlledRenameStatus'
     && toolName !== 'healthcheck';
 }
 

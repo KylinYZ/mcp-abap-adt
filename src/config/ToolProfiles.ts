@@ -74,6 +74,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 受控对象克隆链（crud.clone-object 一站式）：受控写（apply 委托受控创建链），
   // workbench 面显式收录
   'previewCloneObject', 'applyCloneObject', 'getCloneObjectStatus',
+  // 受控对象重命名链（refactor.rename 一站式）：受控写（单确认两步：
+  // 克隆新对象+受控删除旧对象），workbench 面显式收录
+  'previewControlledRename', 'applyControlledRename', 'getControlledRenameStatus',
   // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET
   'getMessages',
   // 版本源码只读工具（revisions.source）：按版本标签/序号读取历史版本源码

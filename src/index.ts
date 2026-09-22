@@ -127,6 +127,8 @@ import { DescriptionChangeHandlers } from './handlers/DescriptionChangeHandlers.
 import { DescriptionChangeWorkflow, bindDescriptionPorts } from './safe/DescriptionChangeWorkflow.js';
 import { CloneObjectHandlers } from './handlers/CloneObjectHandlers.js';
 import { CloneObjectWorkflow } from './safe/CloneObjectWorkflow.js';
+import { RenameControlledHandlers } from './handlers/RenameControlledHandlers.js';
+import { RenameControlledWorkflow } from './safe/RenameControlledWorkflow.js';
 import { createMessageClassReadClient } from './adt/MessageClassReadApi.js';
 import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
 import { createI18nReadClient } from './adt/I18nReadApi.js';
@@ -198,6 +200,7 @@ export class AbapAdtServer extends Server {
   private amdpDiscoveryHandlers: AmdpDiscoveryHandlers;
   private descriptionChangeHandlers: DescriptionChangeHandlers;
   private cloneObjectHandlers: CloneObjectHandlers;
+  private renameControlledHandlers: RenameControlledHandlers;
   private messageClassReadHandlers: MessageClassReadHandlers;
   private revisionSourceHandlers: RevisionSourceHandlers;
   private i18nReadHandlers: I18nReadHandlers;
@@ -593,6 +596,21 @@ export class AbapAdtServer extends Server {
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
       elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
     });
+    // 受控对象重命名（refactor.rename 一站式）：preview 只读快照+改名冻结，
+    // apply 单确认两步——①复用克隆工作流落地新对象（受控创建链保证）；
+    // ②复用受控清理链删除旧对象；删除失败按 PARTIAL_RENAME 终结（双对象
+    // 保留待人工处置，不自动重试不回滚）。确认型工具，外层 gate 豁免。
+    const renameWorkflow = new RenameControlledWorkflow({
+      http: this.adtClient.httpClient as never,
+      clone: cloneWorkflow as never,
+      cleanup: repositoryCleanupWorkflow as never,
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    } as never);
+    this.renameControlledHandlers = new RenameControlledHandlers(renameWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+    });
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
@@ -804,7 +822,8 @@ export class AbapAdtServer extends Server {
       ...this.safeAdvancedHandlers.getTools(),
       ...this.repositoryObjectCreationHandlers.getTools(true),
       ...this.descriptionChangeHandlers.getTools(),
-      ...this.cloneObjectHandlers.getTools()
+      ...this.cloneObjectHandlers.getTools(),
+      ...this.renameControlledHandlers.getTools()
     ];
     const controlledAdvancedTools = completeControlledAdvancedTools;
     const qualityTools = this.safeQualityHandlers.getTools();
@@ -1049,6 +1068,11 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.cloneObjectHandlers.supports(toolName)) {
           return this.cloneObjectHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控对象重命名链：同克隆链的 profile/role 门控与 catalog 成员检查。
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.renameControlledHandlers.supports(toolName)) {
+          return this.renameControlledHandlers.handle(toolName, limitedArguments);
         }
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.safeDebugHandlers.supports(toolName)) {
