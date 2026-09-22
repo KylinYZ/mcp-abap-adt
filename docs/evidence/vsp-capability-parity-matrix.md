@@ -32,10 +32,10 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
 | P1 | 3 | 13 | 4 | 0 | 5 | 0 | 25 |
-| P2 | 3 | 11 | 4 | 2 | 5 | 0 | 25 |
-| 合计 | 10 | 41 | 8 | 2 | 10 | 0 | 71 |
+| P2 | 4 | 11 | 3 | 2 | 5 | 0 | 25 |
+| 合计 | 11 | 41 | 7 | 2 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**51/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**52/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -135,7 +135,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `report.run` | 执行 ABAP 报表（带参数/变体）并捕获 ALV 输出 | SAP(action=debug, target="RUN_REPORT") + focused RunReport（ZADT_VSP WebSocket 底座） | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 | `report.async` | 后台执行报表并轮询取回异步结果 | SAP(action=debug, target="RUN_REPORT_ASYNC\|GET_ASYNC_RESULT") + focused RunReportAsync/GetAsyncResult | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 | `report.variants` | 列出报表变体 | SAP(action=debug, target="GET_VARIANTS") + focused GetVariants；analyze type=variants | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
-| `report.text-elements` | 读写程序文本池/文本元素 | SAP(action=debug, target="GET_TEXT_ELEMENTS\|SET_TEXT_ELEMENTS") + focused Get/SetTextElements | PARTIAL | P2 | `getTextElements` | development, development-workbench, business-readonly, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `report.text-elements` | 读写程序文本池/文本元素 | SAP(action=debug, target="GET_TEXT_ELEMENTS\|SET_TEXT_ELEMENTS") + focused Get/SetTextElements | MCP_SUPERSET | P2 | `getTextElements`、`previewDdicPropertyChange`、`applyDdicPropertyChange` | development, development-workbench | DEV |
 
 ### diagnostics
 
@@ -196,7 +196,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `i18n.read` | 按语言读取对象文本、数据元素标签、消息文本与语言对比 | SAP(action=i18n, params={op:texts\|data_element_labels\|message_class_texts\|text_pool\|compare_languages}) + focused GetObjectTextsInLanguage/GetDataElementLabels/GetMessageClassTexts/GetTextPool/CompareLanguages | EQUIVALENT | P2 | `getTextElements`、`getDomainProperties`、`getDataElementProperties`、`getMessages`、`getObjectContentInLanguage`、`getDataElementLabels`、`getTextPoolInLanguage`、`compareObjectLanguages` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `i18n.write` | 写入数据元素标签与消息类文本 | SAP(action=i18n, params={op:write_labels\|write_message_texts}) | PARTIAL | P2 | （无） | （无） | （无） |
+| `i18n.write` | 写入数据元素标签与消息类文本 | SAP(action=i18n, params={op:write_labels\|write_message_texts}) | PARTIAL | P2 | `previewDdicPropertyChange`、`applyDdicPropertyChange` | development, development-workbench | DEV |
 
 ### revisions
 

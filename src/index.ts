@@ -779,6 +779,8 @@ export class AbapAdtServer extends Server {
         isError: true
       };
     }
+    // 未分类异常兜底：栈走 stderr（不进 MCP 响应、不含凭据），否则 500 无法定位
+    console.error('[abap-ai-workbench] unhandled tool error:', error instanceof Error ? (error.stack || error.message) : error);
     return {
       content: [{
         type: 'text',

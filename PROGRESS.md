@@ -341,3 +341,14 @@
 - 矩阵：refactor.rename PARTIAL → MCP_SUPERSET（evidence + real-dev-verified）。现状：MCP_SUPERSET=10、EQUIVALENT=41、PARTIAL=8、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 51/71。证据：docs/evidence/rename-controlled-real-dev-verified.md。
 - 接线同步：ToolProfiles（workbench +3）+ ToolOperationPolicy（read-only +1/local +1/advanced-mutation +1/CONTROLLED_RENAME_TOOL_NAMES 专属门控 + 角色可见性）+ ToolCatalogIntegrity 计数（development=179、development-workbench=146）+ serverGuardrails（applyControlledRename/getControlledRenameStatus 确认型豁免）+ AGENTS.md 基线（159/1526，2026-09-22）。
 - 遗留：无系统残留（两对象均 absence）。剩余 PARTIAL 8 行中可推进项：report.text-elements/i18n.write（文本池受控写入，复用 DescriptionApi 锁链）、recover-failed-create（语义边界）、diagnostics.knowledge-queries（S/2 集群解析器，工程轮）；GAP 2 行均写方向 RESTRICTION。受控写批次三连发完成（set-description → clone → rename），同一安全模型（immutable plan + 原生确认 + 单次执行 + readback/absence）已形成可复制模式。
+
+## 2026-09-22 闲时轮（三）：受控文本池/数据元素标签写入——report.text-elements 晋级 MCP_SUPERSET（大轮）
+
+- 本轮推进受控写批次第四个工作流（复用 DdicPropertyChangeWorkflow 既有实现，首轮真机暴露从未验证的协议缺陷并全部修复）：SET_TEXT_ELEMENTS 与 SET_DATA_ELEMENT_PROPERTIES（标签）两条受控链真机闭环（scripts/ddic-text-elements-real-dev-smoke.mjs，注册 test:ddic-text-real-dev，14 断言全 PASS、SMOKE OK、零残留）。
+- **S/4 文本池写入三条件链（实测固化的协议知识）**：①stateful 会话；②锁 REPT 子对象（textelements 资源 URL，锁主程序报 "Resource REPT ... is not locked"）；③载荷每符号必须有 @MaxLength 指令行（缺失/一符多修饰触发 DS512"文本元素包含错误"）。协议层 formatTextElements 已按此修复（maxLength 缺省 132=SE32 默认上限），工作流锁目标按 kind 分流到 REPT。上游 abap-adt-api 8.4.3 同样不满足条件③（移植无变形，是上游缺陷）。
+- **verify 语义修正**：DDIC 属性写入是"部分更新+服务器合法回填"（标签长度/布尔默认值/responsible 数字化），整体 hash 恒不相等——SET_DATA_ELEMENT_PROPERTIES/DOMAIN 改为"提交路径逐项匹配"（递归叶子路径+宽松值比较），SET_TEXT_ELEMENTS 保留精确 hash（整体替换语义）。本轮还真实触发了 verify 失败→自动回滚→零残留的防御路径。
+- **附带产品修复**：① stableJson(undefined) 归一 'null'（原 ERR_INVALID_ARG_TYPE 崩溃——changedFieldPaths 深对比键缺失时触发 500）；② handleError 未分类异常兜底输出 stack 到 stderr（原 500 无从定位）。
+- 本地门禁全绿：Jest 160 suites / 1535 tests（+1 suite +9 tests：文本池格式/REPT 锁/verify 回填容忍/undefined hash）、build、coverage、parity、diff --check。
+- 矩阵：report.text-elements PARTIAL → **MCP_SUPERSET**（taskPath 补 previewDdicPropertyChange/applyDdicPropertyChange；VSP SetTextElements 依赖 ZADT_VSP helper，本项目纯 ADT REST）；i18n.write PARTIAL 收窄（write_labels 侧获真机证据，taskPath 收窄，剩余仅 write_message_texts）。现状：MCP_SUPERSET=11、EQUIVALENT=41、PARTIAL=7、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，**对齐 52/71**。证据：docs/evidence/ddic-text-elements-real-dev-verified.md。
+- 清场：smoke 自建对象全部受控清理 absence 通过；诊断期 3 个 $TMP 实验程序协议直删并 absence 复查；临时脚本已删。无系统残留。
+- 剩余 PARTIAL 7 行可推进项：i18n.write 的 write_message_texts（消息类文本受控写入，同模板）、recover-failed-create（语义边界）、diagnostics.knowledge-queries（S/2 集群解析器工程轮）等；GAP 2 行均写方向 RESTRICTION。下一轮起点建议：write_message_texts（复用 immutable plan 模板 + MessageClass API）或集群解析器工程轮。

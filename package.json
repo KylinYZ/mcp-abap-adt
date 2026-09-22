@@ -51,7 +51,8 @@
     "test:wave3-analytics-real-dev": "node ./scripts/wave3-analytics-real-dev-smoke.mjs",
     "test:clone-real-dev": "node ./scripts/clone-object-real-dev-smoke.mjs",
     "test:clone-controlled-real-dev": "node ./scripts/clone-controlled-real-dev-smoke.mjs",
-    "test:rename-controlled-real-dev": "node ./scripts/rename-controlled-real-dev-smoke.mjs"
+    "test:rename-controlled-real-dev": "node ./scripts/rename-controlled-real-dev-smoke.mjs",
+    "test:ddic-text-real-dev": "node ./scripts/ddic-text-elements-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",

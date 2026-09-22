@@ -12,7 +12,7 @@
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
 - profile 目录：`safe=7`、`development=179`、`diagnostic-readonly=139`、`legacy-full=202`、`development-workbench=146`、`business-readonly=18`、`operations-readonly=48`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
-- 自动化基线：159 个 Jest suites、1526 个 tests（2026-09-22）。
+- 自动化基线：160 个 Jest suites、1535 个 tests（2026-09-22）。VSP 能力对齐：52/71（MCP_SUPERSET=11）。
 - 真实 SAP smoke 默认使用 `sap-demo.env`（所有者 2026-09-22 指示；sap-dev 上 S4HK900009 已不可用）。
 - 运行时要求：Node.js >=22.14.0（`.nvmrc` 为 22；Node 18/20 已 EOL，自 0.7.0 起不再支持——为 RFC 基座 open-rfc 的支持合同对齐）。
 

@@ -28,6 +28,7 @@ import {
   changedFieldPaths,
   guardAdvancedApply,
   stableHash,
+  stableJson,
   validateAdvancedTransport,
   type AdvancedAuditSink,
   type AdvancedTransportClient
@@ -135,7 +136,7 @@ export class DdicPropertyChangeWorkflow {
 
       let lockHandle: string;
       try {
-        lockHandle = (await this.client.lock(payload.objectUrl, 'MODIFY')).LOCK_HANDLE;
+        lockHandle = (await this.client.lock(this.lockUrlFor(payload), 'MODIFY')).LOCK_HANDLE;
         payload.lockHandle = lockHandle;
         await appendStage(plan, { stage: 'LOCK', success: true }, stage => this.plans.recordStage(operationPlanId, stage), this.audit, this.policy);
       } catch (error) {
@@ -170,14 +171,11 @@ export class DdicPropertyChangeWorkflow {
 
       try {
         const verified = await this.readPayloadState(payload, 'active');
-        const verificationHash = stableHash(verified);
-        if (verificationHash !== payload.verification.expectedHash) {
-          throw new SafeAbapError('VERIFICATION_FAILED', 'VERIFY', 'The activated DDIC state does not match the confirmed plan.');
-        }
+        this.verifyAgainstPlan(payload, verified);
         await appendStage(plan, { stage: 'VERIFY', success: true }, stage => this.plans.recordStage(operationPlanId, stage), this.audit, this.policy);
         this.plans.recordResult(operationPlanId, 'The DDIC change was activated and verified.');
         this.plans.setStatus(operationPlanId, 'APPLIED');
-        await this.audit.append(advancedAuditEvent(plan, 'APPLY_COMPLETED', true, this.policy, { verificationHash }));
+        await this.audit.append(advancedAuditEvent(plan, 'APPLY_COMPLETED', true, this.policy, { verificationHash: stableHash(verified) }));
         return { status: 'success', plan: this.plans.view(operationPlanId, context) };
       } catch (error) {
         return this.recover(plan, payload, error instanceof SafeAbapError
@@ -269,8 +267,38 @@ export class DdicPropertyChangeWorkflow {
       .then(result => ({ category: payload.input.category, elements: result.textElements }));
   }
 
-  private writePayload(payload: DdicPayload, lockHandle: string, transport?: string): Promise<void> {
-    if (payload.kind === 'SET_DOMAIN_PROPERTIES') {
+  // 校验语义按 kind 区分（真机实测差异）：
+  // - SET_TEXT_ELEMENTS：文本池是整体替换资源，读回=写入，保留精确 hash 比对。
+  // - DDIC 属性（DOMAIN/DATA_ELEMENT）：部分更新 + 服务器合法回填语义——SAP 会补齐
+  //   标签长度（shortFieldLength 等）、布尔默认值、包描述并把 responsible 数字化，
+  //   提交形态与读回形态的整体 hash 永不相等（真机 B3 轮 VERIFICATION_FAILED 实证）。
+  //   改为“提交路径逐项匹配”：只断言计划提交的每个叶子路径在读回中值一致，
+  //   服务器回填的额外字段不参与比对。
+  private verifyAgainstPlan(payload: DdicPayload, verified: unknown): void {
+    if (payload.kind === 'SET_TEXT_ELEMENTS') {
+      if (stableHash(verified) !== payload.verification.expectedHash) {
+        throw new SafeAbapError('VERIFICATION_FAILED', 'VERIFY', 'The activated DDIC state does not match the confirmed plan.');
+      }
+      return;
+    }
+    const proposed = payload.input as unknown as Record<string, Record<string, unknown>>;
+    const actual = verified as Record<string, Record<string, unknown>> | undefined;
+    if (!actual) throw new SafeAbapError('VERIFICATION_FAILED', 'VERIFY', 'The activated DDIC state could not be read.');
+    for (const section of ['metaData', 'properties'] as const) {
+      const expectedSection = proposed[section] || {};
+      const actualSection = actual[section] || {};
+      walkExpectedPaths(expectedSection, actualSection, section);
+    }
+  }
+
+  // 锁目标与主对象 URL 可能不同：S/4 实测 SET_TEXT_ELEMENTS 的写入锁挂在
+  // 文本池部分对象（REPT）自身资源 URL 上，锁主程序会因“资源未锁定/不一致”被拒。
+  private lockUrlFor(payload: DdicPayload): string {
+    if (payload.kind === 'SET_TEXT_ELEMENTS') return textElementsUrlForPayload(payload);
+    return payload.objectUrl;
+  }
+
+  private writePayload(payload: DdicPayload, lockHandle: string, transport?: string): Promise<void> {    if (payload.kind === 'SET_DOMAIN_PROPERTIES') {
       return this.client.setDomainProperties(payload.objectUrl, payload.input.properties, payload.input.metaData, lockHandle, transport);
     }
     if (payload.kind === 'SET_DATA_ELEMENT_PROPERTIES') {
@@ -310,7 +338,7 @@ export class DdicPropertyChangeWorkflow {
 
   private async bestEffortUnlock(plan: AdvancedOperationPlan, payload: DdicPayload, lockHandle: string, auditFailureIsFatal: boolean): Promise<boolean> {
     try {
-      await this.client.unLock(payload.objectUrl, lockHandle);
+      await this.client.unLock(this.lockUrlFor(payload), lockHandle);
       payload.lockHandle = undefined;
       await appendStage(plan, { stage: 'UNLOCK', success: true }, stage => this.plans.recordStage(plan.operationPlanId, stage), this.audit, this.policy, auditFailureIsFatal);
       return true;
@@ -323,7 +351,7 @@ export class DdicPropertyChangeWorkflow {
   private async recover(plan: AdvancedOperationPlan, payload: DdicPayload, primary: SafeAbapError, existingLockHandle?: string): Promise<never> {
     let rollbackError: string | undefined;
     try {
-      const lockHandle = existingLockHandle || (await this.client.lock(payload.objectUrl, 'MODIFY')).LOCK_HANDLE;
+      const lockHandle = existingLockHandle || (await this.client.lock(this.lockUrlFor(payload), 'MODIFY')).LOCK_HANDLE;
       await this.writeRecovery(payload, lockHandle, plan.transport);
       const unlocked = await this.bestEffortUnlock(plan, payload, lockHandle, false);
       if (!unlocked) throw new Error('Failed to unlock restored DDIC state.');
@@ -433,8 +461,42 @@ function uniqueTextTarget(results: SearchResult[], objectType: string, objectNam
   return matches[0];
 }
 
-function currentComparable(payload: DdicPayload, recovery: boolean): unknown {
-  if (payload.kind === 'SET_TEXT_ELEMENTS') {
+// 递归遍历计划提交的每个叶子路径：对象逐键下钻（fieldLabels 等嵌套节），
+// 叶子值走 looseValueEquals；路径缺失或值不等即 VERIFICATION_FAILED（带具体路径）。
+function walkExpectedPaths(expected: Record<string, unknown>, actual: Record<string, unknown>, prefix: string): void {
+  for (const key of Object.keys(expected)) {
+    const expectedValue = expected[key];
+    const actualValue = actual[key];
+    const path = `${prefix}.${key}`;
+    if (isPlainRecord(expectedValue) && isPlainRecord(actualValue)) {
+      walkExpectedPaths(expectedValue, actualValue, path);
+    } else if (!looseValueEquals(actualValue, expectedValue)) {
+      throw new SafeAbapError('VERIFICATION_FAILED', 'VERIFY', `The activated DDIC state does not match the confirmed plan (${path}).`);
+    }
+  }
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+// 逐路径校验的叶子值宽松匹配：SAP 读回会把部分字段数字化/补空串
+// （如 responsible 068157 → 数字 68157），字符串化后比较可吸收该类形态差异；
+// 嵌套结构（fixValues 数组等）退回 stableJson 归一比较。undefined/null/空串互相视为一致。
+function looseValueEquals(actual: unknown, expected: unknown): boolean {
+  if (actual === undefined || actual === null || actual === '') {
+    return expected === undefined || expected === null || expected === '';
+  }
+  if (expected === undefined || expected === null || expected === '') {
+    return false;
+  }
+  if (typeof actual === 'object' || typeof expected === 'object') {
+    return stableJson(actual) === stableJson(expected);
+  }
+  return String(actual) === String(expected);
+}
+
+function currentComparable(payload: DdicPayload, recovery: boolean): unknown {  if (payload.kind === 'SET_TEXT_ELEMENTS') {
     return recovery
       ? { category: payload.recovery.category, elements: payload.recovery.elements }
       : { category: payload.input.category, elements: payload.input.elements };

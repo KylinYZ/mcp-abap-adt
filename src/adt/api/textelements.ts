@@ -115,8 +115,12 @@ export function formatTextElements(
   validateTextElements(elements, category)
   const lines: string[] = []
   for (const el of elements) {
-    if (el.maxLength && el.maxLength > 0 && category === "symbols")
-      lines.push(`@MaxLength:${el.maxLength}`)
+    if (category === "symbols") {
+      // S/4 真机实测（DS512 一致性校验）：每个文本符号前必须有自己的 @MaxLength
+      // 指令行，缺失或一条指令修饰多个符号都会被 SAP 以“文本元素包含错误”拒绝。
+      // 调用方未给 maxLength 时按 SE32 新建符号默认上限 132 兜底。
+      lines.push(`@MaxLength:${el.maxLength && el.maxLength > 0 ? el.maxLength : 132}`)
+    }
     if (category === "selections" && el.ddicReference)
       lines.push(`@DDICReference:${el.ddicReference}`)
     lines.push(`${el.id.toUpperCase()}=${el.text}`)

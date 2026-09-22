@@ -1,2907 +1,2914 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-09-22",
-  "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
-  "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
-  "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
-  "projectWorktreeState": "dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等）",
-  "statusVocabulary": {
-    "MCP_SUPERSET": "本项目完成同一任务，且多了可验证的安全或复读保证；计入完成率",
-    "EQUIVALENT": "两边可完成同一任务，关键输入、输出和副作用相当；计入完成率",
-    "PARTIAL": "只覆盖对象、参数、结果、系统角色或生命周期的一部分；不计入完成率",
-    "GAP": "VSP 已对外提供、本项目没有等价任务路径；不计入完成率",
-    "INTENTIONAL_RESTRICTION": "因 QAS/PRD、无 SAP helper、无授权或不可安全验证而限制；必须写明替代路径和解除条件；不计入完成率",
-    "UNVERIFIED": "代码存在但未完成当前版本的自动化或专用 DEV 验证；不计入完成率"
+ "schemaVersion": 1,
+ "generatedAt": "2026-09-22",
+ "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
+ "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
+ "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
+ "projectWorktreeState": "dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等）",
+ "statusVocabulary": {
+  "MCP_SUPERSET": "本项目完成同一任务，且多了可验证的安全或复读保证；计入完成率",
+  "EQUIVALENT": "两边可完成同一任务，关键输入、输出和副作用相当；计入完成率",
+  "PARTIAL": "只覆盖对象、参数、结果、系统角色或生命周期的一部分；不计入完成率",
+  "GAP": "VSP 已对外提供、本项目没有等价任务路径；不计入完成率",
+  "INTENTIONAL_RESTRICTION": "因 QAS/PRD、无 SAP helper、无授权或不可安全验证而限制；必须写明替代路径和解除条件；不计入完成率",
+  "UNVERIFIED": "代码存在但未完成当前版本的自动化或专用 DEV 验证；不计入完成率"
+ },
+ "evidenceVocabulary": {
+  "source-audit": "仅完成双方源码对照审计，未经自动化或真实 SAP 验证",
+  "automation": "已由本项目 Jest 自动化基线覆盖（运行时 catalog/profile/工作流测试）",
+  "real-dev-verified": "已有专用 DEV 真机 create/readback/transport/cleanup/absence 证据（docs/evidence）",
+  "released": "能力已随 npm 版本发布"
+ },
+ "profileAliases": "focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。",
+ "rows": [
+  {
+   "id": "source.read",
+   "domain": "source",
+   "task": "读取 CLAS/PROG/INTF/FUNC/FUGR/INCL/DDLS/BDEF/SRVD/SRVB/MSAG/VIEW/ENHO 的源码",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"<TYPE> <NAME>\") 源码读取；focused GetSource",
+    "source": [
+     "internal/mcp/handlers_source.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getObjectSource",
+     "inspectAbapObject",
+     "getAbapMemberSource"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
   },
-  "evidenceVocabulary": {
-    "source-audit": "仅完成双方源码对照审计，未经自动化或真实 SAP 验证",
-    "automation": "已由本项目 Jest 自动化基线覆盖（运行时 catalog/profile/工作流测试）",
-    "real-dev-verified": "已有专用 DEV 真机 create/readback/transport/cleanup/absence 证据（docs/evidence）",
-    "released": "能力已随 npm 版本发布"
+  {
+   "id": "source.write",
+   "domain": "source",
+   "task": "修改对象源码并完成锁/激活生命周期（含 CRUD UPDATE_SOURCE 与 method 粒度写入）",
+   "vsp": {
+    "surface": "SAP(action=edit, params={source|method,source}) 自动锁/激活；focused WriteSource/EditSource；CRUD UPDATE_SOURCE",
+    "source": [
+     "internal/mcp/handlers_source.go",
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewAbapChange",
+     "applyAbapChange",
+     "getAbapChangeStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家原子源写入（自带锁/传输/激活责任转移给调用方）",
+      "tools": [
+       "setObjectSource"
+      ],
+      "profiles": [
+       "legacy-full"
+      ],
+      "systemRoles": [
+       "DEV"
+      ]
+     }
+    ]
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
   },
-  "profileAliases": "focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。",
-  "rows": [
-    {
-      "id": "source.read",
-      "domain": "source",
-      "task": "读取 CLAS/PROG/INTF/FUNC/FUGR/INCL/DDLS/BDEF/SRVD/SRVB/MSAG/VIEW/ENHO 的源码",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"<TYPE> <NAME>\") 源码读取；focused GetSource",
-        "source": [
-          "internal/mcp/handlers_source.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getObjectSource",
-          "inspectAbapObject",
-          "getAbapMemberSource"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
+  {
+   "id": "source.class-include",
+   "domain": "source",
+   "task": "按 include 粒度编辑类成员（testclasses/definitions/implementations/macros）",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"CLAS ...\", params={include}) 类 include 写入",
+    "source": [
+     "internal/mcp/handlers_classinclude.go"
+    ],
+    "requires": [
+     "ADT session",
+     "类可锁"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewAbapChange",
+     "applyAbapChange",
+     "getAbapChangeStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控变更链支持 classInclude 参数（definitions/implementations/macros/testclasses 四种粒度，仅 CLASS）：include 可写源 URL 由 resolver 只读解析并冻结进 plan，锁/激活归属父类，原生确认消息显式标注 include 粒度，漂移校验/回滚/单次 apply 全链复用。2026-09-16 真机闭环验证通过（目标 ZVCLINCSMK definitions include：APPLIED + SOURCE_VERIFIED + 独立直读复查一致，审计 SOURCE_WRITTEN→OBJECT_ACTIVATED→SOURCE_VERIFIED→APPLY_COMPLETED；自建类清理 absence 通过）。该 DEV 版本新类也暴露 testclasses include，四种粒度全可解析；缺 include 的容错路径由自动化测试覆盖。",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家原子入口（主源/include 原子写入与测试类补建）",
+      "tools": [
+       "setObjectSource",
+       "createTestInclude"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "source.write",
-      "domain": "source",
-      "task": "修改对象源码并完成锁/激活生命周期（含 CRUD UPDATE_SOURCE 与 method 粒度写入）",
-      "vsp": {
-        "surface": "SAP(action=edit, params={source|method,source}) 自动锁/激活；focused WriteSource/EditSource；CRUD UPDATE_SOURCE",
-        "source": [
-          "internal/mcp/handlers_source.go",
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewAbapChange",
-          "applyAbapChange",
-          "getAbapChangeStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家原子源写入（自带锁/传输/激活责任转移给调用方）",
-            "tools": [
-              "setObjectSource"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation"
+      "profiles": [
+       "legacy-full"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "source.class-include",
-      "domain": "source",
-      "task": "按 include 粒度编辑类成员（testclasses/definitions/implementations/macros）",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"CLAS ...\", params={include}) 类 include 写入",
-        "source": [
-          "internal/mcp/handlers_classinclude.go"
-        ],
-        "requires": [
-          "ADT session",
-          "类可锁"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewAbapChange",
-          "applyAbapChange",
-          "getAbapChangeStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控变更链支持 classInclude 参数（definitions/implementations/macros/testclasses 四种粒度，仅 CLASS）：include 可写源 URL 由 resolver 只读解析并冻结进 plan，锁/激活归属父类，原生确认消息显式标注 include 粒度，漂移校验/回滚/单次 apply 全链复用。2026-09-16 真机闭环验证通过（目标 ZVCLINCSMK definitions include：APPLIED + SOURCE_VERIFIED + 独立直读复查一致，审计 SOURCE_WRITTEN→OBJECT_ACTIVATED→SOURCE_VERIFIED→APPLY_COMPLETED；自建类清理 absence 通过）。该 DEV 版本新类也暴露 testclasses include，四种粒度全可解析；缺 include 的容错路径由自动化测试覆盖。",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家原子入口（主源/include 原子写入与测试类补建）",
-            "tools": [
-              "setObjectSource",
-              "createTestInclude"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.object-metadata",
-      "domain": "read",
-      "task": "读取对象结构化元数据（PROG/CLAS/INTF/FUNC/FUGR/INCL/TABL/DEVC/STRUCT/TYPE_INFO、包内容、函数组清单、类信息）",
-      "vsp": {
-        "surface": "SAP(action=read) 元数据读取 + focused GetPackage/GetFunctionGroup/GetClassInfo/GetObjectStructure",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "objectStructure",
-          "objectStructureElements",
-          "inspectAbapObject"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.ddic-metadata",
-      "domain": "read",
-      "task": "读取 DDIC 表/结构/类型信息与域、数据元素属性",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"TABL|STRUCT|TYPE_INFO ...\") + focused GetTable",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "describeClassicTable",
-          "ddicElement",
-          "ddicRepositoryAccess",
-          "getDomainProperties",
-          "getDataElementProperties"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "business-readonly",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.table-contents",
-      "domain": "read",
-      "task": "读取透明表数据内容与即席 OpenSQL 查询",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"TABL_CONTENTS ...\") + focused GetTable/GetTableContents/RunQuery",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "describeClassicTable",
-          "tableContents",
-          "runQuery"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "business-readonly",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.cds-analysis",
-      "domain": "read",
-      "task": "读取 CDS 依赖树、反向影响分析与元素元数据",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"CDS_DEPS|CDS_IMPACT|CDS_ELEMENTS ...\") + focused GetCDSDependencies/GetCDSImpactAnalysis/GetCDSElementInfo",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getCdsDependencies",
-          "getCdsImpactAnalysis",
-          "getCdsElementInfo"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "getCdsElementInfo 在目标 DEV 系统因缺少 ddlsources.v2 内容类型走降级路径（空元素清单+note 说明）；VSP 上游同样硬编码 v2、在该系统同样不可用，故该环境限制对两边一致。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.coverage",
-      "domain": "read",
-      "task": "运行单元测试并读取行级代码覆盖率",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"COVERAGE ...\") + focused GetCodeCoverage",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "runUnitCoverage"
-        ],
-        "profiles": [
-          "development-workbench",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "runUnitCoverage 已在真实 DEV 系统执行验证：POST abapunit/testruns + coverage 采集 + 结果解析全链路通过（目标 ZVPCL01 无测试类故覆盖率为 0，执行与解析链路真实生效）。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.transaction",
-      "domain": "read",
-      "task": "读取事务码元数据",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"TRAN ...\")",
-        "source": [
-          "internal/mcp/handlers_read.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getTransaction"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "getTransaction 已在真实 DEV 端到端验证（2026-09-18 复测晋级，证据 docs/evidence/transaction-read-real-dev-verified.md）：SE38 → 程序 RSABAPPROGRAM + 描述 \"ABAP Editor\"（EN/DE 双语言）真实返回。第十七轮记录的\"TSTCT datapreview 受限\"实为两层假象的叠加：① TSTCT.SPRSL 是 1 位 SAP 内部语言键，2 位 ISO 字面量（'EN'）超出列宽被 datapreview 拒（真机实测 400）——已修复为查询前经 sapInternalLanguageKey 转内部键（EN→E、DE→D、ZH→1），与知识查询同表；② datapreview 按会话查询预算（约 19 次）耗尽型失败（详见 img-activity 证据）。VSP 的 vit/wb TRAN 端点在该 DEV 无映射的差异保持（本实现走 TSTC/TSTCT 自由 SQL）。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "liftCondition": "TSTCT datapreview 限制解除或找到替代描述通道（如 ADT 短文本端点）后评估 EQUIVALENT。",
-      "nextMilestone": ""
-    },
-    {
-      "id": "read.message-class-texts",
-      "domain": "read",
-      "task": "读取消息类文本（SE91）与 MSAG 对象内容",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"MSAG ...\") + focused GetMessages",
-        "source": [
-          "internal/mcp/handlers_read.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getMessages"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "getMessages 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/message-class-read-real-dev-verified.md）：标准消息类 00 读回 901 条消息（msgno 前导零保留、按号升序、计数一致）；sap-language=EN/DE 语言覆盖均成功；注入样本（引号分号注释符、多级斜杠）在参数层被 InvalidParams 拒绝（零网络往返）。消息文本写入方向（i18n.write）维持缺口。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "search.objects",
-      "domain": "search",
-      "task": "按名称模式搜索仓库对象与对象路径",
-      "vsp": {
-        "surface": "SAP(action=search, target=\"ZCL_*\") + focused SearchObject",
-        "source": [
-          "internal/mcp/handlers_search.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "searchObject",
-          "findObjectPath",
-          "objectTypes"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "business-readonly",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "search.content-grep",
-      "domain": "search",
-      "task": "跨对象/包按源码内容正则搜索（grep）",
-      "vsp": {
-        "surface": "SAP(action=grep, target=..., params={pattern}) + focused GrepObjects/GrepPackages",
-        "source": [
-          "internal/mcp/handlers_grep.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "grepPackage",
-          "grepObjects"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "grepPackage/grepObjects 已在真实 DEV 系统验证：包枚举（7 个 PROG 对象）+ 客户端正则匹配 + 有界结果结构全部通过（scripts/wave3-analytics-real-dev-smoke.mjs）。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "codeintel.navigation",
-      "domain": "codeintel",
-      "task": "定义/引用跳转、类型层次、类组件、未激活对象与 ABAP 文档查询",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:definition|references|type_hierarchy|class_components|inactive_objects|abap_help}) + focused FindDefinition/FindReferences",
-        "source": [
-          "internal/mcp/handlers_codeintel.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "findDefinition",
-          "usageReferences",
-          "usageReferenceSnippets",
-          "typeHierarchy",
-          "classComponents",
-          "inactiveObjects"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "codeintel.completion-format",
-      "domain": "codeintel",
-      "task": "代码补全、格式化与 pretty printer 设置读写",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:completion|pretty_print|get_pretty_printer_settings|set_pretty_printer_settings}) + focused PrettyPrint",
-        "source": [
-          "internal/mcp/handlers_codeintel.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "codeCompletion",
-          "codeCompletionFull",
-          "codeCompletionElement",
-          "prettyPrinter",
-          "prettyPrinterSetting"
-        ],
-        "profiles": [
-          "development",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "codeintel.context",
-      "domain": "codeintel",
-      "task": "压缩依赖上下文、ABAP 解析、依赖与变更影响分析",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:context|parse_abap|analyze_deps|effects}) + focused GetContext",
-        "source": [
-          "internal/mcp/handlers_context.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getDependencyContext",
-          "analyzeDependencies",
-          "parseAbapSource",
-          "analyzeSourceEffects"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "dependency-context-spike 完成并经真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/context-analysis-real-dev-verified.md）：getDependencyContext 对 ZCL_MCP_SM21_ADT_HTTP 发现 3 依赖、3 契约全解析、prologue 130 行、stats 恒等式通过；契约名与 analyzeDependencies 依赖发现清单交叉一致；parseAbapSource 解析 176 条语句并识别 CLASS_DEFINITION；analyzeSourceEffects 给出 LUW=safe 与 local-analysis 边界声明；source 直传通道零 SAP 往返。真机发现并修复 include 相对源 URI 问题（absolutizeSourceUrl，含恶意相对段拒绝单测）。与 VSP 的剩余差异属增值差异：VSP analyze_deps 另带 abaplint parser 层与 SCAN/CROSS 层多层置信度（本项目单 regex 层）；取源为串行（VSP 5 路并发）。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.syntax-check",
-      "domain": "devtools",
-      "task": "对 ABAP/CDS 源执行语法检查",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:syntax_check}) + focused SyntaxCheck",
-        "source": [
-          "internal/mcp/handlers_devtools.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "syntaxCheckCode",
-          "syntaxCheckCdsUrl"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.unit-tests",
-      "domain": "devtools",
-      "task": "执行 ABAP Unit 测试并读取结果",
-      "vsp": {
-        "surface": "SAP(action=test, params={type:unit}) + focused RunUnitTests",
-        "source": [
-          "internal/mcp/handlers_devtools.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "测试类可执行"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "previewQualityCheck",
-          "runQualityCheck",
-          "getQualityCheckStatus"
-        ],
-        "profiles": [
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家直接执行（ADT unit runner 原子入口）",
-            "tools": [
-              "unitTestRun",
-              "unitTestEvaluation"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.atc-run",
-      "domain": "devtools",
-      "task": "对对象发起 ATC 检查运行",
-      "vsp": {
-        "surface": "SAP(action=test, params={type:atc}) + focused RunATCCheck",
-        "source": [
-          "internal/mcp/handlers_atc.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "ATC 定制有效"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "previewQualityCheck",
-          "runQualityCheck",
-          "getQualityCheckStatus"
-        ],
-        "profiles": [
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.atc-read",
-      "domain": "devtools",
-      "task": "读取 ATC 结果工作清单、检查变体与定制",
-      "vsp": {
-        "surface": "SAP(action=test, params={type:atc|atc_customizing}) 结果读取 + focused GetCheckRunResults",
-        "source": [
-          "internal/mcp/handlers_atc.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "atcWorklists",
-          "atcCheckVariant",
-          "atcCustomizing",
-          "atcDocumentation"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.activate",
-      "domain": "devtools",
-      "task": "重新激活未激活对象（单对象/多对象/整包）",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"ACTIVATE|ACTIVATE_MULTI|ACTIVATE_PACKAGE\") + focused Activate/ActivatePackage",
-        "source": [
-          "internal/mcp/handlers_devtools.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "存在未激活对象"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "previewObjectActivation",
-          "applyObjectActivation",
-          "getObjectActivationStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控激活链已在真实 DEV 系统端到端验证（2026-09-16，目标 ZVCL_CAMPAIGN）：preview 冻结 6 条目 plan（全部属目标对象）→ 原生确认 → apply 单次执行 SUCCEEDED（审计 OBJECT_ACTIVATION_CONFIRMED/COMPLETED，结果摘要 activated 6 object(s), 0 still inactive）→ 重复 apply 拒绝 → 目标离开未激活列表复查通过；自建验证对象受控清理 + absence 复查通过。补跑前置修复（apply gate 自我死锁豁免）已入库并有回归测试。激活目标条目需含 adtcore:parentUri（顶层 INTF/DTEL 条目不进激活 plan，与激活载荷需精确 ADT 引用的设计一致）。",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家原子激活（受控链不进 legacy catalog）",
-            "tools": [
-              "activateObjects",
-              "activateByName",
-              "inactiveObjects"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "devtools.execute-abap",
-      "domain": "devtools",
-      "task": "直接执行 ABAP 片段/类并取回输出",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:execute_abap})",
-        "source": [
-          "internal/mcp/handlers_devtools.go"
-        ],
-        "requires": [
-          "ADT session",
-          "可执行对象"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "runClass"
-        ],
-        "profiles": [
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "仅专家 profile 的 runClass 原子入口；无受控执行链，输出与副作用边界弱于 VSP 的 execute_abap。",
-        "liftCondition": "评估受控执行任务（固定入口 + 输出捕获）后晋级。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "crud.create-object",
-      "domain": "crud",
-      "task": "创建仓库对象（包/表/程序/类/函数组/DDIC 域/数据元素/结构/CDS 等）",
-      "vsp": {
-        "surface": "SAP(action=create, target=\"OBJECT|DEVC|TABL\") + workflow create PROGRAM/CLASS_WITH_TESTS + focused CreatePackage/CreateTable",
-        "source": [
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/handlers_workflow.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "开发 license 与命名权限"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "listRepositoryObjectCreationCapabilities",
-          "describeRepositoryObjectCreation",
-          "previewRepositoryObjectCreation",
-          "applyRepositoryObjectCreation",
-          "getRepositoryObjectCreationStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "crud.delete-object",
-      "domain": "crud",
-      "task": "删除仓库对象",
-      "vsp": {
-        "surface": "SAP(action=delete, target=\"OBJECT ...\")",
-        "source": [
-          "internal/mcp/handlers_crud.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewRepositoryObjectCleanup",
-          "applyRepositoryObjectCleanup",
-          "getRepositoryObjectCleanupStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "crud.clone-object",
-      "domain": "crud",
-      "task": "复制对象到新名称",
-      "vsp": {
-        "surface": "SAP(action=create, target=\"CLONE ...\") + focused CloneObject",
-        "source": [
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "目标命名空间权限"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewCloneObject",
-          "applyCloneObject",
-          "getCloneObjectStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控对象克隆一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/clone-controlled-real-dev-smoke.mjs）：preview 只读读源快照+本地声明改名冻结（sourceHash/payloadHash/declarationChanges）→ 原生确认 → apply 委托受控创建链（壳创建/锁/写/语法检查/激活/源码 hash 比对/失败补偿，APPLIED）→ readback 独立直读一致 → 双清理零残留。比 VSP CloneObject 多 immutable plan、上下文绑定重放拒绝、原生确认与失败补偿；类源码改名要求 DEFINITION/IMPLEMENTATION 两处同步（VSP 只替换首个匹配，多声明漏改）。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+      "systemRoles": [
+       "DEV"
       ]
-    },
-    {
-      "id": "crud.move-package",
-      "domain": "crud",
-      "task": "把对象移动到其他包",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"MOVE ...\") + focused MoveObject",
-        "source": [
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "previewPackageChange",
-          "applyPackageChange"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation"
+     }
+    ]
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.object-metadata",
+   "domain": "read",
+   "task": "读取对象结构化元数据（PROG/CLAS/INTF/FUNC/FUGR/INCL/TABL/DEVC/STRUCT/TYPE_INFO、包内容、函数组清单、类信息）",
+   "vsp": {
+    "surface": "SAP(action=read) 元数据读取 + focused GetPackage/GetFunctionGroup/GetClassInfo/GetObjectStructure",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "objectStructure",
+     "objectStructureElements",
+     "inspectAbapObject"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.ddic-metadata",
+   "domain": "read",
+   "task": "读取 DDIC 表/结构/类型信息与域、数据元素属性",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"TABL|STRUCT|TYPE_INFO ...\") + focused GetTable",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "describeClassicTable",
+     "ddicElement",
+     "ddicRepositoryAccess",
+     "getDomainProperties",
+     "getDataElementProperties"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "business-readonly",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.table-contents",
+   "domain": "read",
+   "task": "读取透明表数据内容与即席 OpenSQL 查询",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"TABL_CONTENTS ...\") + focused GetTable/GetTableContents/RunQuery",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "describeClassicTable",
+     "tableContents",
+     "runQuery"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "business-readonly",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.cds-analysis",
+   "domain": "read",
+   "task": "读取 CDS 依赖树、反向影响分析与元素元数据",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"CDS_DEPS|CDS_IMPACT|CDS_ELEMENTS ...\") + focused GetCDSDependencies/GetCDSImpactAnalysis/GetCDSElementInfo",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getCdsDependencies",
+     "getCdsImpactAnalysis",
+     "getCdsElementInfo"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "getCdsElementInfo 在目标 DEV 系统因缺少 ddlsources.v2 内容类型走降级路径（空元素清单+note 说明）；VSP 上游同样硬编码 v2、在该系统同样不可用，故该环境限制对两边一致。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.coverage",
+   "domain": "read",
+   "task": "运行单元测试并读取行级代码覆盖率",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"COVERAGE ...\") + focused GetCodeCoverage",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "runUnitCoverage"
+    ],
+    "profiles": [
+     "development-workbench",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "runUnitCoverage 已在真实 DEV 系统执行验证：POST abapunit/testruns + coverage 采集 + 结果解析全链路通过（目标 ZVPCL01 无测试类故覆盖率为 0，执行与解析链路真实生效）。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.transaction",
+   "domain": "read",
+   "task": "读取事务码元数据",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"TRAN ...\")",
+    "source": [
+     "internal/mcp/handlers_read.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getTransaction"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "getTransaction 已在真实 DEV 端到端验证（2026-09-18 复测晋级，证据 docs/evidence/transaction-read-real-dev-verified.md）：SE38 → 程序 RSABAPPROGRAM + 描述 \"ABAP Editor\"（EN/DE 双语言）真实返回。第十七轮记录的\"TSTCT datapreview 受限\"实为两层假象的叠加：① TSTCT.SPRSL 是 1 位 SAP 内部语言键，2 位 ISO 字面量（'EN'）超出列宽被 datapreview 拒（真机实测 400）——已修复为查询前经 sapInternalLanguageKey 转内部键（EN→E、DE→D、ZH→1），与知识查询同表；② datapreview 按会话查询预算（约 19 次）耗尽型失败（详见 img-activity 证据）。VSP 的 vit/wb TRAN 端点在该 DEV 无映射的差异保持（本实现走 TSTC/TSTCT 自由 SQL）。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "liftCondition": "TSTCT datapreview 限制解除或找到替代描述通道（如 ADT 短文本端点）后评估 EQUIVALENT。",
+   "nextMilestone": ""
+  },
+  {
+   "id": "read.message-class-texts",
+   "domain": "read",
+   "task": "读取消息类文本（SE91）与 MSAG 对象内容",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"MSAG ...\") + focused GetMessages",
+    "source": [
+     "internal/mcp/handlers_read.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getMessages"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "getMessages 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/message-class-read-real-dev-verified.md）：标准消息类 00 读回 901 条消息（msgno 前导零保留、按号升序、计数一致）；sap-language=EN/DE 语言覆盖均成功；注入样本（引号分号注释符、多级斜杠）在参数层被 InvalidParams 拒绝（零网络往返）。消息文本写入方向（i18n.write）维持缺口。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "search.objects",
+   "domain": "search",
+   "task": "按名称模式搜索仓库对象与对象路径",
+   "vsp": {
+    "surface": "SAP(action=search, target=\"ZCL_*\") + focused SearchObject",
+    "source": [
+     "internal/mcp/handlers_search.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "searchObject",
+     "findObjectPath",
+     "objectTypes"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "business-readonly",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "search.content-grep",
+   "domain": "search",
+   "task": "跨对象/包按源码内容正则搜索（grep）",
+   "vsp": {
+    "surface": "SAP(action=grep, target=..., params={pattern}) + focused GrepObjects/GrepPackages",
+    "source": [
+     "internal/mcp/handlers_grep.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "grepPackage",
+     "grepObjects"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "grepPackage/grepObjects 已在真实 DEV 系统验证：包枚举（7 个 PROG 对象）+ 客户端正则匹配 + 有界结果结构全部通过（scripts/wave3-analytics-real-dev-smoke.mjs）。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "codeintel.navigation",
+   "domain": "codeintel",
+   "task": "定义/引用跳转、类型层次、类组件、未激活对象与 ABAP 文档查询",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:definition|references|type_hierarchy|class_components|inactive_objects|abap_help}) + focused FindDefinition/FindReferences",
+    "source": [
+     "internal/mcp/handlers_codeintel.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "findDefinition",
+     "usageReferences",
+     "usageReferenceSnippets",
+     "typeHierarchy",
+     "classComponents",
+     "inactiveObjects"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "codeintel.completion-format",
+   "domain": "codeintel",
+   "task": "代码补全、格式化与 pretty printer 设置读写",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:completion|pretty_print|get_pretty_printer_settings|set_pretty_printer_settings}) + focused PrettyPrint",
+    "source": [
+     "internal/mcp/handlers_codeintel.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "codeCompletion",
+     "codeCompletionFull",
+     "codeCompletionElement",
+     "prettyPrinter",
+     "prettyPrinterSetting"
+    ],
+    "profiles": [
+     "development",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "codeintel.context",
+   "domain": "codeintel",
+   "task": "压缩依赖上下文、ABAP 解析、依赖与变更影响分析",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:context|parse_abap|analyze_deps|effects}) + focused GetContext",
+    "source": [
+     "internal/mcp/handlers_context.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getDependencyContext",
+     "analyzeDependencies",
+     "parseAbapSource",
+     "analyzeSourceEffects"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "dependency-context-spike 完成并经真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/context-analysis-real-dev-verified.md）：getDependencyContext 对 ZCL_MCP_SM21_ADT_HTTP 发现 3 依赖、3 契约全解析、prologue 130 行、stats 恒等式通过；契约名与 analyzeDependencies 依赖发现清单交叉一致；parseAbapSource 解析 176 条语句并识别 CLASS_DEFINITION；analyzeSourceEffects 给出 LUW=safe 与 local-analysis 边界声明；source 直传通道零 SAP 往返。真机发现并修复 include 相对源 URI 问题（absolutizeSourceUrl，含恶意相对段拒绝单测）。与 VSP 的剩余差异属增值差异：VSP analyze_deps 另带 abaplint parser 层与 SCAN/CROSS 层多层置信度（本项目单 regex 层）；取源为串行（VSP 5 路并发）。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.syntax-check",
+   "domain": "devtools",
+   "task": "对 ABAP/CDS 源执行语法检查",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:syntax_check}) + focused SyntaxCheck",
+    "source": [
+     "internal/mcp/handlers_devtools.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "syntaxCheckCode",
+     "syntaxCheckCdsUrl"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.unit-tests",
+   "domain": "devtools",
+   "task": "执行 ABAP Unit 测试并读取结果",
+   "vsp": {
+    "surface": "SAP(action=test, params={type:unit}) + focused RunUnitTests",
+    "source": [
+     "internal/mcp/handlers_devtools.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "测试类可执行"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "previewQualityCheck",
+     "runQualityCheck",
+     "getQualityCheckStatus"
+    ],
+    "profiles": [
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家直接执行（ADT unit runner 原子入口）",
+      "tools": [
+       "unitTestRun",
+       "unitTestEvaluation"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "crud.recover-failed-create",
-      "domain": "crud",
-      "task": "恢复/清理一次失败的创建留下的半成品对象",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"RECOVER_FAILED_CREATE ...\")",
-        "source": [
-          "internal/mcp/handlers_crud.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "previewRepositoryObjectCleanup",
-          "getRepositoryObjectCleanupStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控清理只针对已知 plan 与已验证对象；对来源不明的半成品遵循『结果未知即停止』边界，不做自动恢复删除。",
-        "liftCondition": "在保持未知结果停止边界的前提下，为失败创建补齐显式恢复任务后晋级。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation"
+      "profiles": [
+       "legacy-full"
       ],
-      "nextMilestone": "recover-failed-create-alignment"
-    },
-    {
-      "id": "crud.compare-source",
-      "domain": "crud",
-      "task": "对比两个对象的源码差异",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"COMPARE_SOURCE ...\") + focused CompareSource",
-        "source": [
-          "internal/mcp/handlers_crud.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "compareSourceObjects"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "compareSourceObjects 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/compare-source-real-dev-verified.md）：ZVCL_CAMPAIGN 自比 identical（14 行）；ZVCL_CAMPAIGN vs RFITEMAP 检出真实差异（+1408/-10，unified hunk 头、两侧标注正确、行数统计一致）；非法 objectType/缺字段/非法名字均参数层拒绝。与 VSP 的安全差异：不接受任意 URL，两对象源 URL 服务端解析。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "crud.set-description",
-      "domain": "crud",
-      "task": "修改对象描述/短文本",
-      "vsp": {
-        "surface": "SAP(action=edit, params={editType:set_description})",
-        "source": [
-          "internal/mcp/handlers_workflow.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewDescriptionChange",
-          "applyDescriptionChange",
-          "getDescriptionChangeStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控描述修改链已在真实 DEV 系统端到端验证（2026-09-21，scripts/description-verify-smoke.mjs）：预检冻结（old→new + payloadHash）→ 原生确认 → 锁链单次执行 → readback 一致 → 同值短路 → 受控清理零残留。比 VSP SetDescription 多 immutable plan、原生确认与 readback 保证；长度限制按元数据 descriptionTextLimit 动态校验。",
-        "liftCondition": "把描述变更扩展为通用受控文本变更任务后晋级。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "transport.read",
-      "domain": "transport",
-      "task": "查询传输请求、配置与用户传输清单",
-      "vsp": {
-        "surface": "system type=list_transports|get_transport|get_user_transports|get_transport_info + focused ListTransports/GetTransport",
-        "source": [
-          "internal/mcp/handlers_transport.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "传输配置"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "transportInfo",
-          "hasTransportConfig",
-          "transportConfigurations",
-          "getTransportConfiguration",
-          "userTransports",
-          "transportsByConfig",
-          "systemUsers",
-          "transportReference"
-        ],
-        "profiles": [
-          "development",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "transport.create-release",
-      "domain": "transport",
-      "task": "创建、释放或删除传输请求",
-      "vsp": {
-        "surface": "system type=create_transport|release_transport|delete_transport",
-        "source": [
-          "internal/mcp/handlers_transport.go"
-        ],
-        "requires": [
-          "ADT session",
-          "传输层配置"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "createTransport",
-          "transportRelease",
-          "transportDelete"
-        ],
-        "profiles": [
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "受控对象创建任务接受 transportRequest 归属，避免独立创建传输",
-            "tools": [
-              "previewRepositoryObjectCreation",
-              "applyRepositoryObjectCreation"
-            ],
-            "profiles": [
-              "development",
-              "development-workbench"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "transport.merge-move",
-      "domain": "transport",
-      "task": "合并传输请求或在请求间移动对象",
-      "vsp": {
-        "surface": "system type=merge_transports|move_transport_object",
-        "source": [
-          "internal/mcp/handlers_transport.go"
-        ],
-        "requires": [
-          "ADT session",
-          "传输管理授权"
-        ]
-      },
-      "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "rfc.remote-enabled.call",
-      "domain": "rfc",
-      "task": "通过 classic RFC 直连调用任意 remote-enabled 函数模块",
-      "vsp": {
-        "surface": "SAP(action=rfc, target=\"<FM>\", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT）",
-        "source": [
-          "internal/mcp/handlers_rfc.go"
-        ],
-        "requires": [
-          "direct RFC gateway connectivity",
-          "remote-enabled FM"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "callRfm"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "callRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：受控只读 RFM 调用——allowlist 硬门（默认 7 个 SAP 标准无副作用 RFM：探测/指纹/表读取/接口元数据/FM 检索/权限仿真；白名单外 RF_CALL_NOT_ALLOWED 且拒绝发生在任何网络往返之前，message 携带当前白名单）→ 载荷透传（顶层参数键大小写归一）→ invokeFmCall 超时/取消链。真机：RFC_SYSTEM_INFO 指纹（RFCSI_EXPORT.RFCSYSID=S4H，裸 RFM 透传保真）、describe 输出驱动 RFC_FUNCTION_SEARCH 组参调用闭环、RFC_READ_TABLE 透传读回 ET_DATA 2 行、白名单外/非法名双负例拒绝。与 VSP 的差异：VSP 面向任意 remote-enabled FM；本项目把安全面收窄为只读 allowlist，业务自定义 RFM 经构造注入扩展（按部署分层放开）。RFC_SIMULATE_AUTH_CHECK 结果的语义化呈现为后续轮次。",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "rfc.remote-enabled.describe",
-      "domain": "rfc",
-      "task": "描述 remote-enabled 函数模块接口（JSON Schema）",
-      "vsp": {
-        "surface": "SAP(action=rfc, target=\"<FM>\", params={op:describe})",
-        "source": [
-          "internal/mcp/handlers_rfc.go"
-        ],
-        "requires": [
-          "direct RFC gateway connectivity",
-          "remote-enabled FM"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "describeRfm"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "describeRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：FM 接口元数据 → 参数级结构化描述（方向/ABAP 类型码/关联 DDIC 类型/长度/可选性）+ 仅导入与变更参数构造的轻量 inputSchema（callRfm 组参输入面）+ allowlisted 提示。元数据通道复用 TransportAdapter.getFunctionInterface（OpenRfcTransport 委托 open-rfc Client.getFunctionInterface，RFC_METADATA_GET/RFC_GET_FUNCTION_INTERFACE 同源），describe 不执行目标 FM（真机断言 invoke 零调用）。真机：RFC_READ_TABLE 11 参数（含 S/4 增强形态 USE_ET_DATA_4_RETURN/ET_DATA，与元数据实测交叉印证）。与 VSP 的差异：VSP 经 RFC_METADATA_GET 返回完整接口；本实现输出参数级描述+轻量 inputSchema，表/结构行形状以 associatedType 引用（经 DDIC 元数据工具另查），不递归展开。",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "rfc.remote-enabled.discovery",
-      "domain": "rfc",
-      "task": "RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索",
-      "vsp": {
-        "surface": "SAP(action=rfc, params={op:info|ping|probe|search})",
-        "source": [
-          "internal/mcp/handlers_rfc.go"
-        ],
-        "requires": [
-          "direct RFC gateway connectivity"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "inspectSapSystem",
-          "searchObject",
-          "packageSearchHelp",
-          "probeRfcSystem"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "probeRfcSystem 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-probe-real-dev-verified.md）：open-rfc 纯 TS 客户端直连网关（host 10.30.254.48 + sysnr 01，.vsp.json rfc_sysnr 实测值），RFC_PING 连通 + RFC_SYSTEM_INFO 全量指纹（sysid=S4H release=816 host=sapides dbsys=HDB ip=10.30.254.48 kernel=916）。RFC_SIMULATE_AUTH_CHECK 授权模拟探测尚未纳入（notes 标注）。协议层安全链路全量生效：allowlist 只读门控（白名单外 RF_CALL_NOT_ALLOWED）→ invokeFmCall 超时/取消 → OpenRfcTransport（传输故障剔除、ABAP 异常不剔除）。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "rfc.helper-bridge",
-      "domain": "rfc",
-      "task": "经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座",
-      "vsp": {
-        "surface": "debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座",
-        "source": [
-          "internal/mcp/handlers_rfc.go",
-          "internal/mcp/handlers_debugger.go",
-          "internal/mcp/handlers_git.go",
-          "internal/mcp/handlers_report.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper",
-          "helper WebSocket 通道"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "ZADT_VSP bridge 依赖 SAP 端预先安装的 helper 对象（存在 SAP 端前置条件），其任意 FM 触发路径绕过本项目的 ADT 审计与确认边界；不作为 RFC transport 的替代。2026-09-17 规划修订后，remote-enabled FM 的等价方向由 open-rfc 基座承接，本行限制仅针对非 remote-enabled FM 与 helper 底座，不受该修订影响。",
-        "liftCondition": "仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "debug.session",
-      "domain": "debug",
-      "task": "调试会话生命周期：监听、附加、分离、单步、调用栈、变量查看",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"LISTEN|ATTACH|DETACH|STEP|GET_STACK|GET_VARIABLES\") + focused Debugger*",
-        "source": [
-          "internal/mcp/handlers_debugger_legacy.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "外部调试权限"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewDebugOperation",
-          "applyDebugOperation",
-          "authorizeDebugSession",
-          "executeDebugCommand",
-          "getDebugOperationStatus",
-          "revokeDebugSession"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家原生调试入口（ADT debugger API 原子操作）",
-            "tools": [
-              "debuggerListen",
-              "debuggerAttach",
-              "debuggerStep",
-              "debuggerStackTrace",
-              "debuggerVariables",
-              "debuggerChildVariables"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "debug.breakpoints",
-      "domain": "debug",
-      "task": "外部断点的设置、查询与删除",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"SET_BREAKPOINT|GET_BREAKPOINTS|DELETE_BREAKPOINT\") + focused Set/Get/DeleteBreakpoint",
-        "source": [
-          "internal/mcp/handlers_debugger.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "外部调试权限"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewDebugOperation",
-          "applyDebugOperation",
-          "debuggerListeners"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "debug.amdp-adt",
-      "domain": "debug",
-      "task": "AMDP（HANA）存储过程调试（ADT 原路径）",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"AMDP_ADT_START|AMDP_ADT_BREAKPOINT|AMDP_ADT_AWAIT|AMDP_ADT_STOP\")",
-        "source": [
-          "internal/mcp/handlers_amdp_adt.go"
-        ],
-        "requires": [
-          "ADT session",
-          "HANA AMDP 调试授权"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "checkAmdpDebugger"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "discovery 前置已真机验证（2026-09-18）：checkAmdpDebugger 探得目标 DEV 具备 ADT 原生 AMDP 调试资源（GET /sap/bc/adt/amdp/debugger/main → 400 \"Parameter mainId could not be found\"，与 VSP probeAMDP 的存在性判据一致，服务端零安装）。AMDP 调试会话本体（AMDP_ADT_START/BREAKPOINT/AWAIT/STOP）未实现：调试句柄存于 ABAP 会话内存（class-data），必须复用同一有状态会话，属后续受控调试工作流立项范围。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": "amdp-debugger-controlled-workflow"
-    },
-    {
-      "id": "debug.amdp-helper",
-      "domain": "debug",
-      "task": "AMDP 调试（ZADT_VSP helper WebSocket 路径）",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"AMDP_START|AMDP_RESUME|AMDP_STOP|AMDP_STEP|AMDP_GET_VARIABLES|AMDP_SET_BREAKPOINT|AMDP_GET_BREAKPOINTS\")",
-        "source": [
-          "internal/mcp/handlers_amdp.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper",
-          "helper WebSocket 通道"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。",
-        "liftCondition": "专用 DEV + 明确授权 + helper 前置检查通过并完成独立风险评审后单独评估。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "report.run",
-      "domain": "report",
-      "task": "执行 ABAP 报表（带参数/变体）并捕获 ALV 输出",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"RUN_REPORT\") + focused RunReport（ZADT_VSP WebSocket 底座）",
-        "source": [
-          "internal/mcp/handlers_report.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
-        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "report-execution-spike"
-    },
-    {
-      "id": "report.async",
-      "domain": "report",
-      "task": "后台执行报表并轮询取回异步结果",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"RUN_REPORT_ASYNC|GET_ASYNC_RESULT\") + focused RunReportAsync/GetAsyncResult",
-        "source": [
-          "internal/mcp/handlers_report.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper",
-          "后台作业授权"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
-        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "report-execution-spike"
-    },
-    {
-      "id": "report.variants",
-      "domain": "report",
-      "task": "列出报表变体",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"GET_VARIANTS\") + focused GetVariants；analyze type=variants",
-        "source": [
-          "internal/mcp/handlers_report.go",
-          "internal/mcp/handlers_dumps.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
-        "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "report-variant-read-spike"
-    },
-    {
-      "id": "report.text-elements",
-      "domain": "report",
-      "task": "读写程序文本池/文本元素",
-      "vsp": {
-        "surface": "SAP(action=debug, target=\"GET_TEXT_ELEMENTS|SET_TEXT_ELEMENTS\") + focused Get/SetTextElements",
-        "source": [
-          "internal/mcp/handlers_report.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session 或 ZADT_VSP helper（视对象类型）"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "getTextElements"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "business-readonly",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "文本元素读取经 ADT 覆盖；写入 setTextElements 为专家原子工具（legacy-full），无受控写入链。",
-        "liftCondition": "文本池受控写入任务设计评审后晋级。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "",
-      "alternatePaths": [
-        {
-          "purpose": "专家原子文本元素写入",
-          "tools": [
-            "setTextElements"
-          ],
-          "profiles": [
-            "legacy-full"
-          ],
-          "systemRoles": [
-            "DEV"
-          ]
-        }
+      "systemRoles": [
+       "DEV"
       ]
-    },
-    {
-      "id": "diagnostics.dumps",
-      "domain": "diagnostics",
-      "task": "运行时错误（ST22 dump）列表、详情与聚合分析",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:list_dumps|get_dump|group_dumps|explain_dump|similar_dumps|dump_impact}) + focused ListDumps/GetDump",
-        "source": [
-          "internal/mcp/handlers_dumps.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "readRuntimeDumps",
-          "analyzeRuntimeErrors",
-          "groupRuntimeDumps",
-          "findSimilarDumps"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "窗口列表/分组聚合/同类检索已全链路真机验证（2026-09-18）；轮四遗留的服务端 runtimeError 过滤缺陷已清账（2026-09-20 真机复验：feed 协议仅支持时间窗谓词，其余过滤改为客户端匹配，带 runtimeError 查询返回 30 条且 100% 为目标异常）；跨源关联（explain/impact）已部分由 analyzeRuntimeErrors（ST22+SM21）承担，AI 级解释属增值差异。",
-        "liftCondition": "dump 分析增强任务（分组/相似/影响）完成后晋级。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+     }
+    ]
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.atc-run",
+   "domain": "devtools",
+   "task": "对对象发起 ATC 检查运行",
+   "vsp": {
+    "surface": "SAP(action=test, params={type:atc}) + focused RunATCCheck",
+    "source": [
+     "internal/mcp/handlers_atc.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "ATC 定制有效"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "previewQualityCheck",
+     "runQualityCheck",
+     "getQualityCheckStatus"
+    ],
+    "profiles": [
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.atc-read",
+   "domain": "devtools",
+   "task": "读取 ATC 结果工作清单、检查变体与定制",
+   "vsp": {
+    "surface": "SAP(action=test, params={type:atc|atc_customizing}) 结果读取 + focused GetCheckRunResults",
+    "source": [
+     "internal/mcp/handlers_atc.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "atcWorklists",
+     "atcCheckVariant",
+     "atcCustomizing",
+     "atcDocumentation"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.activate",
+   "domain": "devtools",
+   "task": "重新激活未激活对象（单对象/多对象/整包）",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"ACTIVATE|ACTIVATE_MULTI|ACTIVATE_PACKAGE\") + focused Activate/ActivatePackage",
+    "source": [
+     "internal/mcp/handlers_devtools.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "存在未激活对象"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "previewObjectActivation",
+     "applyObjectActivation",
+     "getObjectActivationStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控激活链已在真实 DEV 系统端到端验证（2026-09-16，目标 ZVCL_CAMPAIGN）：preview 冻结 6 条目 plan（全部属目标对象）→ 原生确认 → apply 单次执行 SUCCEEDED（审计 OBJECT_ACTIVATION_CONFIRMED/COMPLETED，结果摘要 activated 6 object(s), 0 still inactive）→ 重复 apply 拒绝 → 目标离开未激活列表复查通过；自建验证对象受控清理 + absence 复查通过。补跑前置修复（apply gate 自我死锁豁免）已入库并有回归测试。激活目标条目需含 adtcore:parentUri（顶层 INTF/DTEL 条目不进激活 plan，与激活载荷需精确 ADT 引用的设计一致）。",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家原子激活（受控链不进 legacy catalog）",
+      "tools": [
+       "activateObjects",
+       "activateByName",
+       "inactiveObjects"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "diagnostics.application-log",
-      "domain": "diagnostics",
-      "task": "读取 BAL 应用日志（SLG1）",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:application_log})",
-        "source": [
-          "internal/mcp/handlers_dumps.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "readApplicationLog"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "readApplicationLog 已在真实 DEV 系统验证：BALHDR 查询返回 50 条真实日志（/WF/JOBS 后台作业条目）并正确标记截断；消息文本回读（BALDAT/T100）仍未纳入，见矩阵 PARTIAL 邻域说明。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+      "profiles": [
+       "legacy-full"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "diagnostics.spool-jobs",
-      "domain": "diagnostics",
-      "task": "后台作业清单/日志与 spool 请求读取",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:spool_list|spool_read|job_list|job_log})",
-        "source": [
-          "internal/mcp/handlers_dumps.go"
-        ],
-        "requires": [
-          "ADT session 或 helper（视实现）"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "listSpoolRequests",
-          "listJobs",
-          "readSpoolContent"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "清单与内容读取全链路真机验证（2026-09-18）：listJobs/listSpoolRequests（2026-09-17 验证）+ readSpoolContent（tsp01→tst01 头→tst03 内容，按 dcharcod 4103/4110 UTF-16LE 与 latin-1 分支解码，ABAP list 控制字节清理后输出可读文本，LIST 类真机取回 568 字符可读内容）；非文本类（OTF/PDF）返回 raw 说明不解码、VSP 的完整 ABAP list 排版还原器与 job_log（RFC/XBP）仍属差异方向。",
-        "liftCondition": "spool 内容读取（TemSe/TST03 解码）与作业日志读取（需 RFC/XBP，随 rfc-transport-spike 以 open-rfc 基座落地后接入）补齐后可评估 EQUIVALENT。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "diagnostics.knowledge-queries",
-      "domain": "diagnostics",
-      "task": "FM 测试数据、文档、IMG 活动检索等诊断辅助查询",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:fm_test_data|documentation|img_search|img_activity|cluster_read})",
-        "source": [
-          "internal/mcp/handlers_dumps.go",
-          "internal/mcp/handlers_cluster.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "getAbapDocumentation",
-          "searchImgActivities",
-          "getImgActivity"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "documentation/img_search/img_activity 子集已在真实 DEV 端到端验证（2026-09-17 documentation/img_search、2026-09-18 img_activity，证据 docs/evidence/img-activity-real-dev-verified.md）：getImgActivity 对 APOC_C_FORMV 返回基础行/事务码（S_ER9_68000005）/菜单路径（TNODEIMGR 引用 → TNODEIMG 向上递归 + TNODEIMGT 按语言文本，路径串根在前排序）；文本/文档/路径逐项容错降级为 notes；带空格 docu_id 等异常经 token 校验容错。与 VSP 的差异：路径递归不用 JOIN（datapreview 兼容口径，逐级两次单表查询）；maxRefs 有界入参控制查询量。重要环境发现（本轮实测）：datapreview 有按会话的查询预算（约 19 次，耗尽后本会话持续报错直至新会话）——历史上多轮的瞬时失败（CUS_IMGACH/TSTCT/E071 等）大概率即此机制，非表级限制；知识查询层据此不做失败重试（重试白烧预算）。剩余缺口：fm_test_data 与 cluster_read 需要 S/2 集群二进制解析器（VSP pkg/datacluster 约 2.2k 行 + sapcompress），属独立工程轮。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "liftCondition": "fm_test_data 与 cluster_read 通道确认可用、img_activity 完整路径递归实现后评估 EQUIVALENT。",
-      "nextMilestone": ""
-    },
-    {
-      "id": "diagnostics.traces",
-      "domain": "diagnostics",
-      "task": "ABAP profiler/性能跟踪文件列表与命中分析",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:list_traces|get_trace}) + focused ListTraces/GetTrace",
-        "source": [
-          "internal/mcp/handlers_traces.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "tracesList",
-          "tracesListRequests",
-          "tracesHitList",
-          "tracesStatements",
-          "tracesDbAccess"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "diagnostics.sql-trace",
-      "domain": "diagnostics",
-      "task": "SQL 跟踪（ST05）状态与记录读取",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:sql_trace_state|list_sql_traces}) + focused GetSQLTraceState/ListSQLTraces",
-        "source": [
-          "internal/mcp/handlers_sqltrace.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "tracesDbAccess",
-          "tracesStatements"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "analysis.callgraph",
-      "domain": "analysis",
-      "task": "调用图/调用者/被调用者分析与静态-动态对比",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:call_graph|callers|callees|analyze_call_graph|compare_call_graphs|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution",
-        "source": [
-          "internal/mcp/handlers_analysis.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "usageReferences",
-          "usageReferenceSnippets",
-          "typeHierarchy",
-          "getCallees"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "down 方向 getCallees 已在真实 DEV 系统验证（WBCROSSGT+CROSS 双表查询成功、failedSources 容错生效）；up 方向 usageReferences 既有。ADT cai/callgraph 端点在 7.50+ 系统 404（VSP 同源限制），完整调用图/静态-动态对比仍属双方向外的增值差异。",
-        "liftCondition": "call-graph-spike 完成只读调用图任务后晋级。"
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "analysis.boundaries",
-      "domain": "analysis",
-      "task": "包边界违规检查（clean core）",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries",
-        "source": [
-          "internal/mcp/handlers_analysis.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "checkPackageBoundaries"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "checkPackageBoundaries 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/boundary-check-real-dev-verified.md）：Z001 包枚举 15 个源码对象、串行读源提取 3 条依赖、TADIR 反查全部裁定 STANDARD（该包无跨包 Z 依赖），六类计数之和与依赖总数一致，crossedPackages/violatingObjects/notes 结构完整；白名单与 VIOLATION 裁定分支由单测覆盖（真机数据干净未触发正向违规）。已知边界：动态调用检测（VSP DYNAMIC 裁定）未实现，dynamic 恒 0 并在 notes 标注。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "analysis.lint",
-      "domain": "analysis",
-      "task": "离线 ABAP 静态分析（abaplint）",
-      "vsp": {
-        "surface": "SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "本地 abaplint 引擎"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。",
-        "liftCondition": "出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "analysis.history",
-      "domain": "analysis",
-      "task": "共同变更、影响面、变更单历史与传输边界分析",
-      "vsp": {
-        "surface": "SAP(action=analyze, params={type:co_change|impact|cr_history|tr_boundaries|cr_boundaries|health|loads|graph_stats|where_used_config|usage_examples})",
-        "source": [
-          "internal/mcp/handlers_analysis.go"
-        ],
-        "requires": [
-          "ADT session",
-          "历史数据可用"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "revisions",
-          "transportInfo",
-          "getCrHistory",
-          "getCoChange"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "cr_history 与 co_change 子集已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/transport-history-real-dev-verified.md）：getCrHistory 对 ZVCL_CAMPAIGN 返回任务 S4HK900010 → 请求 S4HK900009 层级、用户/日期，E070A CR 属性未配置记 notes；getCoChange 返回同请求共现对象频次排行（实测发现锁对象 ENQU EZVLOCK3 等真实共现）。第十八轮记录的 E071/E070 \"datapreview 受限\"实为会话查询预算耗尽假象（详见 img-activity 证据），复测即正常。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/loads/graph_stats 等图引擎类分析（需 pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "git.abapgit",
-      "domain": "git",
-      "task": "abapGit 对象类型查询与包/对象导出",
-      "vsp": {
-        "surface": "system type=git_types|git_export + focused GitTypes/GitExport（ZADT_VSP WebSocket 底座）",
-        "source": [
-          "internal/mcp/handlers_git.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "SAP 端已安装 ZADT_VSP helper",
-          "SAP 端 abapGit"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [
-          "gitRepos",
-          "gitExternalRepoInfo",
-          "checkRepo",
-          "remoteRepoInfo"
-        ],
-        "profiles": [
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。真机实测（2026-09-17，checkInstallPrerequisites）：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装），abapGit 对齐在当前环境无从验证，前置现状可经 checkInstallPrerequisites 只读发现。",
-        "liftCondition": "abapgit-export-alignment 任务确定只读导出路径后晋级。"
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": "abapgit-export-alignment"
-    },
-    {
-      "id": "install.zadt-vsp",
-      "domain": "install",
-      "task": "向 SAP 端部署 ZADT_VSP WebSocket helper",
-      "vsp": {
-        "surface": "system type=install_zadt_vsp + focused InstallZADTVSP",
-        "source": [
-          "internal/mcp/handlers_install.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "开发授权",
-          "SAP 端对象创建权限"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本项目不自动在 SAP 端安装/部署对象；helper 部署属于有业务副作用的系统变更。",
-        "liftCondition": "用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "install.abapgit",
-      "domain": "install",
-      "task": "向 SAP 端部署 abapGit（standalone/dev edition）",
-      "vsp": {
-        "surface": "system type=install_abapgit + focused InstallAbapGit",
-        "source": [
-          "internal/mcp/handlers_install.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "开发授权",
-          "SAP 端对象创建权限"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本项目不自动在 SAP 端安装/部署对象；abapGit 部署属于有业务副作用的系统变更。",
-        "liftCondition": "用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "install.deploy-zip",
-      "domain": "install",
-      "task": "从 abapGit 格式 ZIP 批量导入对象到包",
-      "vsp": {
-        "surface": "system type=deploy_zip + focused DeployZip",
-        "source": [
-          "internal/mcp/handlers_install.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "开发授权",
-          "目标包写入权限"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "批量对象导入属于高风险写入，未经受控导入工作流（immutable plan + 原生确认 + readback）评审。",
-        "liftCondition": "受控导入工作流设计评审通过后另立任务，禁止一次性开放。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "install.diagnostics",
-      "domain": "install",
-      "task": "安装依赖清单与安装自检",
-      "vsp": {
-        "surface": "system type=list_dependencies|install_dummy_test + focused ListDependencies/InstallDummyTest；system FEATURES",
-        "source": [
-          "internal/mcp/handlers_install.go",
-          "internal/mcp/handlers_system.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "本地依赖"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "healthcheck",
-          "featureDetails",
-          "checkInstallPrerequisites"
-        ],
-        "profiles": [
-          "development",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "checkInstallPrerequisites 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/install-diagnostics-real-dev-verified.md）：ZADT_VSP helper TADIR 探测 installed=false（该系统从未安装 helper，探测含瞬时 500 重试）；abapGit ADT 服务（/sap/bc/adt/abapgit/repos，v2 Accept）分类 not_installed（资源不存在语义识别）；本地 Node v22 运行时报告；notes 明确不做任何安装动作。本地进程与 ADT 特性诊断由 healthcheck/featureDetails 继续覆盖。",
-        "liftCondition": "helper 前置检查任务（只读 discovery）完成后晋级。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "fileio.import-export",
-      "domain": "fileio",
-      "task": "本地文件与 SAP 对象的批量导入/导出及文件侧重命名",
-      "vsp": {
-        "surface": "SAP(action=system|edit, params={fileType:deploy_from_file|save_to_file|rename}) + focused ImportFromFile/ExportToFile",
-        "source": [
-          "internal/mcp/handlers_fileio.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "本地文件系统访问",
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本地文件往返与批量导入导出涉及工作区副作用与批量 SAP 写入，未纳入受控工作流。",
-        "liftCondition": "按对象粒度设计受控导入/导出任务并通过安全评审后另立任务。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "refactor.rename",
-      "domain": "refactor",
-      "task": "对象/元素重命名（评估、预览、执行）",
-      "vsp": {
-        "surface": "SAP(action=system|edit, params={fileType:rename})",
-        "source": [
-          "internal/mcp/handlers_fileio.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewControlledRename",
-          "applyControlledRename",
-          "getControlledRenameStatus"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "受控对象重命名一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/rename-controlled-real-dev-smoke.mjs，sap-demo）：preview 只读读源快照+声明改名冻结（按对象类型精确锚定，拒绝 VSP 全文 ReplaceAll 误伤面）→ 单确认两步执行：克隆工作流落地新对象（受控创建链保证）+ 受控清理链删除旧对象 → readback 逐字一致 → absence 零残留。防御语义：创建失败绝不触碰旧对象；删除侧失败时缺席复核（按状态码判定，兼容 ADT 客户端 err 字段与本地化消息）证实旧对象已不在则收敛 SUCCEEDED，否则 PARTIAL_RENAME 保留现场。比 VSP RenameObject 多 immutable plan、重放拒绝、原生确认与失败补偿。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+      "systemRoles": [
+       "DEV"
       ]
-    },
-    {
-      "id": "ui5.read",
-      "domain": "ui5",
-      "task": "UI5/Fiori BSP 应用发现与文件读取",
-      "vsp": {
-        "surface": "SAP(action=read, target=\"UI5_LIST|UI5_APP|UI5_FILE\") + focused UI5ListApps/UI5GetApp/UI5GetFileContent",
-        "source": [
-          "internal/mcp/handlers_ui5.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT filestore 权限"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "ui5ListApps",
-          "ui5GetApp",
-          "ui5GetFileContent"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "ui5-readonly 三工具已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/ui5-readonly-real-dev-verified.md）：ui5ListApps 解析 filestore Atom feed 3105 条、返回 200 应用（含命名空间 /SAM4U/DASHBRD 形态）；客户端 Z* 通配符过滤正确；ui5GetApp 对 /SAM4U/DASHBRD 返回 17 条文件树（file/folder、路径相对应用根）；ui5GetFileContent 真实读回 .Ui5RepositoryBinaryFiles（92 bytes）；路径穿越输入在参数层被 InvalidParams 拒绝（零网络往返）。应用名单级命名空间白名单 + 文件路径穿越拒绝，URL 由名称拼接整体转义。已知行为：系统忽略 name 查询参数（VSP 同受影响），query 另做客户端通配符过滤（行为增强）。ui5.write 方向维持缺口。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+     }
+    ]
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "devtools.execute-abap",
+   "domain": "devtools",
+   "task": "直接执行 ABAP 片段/类并取回输出",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:execute_abap})",
+    "source": [
+     "internal/mcp/handlers_devtools.go"
+    ],
+    "requires": [
+     "ADT session",
+     "可执行对象"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "runClass"
+    ],
+    "profiles": [
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "仅专家 profile 的 runClass 原子入口；无受控执行链，输出与副作用边界弱于 VSP 的 execute_abap。",
+    "liftCondition": "评估受控执行任务（固定入口 + 输出捕获）后晋级。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "crud.create-object",
+   "domain": "crud",
+   "task": "创建仓库对象（包/表/程序/类/函数组/DDIC 域/数据元素/结构/CDS 等）",
+   "vsp": {
+    "surface": "SAP(action=create, target=\"OBJECT|DEVC|TABL\") + workflow create PROGRAM/CLASS_WITH_TESTS + focused CreatePackage/CreateTable",
+    "source": [
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/handlers_workflow.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "开发 license 与命名权限"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "listRepositoryObjectCreationCapabilities",
+     "describeRepositoryObjectCreation",
+     "previewRepositoryObjectCreation",
+     "applyRepositoryObjectCreation",
+     "getRepositoryObjectCreationStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "crud.delete-object",
+   "domain": "crud",
+   "task": "删除仓库对象",
+   "vsp": {
+    "surface": "SAP(action=delete, target=\"OBJECT ...\")",
+    "source": [
+     "internal/mcp/handlers_crud.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewRepositoryObjectCleanup",
+     "applyRepositoryObjectCleanup",
+     "getRepositoryObjectCleanupStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "crud.clone-object",
+   "domain": "crud",
+   "task": "复制对象到新名称",
+   "vsp": {
+    "surface": "SAP(action=create, target=\"CLONE ...\") + focused CloneObject",
+    "source": [
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "目标命名空间权限"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewCloneObject",
+     "applyCloneObject",
+     "getCloneObjectStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控对象克隆一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/clone-controlled-real-dev-smoke.mjs）：preview 只读读源快照+本地声明改名冻结（sourceHash/payloadHash/declarationChanges）→ 原生确认 → apply 委托受控创建链（壳创建/锁/写/语法检查/激活/源码 hash 比对/失败补偿，APPLIED）→ readback 独立直读一致 → 双清理零残留。比 VSP CloneObject 多 immutable plan、上下文绑定重放拒绝、原生确认与失败补偿；类源码改名要求 DEFINITION/IMPLEMENTATION 两处同步（VSP 只替换首个匹配，多声明漏改）。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ]
+  },
+  {
+   "id": "crud.move-package",
+   "domain": "crud",
+   "task": "把对象移动到其他包",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"MOVE ...\") + focused MoveObject",
+    "source": [
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "previewPackageChange",
+     "applyPackageChange"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "crud.recover-failed-create",
+   "domain": "crud",
+   "task": "恢复/清理一次失败的创建留下的半成品对象",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"RECOVER_FAILED_CREATE ...\")",
+    "source": [
+     "internal/mcp/handlers_crud.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "previewRepositoryObjectCleanup",
+     "getRepositoryObjectCleanupStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控清理只针对已知 plan 与已验证对象；对来源不明的半成品遵循『结果未知即停止』边界，不做自动恢复删除。",
+    "liftCondition": "在保持未知结果停止边界的前提下，为失败创建补齐显式恢复任务后晋级。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": "recover-failed-create-alignment"
+  },
+  {
+   "id": "crud.compare-source",
+   "domain": "crud",
+   "task": "对比两个对象的源码差异",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"COMPARE_SOURCE ...\") + focused CompareSource",
+    "source": [
+     "internal/mcp/handlers_crud.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "compareSourceObjects"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "compareSourceObjects 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/compare-source-real-dev-verified.md）：ZVCL_CAMPAIGN 自比 identical（14 行）；ZVCL_CAMPAIGN vs RFITEMAP 检出真实差异（+1408/-10，unified hunk 头、两侧标注正确、行数统计一致）；非法 objectType/缺字段/非法名字均参数层拒绝。与 VSP 的安全差异：不接受任意 URL，两对象源 URL 服务端解析。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "crud.set-description",
+   "domain": "crud",
+   "task": "修改对象描述/短文本",
+   "vsp": {
+    "surface": "SAP(action=edit, params={editType:set_description})",
+    "source": [
+     "internal/mcp/handlers_workflow.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewDescriptionChange",
+     "applyDescriptionChange",
+     "getDescriptionChangeStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控描述修改链已在真实 DEV 系统端到端验证（2026-09-21，scripts/description-verify-smoke.mjs）：预检冻结（old→new + payloadHash）→ 原生确认 → 锁链单次执行 → readback 一致 → 同值短路 → 受控清理零残留。比 VSP SetDescription 多 immutable plan、原生确认与 readback 保证；长度限制按元数据 descriptionTextLimit 动态校验。",
+    "liftCondition": "把描述变更扩展为通用受控文本变更任务后晋级。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "transport.read",
+   "domain": "transport",
+   "task": "查询传输请求、配置与用户传输清单",
+   "vsp": {
+    "surface": "system type=list_transports|get_transport|get_user_transports|get_transport_info + focused ListTransports/GetTransport",
+    "source": [
+     "internal/mcp/handlers_transport.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "传输配置"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "transportInfo",
+     "hasTransportConfig",
+     "transportConfigurations",
+     "getTransportConfiguration",
+     "userTransports",
+     "transportsByConfig",
+     "systemUsers",
+     "transportReference"
+    ],
+    "profiles": [
+     "development",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "transport.create-release",
+   "domain": "transport",
+   "task": "创建、释放或删除传输请求",
+   "vsp": {
+    "surface": "system type=create_transport|release_transport|delete_transport",
+    "source": [
+     "internal/mcp/handlers_transport.go"
+    ],
+    "requires": [
+     "ADT session",
+     "传输层配置"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "createTransport",
+     "transportRelease",
+     "transportDelete"
+    ],
+    "profiles": [
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "受控对象创建任务接受 transportRequest 归属，避免独立创建传输",
+      "tools": [
+       "previewRepositoryObjectCreation",
+       "applyRepositoryObjectCreation"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "ui5.write",
-      "domain": "ui5",
-      "task": "UI5 应用与文件的创建/上传/删除",
-      "vsp": {
-        "surface": "SAP(action=create|edit|delete, target=\"UI5_APP|UI5_FILE\")",
-        "source": [
-          "internal/mcp/handlers_ui5.go"
-        ],
-        "requires": [
-          "ADT filestore 写权限"
-        ]
-      },
-      "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
+      "profiles": [
+       "development",
+       "development-workbench"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "i18n.read",
-      "domain": "i18n",
-      "task": "按语言读取对象文本、数据元素标签、消息文本与语言对比",
-      "vsp": {
-        "surface": "SAP(action=i18n, params={op:texts|data_element_labels|message_class_texts|text_pool|compare_languages}) + focused GetObjectTextsInLanguage/GetDataElementLabels/GetMessageClassTexts/GetTextPool/CompareLanguages",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "目标语言已维护"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "getTextElements",
-          "getDomainProperties",
-          "getDataElementProperties",
-          "getMessages",
-          "getObjectContentInLanguage",
-          "getDataElementLabels",
-          "getTextPoolInLanguage",
-          "compareObjectLanguages"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "i18n-language-read 四工具已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/i18n-language-read-real-dev-verified.md）：getDataElementLabels 对标准元素 LANGU 读回四段标签（EN/DE，含主语言回退行为标注）；getTextPoolInLanguage 对 RFITEMAP 解析 106 条文本池条目（symbols/selections/headings，missing=[]）；getObjectContentInLanguage 读回 1412 行内容；compareObjectLanguages 双语行级对比结构完整（differing 与 entries 一致）；getMessages 的 sap-language 覆盖亦已验证（read.message-class-texts 轮）。注入负例参数层拒绝。消息文本写入方向（i18n.write）维持缺口。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
+      "systemRoles": [
+       "DEV"
+      ]
+     }
+    ]
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "transport.merge-move",
+   "domain": "transport",
+   "task": "合并传输请求或在请求间移动对象",
+   "vsp": {
+    "surface": "system type=merge_transports|move_transport_object",
+    "source": [
+     "internal/mcp/handlers_transport.go"
+    ],
+    "requires": [
+     "ADT session",
+     "传输管理授权"
+    ]
+   },
+   "mcp": {
+    "status": "GAP",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "rfc.remote-enabled.call",
+   "domain": "rfc",
+   "task": "通过 classic RFC 直连调用任意 remote-enabled 函数模块",
+   "vsp": {
+    "surface": "SAP(action=rfc, target=\"<FM>\", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT）",
+    "source": [
+     "internal/mcp/handlers_rfc.go"
+    ],
+    "requires": [
+     "direct RFC gateway connectivity",
+     "remote-enabled FM"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "callRfm"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "callRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：受控只读 RFM 调用——allowlist 硬门（默认 7 个 SAP 标准无副作用 RFM：探测/指纹/表读取/接口元数据/FM 检索/权限仿真；白名单外 RF_CALL_NOT_ALLOWED 且拒绝发生在任何网络往返之前，message 携带当前白名单）→ 载荷透传（顶层参数键大小写归一）→ invokeFmCall 超时/取消链。真机：RFC_SYSTEM_INFO 指纹（RFCSI_EXPORT.RFCSYSID=S4H，裸 RFM 透传保真）、describe 输出驱动 RFC_FUNCTION_SEARCH 组参调用闭环、RFC_READ_TABLE 透传读回 ET_DATA 2 行、白名单外/非法名双负例拒绝。与 VSP 的差异：VSP 面向任意 remote-enabled FM；本项目把安全面收窄为只读 allowlist，业务自定义 RFM 经构造注入扩展（按部署分层放开）。RFC_SIMULATE_AUTH_CHECK 结果的语义化呈现为后续轮次。",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "rfc.remote-enabled.describe",
+   "domain": "rfc",
+   "task": "描述 remote-enabled 函数模块接口（JSON Schema）",
+   "vsp": {
+    "surface": "SAP(action=rfc, target=\"<FM>\", params={op:describe})",
+    "source": [
+     "internal/mcp/handlers_rfc.go"
+    ],
+    "requires": [
+     "direct RFC gateway connectivity",
+     "remote-enabled FM"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "describeRfm"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "describeRfm 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-call-describe-real-dev-verified.md）：FM 接口元数据 → 参数级结构化描述（方向/ABAP 类型码/关联 DDIC 类型/长度/可选性）+ 仅导入与变更参数构造的轻量 inputSchema（callRfm 组参输入面）+ allowlisted 提示。元数据通道复用 TransportAdapter.getFunctionInterface（OpenRfcTransport 委托 open-rfc Client.getFunctionInterface，RFC_METADATA_GET/RFC_GET_FUNCTION_INTERFACE 同源），describe 不执行目标 FM（真机断言 invoke 零调用）。真机：RFC_READ_TABLE 11 参数（含 S/4 增强形态 USE_ET_DATA_4_RETURN/ET_DATA，与元数据实测交叉印证）。与 VSP 的差异：VSP 经 RFC_METADATA_GET 返回完整接口；本实现输出参数级描述+轻量 inputSchema，表/结构行形状以 associatedType 引用（经 DDIC 元数据工具另查），不递归展开。",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "rfc.remote-enabled.discovery",
+   "domain": "rfc",
+   "task": "RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索",
+   "vsp": {
+    "surface": "SAP(action=rfc, params={op:info|ping|probe|search})",
+    "source": [
+     "internal/mcp/handlers_rfc.go"
+    ],
+    "requires": [
+     "direct RFC gateway connectivity"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "inspectSapSystem",
+     "searchObject",
+     "packageSearchHelp",
+     "probeRfcSystem"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "probeRfcSystem 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/rfc-probe-real-dev-verified.md）：open-rfc 纯 TS 客户端直连网关（host 10.30.254.48 + sysnr 01，.vsp.json rfc_sysnr 实测值），RFC_PING 连通 + RFC_SYSTEM_INFO 全量指纹（sysid=S4H release=816 host=sapides dbsys=HDB ip=10.30.254.48 kernel=916）。RFC_SIMULATE_AUTH_CHECK 授权模拟探测尚未纳入（notes 标注）。协议层安全链路全量生效：allowlist 只读门控（白名单外 RF_CALL_NOT_ALLOWED）→ invokeFmCall 超时/取消 → OpenRfcTransport（传输故障剔除、ABAP 异常不剔除）。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "rfc.helper-bridge",
+   "domain": "rfc",
+   "task": "经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座",
+   "vsp": {
+    "surface": "debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座",
+    "source": [
+     "internal/mcp/handlers_rfc.go",
+     "internal/mcp/handlers_debugger.go",
+     "internal/mcp/handlers_git.go",
+     "internal/mcp/handlers_report.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper",
+     "helper WebSocket 通道"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "ZADT_VSP bridge 依赖 SAP 端预先安装的 helper 对象（存在 SAP 端前置条件），其任意 FM 触发路径绕过本项目的 ADT 审计与确认边界；不作为 RFC transport 的替代。2026-09-17 规划修订后，remote-enabled FM 的等价方向由 open-rfc 基座承接，本行限制仅针对非 remote-enabled FM 与 helper 底座，不受该修订影响。",
+    "liftCondition": "仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "debug.session",
+   "domain": "debug",
+   "task": "调试会话生命周期：监听、附加、分离、单步、调用栈、变量查看",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"LISTEN|ATTACH|DETACH|STEP|GET_STACK|GET_VARIABLES\") + focused Debugger*",
+    "source": [
+     "internal/mcp/handlers_debugger_legacy.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "外部调试权限"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewDebugOperation",
+     "applyDebugOperation",
+     "authorizeDebugSession",
+     "executeDebugCommand",
+     "getDebugOperationStatus",
+     "revokeDebugSession"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家原生调试入口（ADT debugger API 原子操作）",
+      "tools": [
+       "debuggerListen",
+       "debuggerAttach",
+       "debuggerStep",
+       "debuggerStackTrace",
+       "debuggerVariables",
+       "debuggerChildVariables"
       ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "i18n.write",
-      "domain": "i18n",
-      "task": "写入数据元素标签与消息类文本",
-      "vsp": {
-        "surface": "SAP(action=i18n, params={op:write_labels|write_message_texts})",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go"
-        ],
-        "requires": [
-          "ADT session",
-          "对象可锁"
-        ]
-      },
-      "mcp": {
-        "status": "PARTIAL",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "本项目仅有消息类受控创建与专家原子 setTextElements（legacy-full）；无受控的多语言标签/消息文本写入任务路径。",
-        "liftCondition": "受控多语言文本写入任务设计评审后晋级。"
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
+      "profiles": [
+       "legacy-full"
       ],
-      "nextMilestone": ""
-    },
+      "systemRoles": [
+       "DEV"
+      ]
+     }
+    ]
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "debug.breakpoints",
+   "domain": "debug",
+   "task": "外部断点的设置、查询与删除",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"SET_BREAKPOINT|GET_BREAKPOINTS|DELETE_BREAKPOINT\") + focused Set/Get/DeleteBreakpoint",
+    "source": [
+     "internal/mcp/handlers_debugger.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "外部调试权限"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewDebugOperation",
+     "applyDebugOperation",
+     "debuggerListeners"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "debug.amdp-adt",
+   "domain": "debug",
+   "task": "AMDP（HANA）存储过程调试（ADT 原路径）",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"AMDP_ADT_START|AMDP_ADT_BREAKPOINT|AMDP_ADT_AWAIT|AMDP_ADT_STOP\")",
+    "source": [
+     "internal/mcp/handlers_amdp_adt.go"
+    ],
+    "requires": [
+     "ADT session",
+     "HANA AMDP 调试授权"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "checkAmdpDebugger"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "discovery 前置已真机验证（2026-09-18）：checkAmdpDebugger 探得目标 DEV 具备 ADT 原生 AMDP 调试资源（GET /sap/bc/adt/amdp/debugger/main → 400 \"Parameter mainId could not be found\"，与 VSP probeAMDP 的存在性判据一致，服务端零安装）。AMDP 调试会话本体（AMDP_ADT_START/BREAKPOINT/AWAIT/STOP）未实现：调试句柄存于 ABAP 会话内存（class-data），必须复用同一有状态会话，属后续受控调试工作流立项范围。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": "amdp-debugger-controlled-workflow"
+  },
+  {
+   "id": "debug.amdp-helper",
+   "domain": "debug",
+   "task": "AMDP 调试（ZADT_VSP helper WebSocket 路径）",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"AMDP_START|AMDP_RESUME|AMDP_STOP|AMDP_STEP|AMDP_GET_VARIABLES|AMDP_SET_BREAKPOINT|AMDP_GET_BREAKPOINTS\")",
+    "source": [
+     "internal/mcp/handlers_amdp.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper",
+     "helper WebSocket 通道"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。",
+    "liftCondition": "专用 DEV + 明确授权 + helper 前置检查通过并完成独立风险评审后单独评估。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "report.run",
+   "domain": "report",
+   "task": "执行 ABAP 报表（带参数/变体）并捕获 ALV 输出",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"RUN_REPORT\") + focused RunReport（ZADT_VSP WebSocket 底座）",
+    "source": [
+     "internal/mcp/handlers_report.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+    "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": "report-execution-spike"
+  },
+  {
+   "id": "report.async",
+   "domain": "report",
+   "task": "后台执行报表并轮询取回异步结果",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"RUN_REPORT_ASYNC|GET_ASYNC_RESULT\") + focused RunReportAsync/GetAsyncResult",
+    "source": [
+     "internal/mcp/handlers_report.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper",
+     "后台作业授权"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+    "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": "report-execution-spike"
+  },
+  {
+   "id": "report.variants",
+   "domain": "report",
+   "task": "列出报表变体",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"GET_VARIANTS\") + focused GetVariants；analyze type=variants",
+    "source": [
+     "internal/mcp/handlers_report.go",
+     "internal/mcp/handlers_dumps.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "所有者早期决策（2026-09-16 轮记录\"report 写为 RESTRICTION 方向\"，会话交接确认 report.* 排除）：报表执行面（SUBMIT/作业调度/变体管理）涉及后台作业创建与系统负载，且该面的等价读能力已由 diagnostics.spool-jobs（作业/Spool 清单与内容）与 report.text-elements 覆盖。矩阵保真：从 GAP 移入显式限制，GAP 桶去虚存实。",
+    "liftCondition": "所有者重新放开报表执行方向并完成受控执行工作流（preview/确认/apply + 作业清理）设计评审后重新评估。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": "report-variant-read-spike"
+  },
+  {
+   "id": "report.text-elements",
+   "domain": "report",
+   "task": "读写程序文本池/文本元素",
+   "vsp": {
+    "surface": "SAP(action=debug, target=\"GET_TEXT_ELEMENTS|SET_TEXT_ELEMENTS\") + focused Get/SetTextElements",
+    "source": [
+     "internal/mcp/handlers_report.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session 或 ZADT_VSP helper（视对象类型）"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "getTextElements",
+     "previewDdicPropertyChange",
+     "applyDdicPropertyChange"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "文本元素读取经 ADT 覆盖；写入经受控 DDIC 工作流（SET_TEXT_ELEMENTS：immutable plan→原生确认→REPT 子对象锁→每符号 @MaxLength 载荷→激活→逐字 readback→同值短路→回滚保证）在真实 DEV 端到端验证（2026-09-22，test:ddic-text-real-dev）。协议层比 VSP SetTextElements 强：VSP 走 ZADT_VSP WebSocket helper，本项目纯 ADT REST 无服务器端依赖；S/4 三条件链（stateful 会话/REPT 锁/@MaxLength 每符号指令）为本项目实测固化的协议知识。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": "",
+   "alternatePaths": [
     {
-      "id": "revisions.list",
-      "domain": "revisions",
-      "task": "查询对象版本历史",
-      "vsp": {
-        "surface": "SAP(action=revisions, params={op:list}) + focused GetRevisions",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "版本管理可用"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "revisions"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "revisions.source",
-      "domain": "revisions",
-      "task": "读取指定历史版本的源码",
-      "vsp": {
-        "surface": "SAP(action=revisions, params={op:source}) + focused GetRevisionSource",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "版本管理可用"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "revisions",
-          "getRevisionSource"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "getRevisionSource 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/revision-source-real-dev-verified.md）：发现模式返回版本清单（ZVCL_CAMPAIGN 版本标签为传输号 S4HK900009）；index=1 与标签（大小写不敏感）双路径读到同一版本源码（14 行，内容一致）；未知标签/非法名字/非法 objectType 均参数层拒绝。与 VSP 的安全差异：不接受调用方 version_uri，版本与源 URI 全部服务端解析；operations-readonly 已收录 getRevisionSource（与 revisions 清单同级运维诊断）。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "revisions.compare",
-      "domain": "revisions",
-      "task": "对比两个版本差异",
-      "vsp": {
-        "surface": "SAP(action=revisions, params={op:compare}) + focused CompareVersions",
-        "source": [
-          "internal/mcp/handlers_route_eleven.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session",
-          "版本管理可用"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "revisions",
-          "getRevisionSource",
-          "compareRevisions"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "operations-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "compareRevisions 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/revision-compare-real-dev-verified.md）：ZVCL_CAMPAIGN 版本 S4HK900009 vs current 检出真实差异（+1/-1，hunk @@ -10,5 +10,5 @@——对象激活后被修改）；相同版本对比 identical=true 无 diff 体；标签大小写不敏感与序号双选择器路径一致；未知版本/缺 version1 参数层拒绝。与 VSP 的安全差异：不接受 version_uri 直传，版本与源 URI 服务端解析；version2 缺省 current 与 VSP 一致。",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "service-binding.publish",
-      "domain": "service-binding",
-      "task": "发布/取消发布服务绑定",
-      "vsp": {
-        "surface": "SAP(action=edit, target=\"PUBLISH_SERVICE|UNPUBLISH_SERVICE\")",
-        "source": [
-          "internal/mcp/handlers_servicebinding.go"
-        ],
-        "requires": [
-          "ADT session",
-          "服务绑定可发布"
-        ]
-      },
-      "mcp": {
-        "status": "MCP_SUPERSET",
-        "taskPath": [
-          "previewRapOperation",
-          "applyRapOperation"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV"
-        ],
-        "restrictionReason": "",
-        "liftCondition": "",
-        "alternatePaths": [
-          {
-            "purpose": "专家原生发布入口",
-            "tools": [
-              "publishServiceBinding",
-              "unPublishServiceBinding",
-              "bindingDetails"
-            ],
-            "profiles": [
-              "legacy-full"
-            ],
-            "systemRoles": [
-              "DEV"
-            ]
-          }
-        ]
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "system.info",
-      "domain": "system",
-      "task": "系统信息、组件清单、连接与特性自检",
-      "vsp": {
-        "surface": "SAP() 空调用 info + SAP(action=system, target=\"INFO|COMPONENTS|CONNECTION|FEATURES\") + focused GetSystemInfo/GetInstalledComponents",
-        "source": [
-          "internal/mcp/handlers_system.go",
-          "internal/mcp/handlers_info.go",
-          "internal/mcp/tools_focused.go"
-        ],
-        "requires": [
-          "ADT session"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "inspectSapSystem",
-          "healthcheck",
-          "sapDoctor"
-        ],
-        "profiles": [
-          "development-workbench",
-          "business-readonly",
-          "operations-readonly"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P0",
-      "evidence": [
-        "source-audit",
-        "automation"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "system.help",
-      "domain": "system",
-      "task": "使用帮助与下一步指引",
-      "vsp": {
-        "surface": "SAP(action=help, target=tips) + SAP(action=info)",
-        "source": [
-          "internal/mcp/handlers_help.go",
-          "internal/mcp/handlers_info.go"
-        ],
-        "requires": []
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "sap",
-          "sapDoctor"
-        ],
-        "profiles": [
-          "development-workbench"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "",
-        "liftCondition": ""
-      },
-      "priority": "P2",
-      "evidence": [
-        "source-audit"
-      ],
-      "nextMilestone": ""
-    },
-    {
-      "id": "rfc.remote-enabled.read-table",
-      "domain": "rfc",
-      "task": "经 RFC 直读 DDIC 表（fields/where/top）",
-      "vsp": {
-        "surface": "SAP(action=rfc, target=\"<TABLE>\", params={op:read_table,fields,where,top})",
-        "source": [
-          "internal/mcp/handlers_rfc.go"
-        ],
-        "requires": [
-          "direct RFC gateway connectivity"
-        ]
-      },
-      "mcp": {
-        "status": "EQUIVALENT",
-        "taskPath": [
-          "tableContents",
-          "runQuery",
-          "describeClassicTable",
-          "readRfcTable"
-        ],
-        "profiles": [
-          "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
-        ],
-        "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
-        ],
-        "restrictionReason": "readRfcTable 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/read-table-real-dev-verified.md）：open-rfc 直链调用 RFC_READ_TABLE——T001 全量 10 行、WHERE 过滤（该 client 无 BUKRS=1000，0 行属正确行为）、列投影（BUKRS/BUTXT）、注入负例参数层拒绝。三项真机缺陷已修复并有单测：① open-rfc 递归序列化器决策门（OpenRfcTransport 缺省注入 classic-xRFC 观测策略，options 可覆盖）；② DELIMITER 为 CHAR1，双字符分隔串被拒，改回 VSP 同款单字符 |；③ WHERE 引号按原样透传（OPTIONS TEXT 是动态 Open SQL 片段，翻倍触发 ABAP DB_Error；此前注释中的 VSP sqlQuote 系误记）。另适配 S/4 增强形态：该 DEV 的 RFC_READ_TABLE 含 USE_ET_DATA_4_RETURN/ET_DATA（经典 DATA 回填已死），经 TransportAdapter.getFunctionInterface（新增可选传输能力）探测双路径并按适配器缓存，旧系统不发开关。已知限制：DELIMITER 单字符下列值含 | 会串列（VSP 同面）；增强系统无投影时不回传 FIELDS 列目录。",
-        "liftCondition": ""
-      },
-      "priority": "P1",
-      "evidence": [
-        "source-audit",
-        "automation",
-        "real-dev-verified"
-      ],
-      "nextMilestone": ""
+     "purpose": "专家原子文本元素写入",
+     "tools": [
+      "setTextElements"
+     ],
+     "profiles": [
+      "legacy-full"
+     ],
+     "systemRoles": [
+      "DEV"
+     ]
     }
-  ]
+   ]
+  },
+  {
+   "id": "diagnostics.dumps",
+   "domain": "diagnostics",
+   "task": "运行时错误（ST22 dump）列表、详情与聚合分析",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:list_dumps|get_dump|group_dumps|explain_dump|similar_dumps|dump_impact}) + focused ListDumps/GetDump",
+    "source": [
+     "internal/mcp/handlers_dumps.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "readRuntimeDumps",
+     "analyzeRuntimeErrors",
+     "groupRuntimeDumps",
+     "findSimilarDumps"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "窗口列表/分组聚合/同类检索已全链路真机验证（2026-09-18）；轮四遗留的服务端 runtimeError 过滤缺陷已清账（2026-09-20 真机复验：feed 协议仅支持时间窗谓词，其余过滤改为客户端匹配，带 runtimeError 查询返回 30 条且 100% 为目标异常）；跨源关联（explain/impact）已部分由 analyzeRuntimeErrors（ST22+SM21）承担，AI 级解释属增值差异。",
+    "liftCondition": "dump 分析增强任务（分组/相似/影响）完成后晋级。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "diagnostics.application-log",
+   "domain": "diagnostics",
+   "task": "读取 BAL 应用日志（SLG1）",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:application_log})",
+    "source": [
+     "internal/mcp/handlers_dumps.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "readApplicationLog"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "readApplicationLog 已在真实 DEV 系统验证：BALHDR 查询返回 50 条真实日志（/WF/JOBS 后台作业条目）并正确标记截断；消息文本回读（BALDAT/T100）仍未纳入，见矩阵 PARTIAL 邻域说明。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "diagnostics.spool-jobs",
+   "domain": "diagnostics",
+   "task": "后台作业清单/日志与 spool 请求读取",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:spool_list|spool_read|job_list|job_log})",
+    "source": [
+     "internal/mcp/handlers_dumps.go"
+    ],
+    "requires": [
+     "ADT session 或 helper（视实现）"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "listSpoolRequests",
+     "listJobs",
+     "readSpoolContent"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "清单与内容读取全链路真机验证（2026-09-18）：listJobs/listSpoolRequests（2026-09-17 验证）+ readSpoolContent（tsp01→tst01 头→tst03 内容，按 dcharcod 4103/4110 UTF-16LE 与 latin-1 分支解码，ABAP list 控制字节清理后输出可读文本，LIST 类真机取回 568 字符可读内容）；非文本类（OTF/PDF）返回 raw 说明不解码、VSP 的完整 ABAP list 排版还原器与 job_log（RFC/XBP）仍属差异方向。",
+    "liftCondition": "spool 内容读取（TemSe/TST03 解码）与作业日志读取（需 RFC/XBP，随 rfc-transport-spike 以 open-rfc 基座落地后接入）补齐后可评估 EQUIVALENT。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "diagnostics.knowledge-queries",
+   "domain": "diagnostics",
+   "task": "FM 测试数据、文档、IMG 活动检索等诊断辅助查询",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:fm_test_data|documentation|img_search|img_activity|cluster_read})",
+    "source": [
+     "internal/mcp/handlers_dumps.go",
+     "internal/mcp/handlers_cluster.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "getAbapDocumentation",
+     "searchImgActivities",
+     "getImgActivity"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "documentation/img_search/img_activity 子集已在真实 DEV 端到端验证（2026-09-17 documentation/img_search、2026-09-18 img_activity，证据 docs/evidence/img-activity-real-dev-verified.md）：getImgActivity 对 APOC_C_FORMV 返回基础行/事务码（S_ER9_68000005）/菜单路径（TNODEIMGR 引用 → TNODEIMG 向上递归 + TNODEIMGT 按语言文本，路径串根在前排序）；文本/文档/路径逐项容错降级为 notes；带空格 docu_id 等异常经 token 校验容错。与 VSP 的差异：路径递归不用 JOIN（datapreview 兼容口径，逐级两次单表查询）；maxRefs 有界入参控制查询量。重要环境发现（本轮实测）：datapreview 有按会话的查询预算（约 19 次，耗尽后本会话持续报错直至新会话）——历史上多轮的瞬时失败（CUS_IMGACH/TSTCT/E071 等）大概率即此机制，非表级限制；知识查询层据此不做失败重试（重试白烧预算）。剩余缺口：fm_test_data 与 cluster_read 需要 S/2 集群二进制解析器（VSP pkg/datacluster 约 2.2k 行 + sapcompress），属独立工程轮。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "liftCondition": "fm_test_data 与 cluster_read 通道确认可用、img_activity 完整路径递归实现后评估 EQUIVALENT。",
+   "nextMilestone": ""
+  },
+  {
+   "id": "diagnostics.traces",
+   "domain": "diagnostics",
+   "task": "ABAP profiler/性能跟踪文件列表与命中分析",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:list_traces|get_trace}) + focused ListTraces/GetTrace",
+    "source": [
+     "internal/mcp/handlers_traces.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "tracesList",
+     "tracesListRequests",
+     "tracesHitList",
+     "tracesStatements",
+     "tracesDbAccess"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "diagnostics.sql-trace",
+   "domain": "diagnostics",
+   "task": "SQL 跟踪（ST05）状态与记录读取",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:sql_trace_state|list_sql_traces}) + focused GetSQLTraceState/ListSQLTraces",
+    "source": [
+     "internal/mcp/handlers_sqltrace.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "tracesDbAccess",
+     "tracesStatements"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "analysis.callgraph",
+   "domain": "analysis",
+   "task": "调用图/调用者/被调用者分析与静态-动态对比",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:call_graph|callers|callees|analyze_call_graph|compare_call_graphs|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution",
+    "source": [
+     "internal/mcp/handlers_analysis.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "usageReferences",
+     "usageReferenceSnippets",
+     "typeHierarchy",
+     "getCallees"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "down 方向 getCallees 已在真实 DEV 系统验证（WBCROSSGT+CROSS 双表查询成功、failedSources 容错生效）；up 方向 usageReferences 既有。ADT cai/callgraph 端点在 7.50+ 系统 404（VSP 同源限制），完整调用图/静态-动态对比仍属双方向外的增值差异。",
+    "liftCondition": "call-graph-spike 完成只读调用图任务后晋级。"
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "analysis.boundaries",
+   "domain": "analysis",
+   "task": "包边界违规检查（clean core）",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries",
+    "source": [
+     "internal/mcp/handlers_analysis.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "checkPackageBoundaries"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "checkPackageBoundaries 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/boundary-check-real-dev-verified.md）：Z001 包枚举 15 个源码对象、串行读源提取 3 条依赖、TADIR 反查全部裁定 STANDARD（该包无跨包 Z 依赖），六类计数之和与依赖总数一致，crossedPackages/violatingObjects/notes 结构完整；白名单与 VIOLATION 裁定分支由单测覆盖（真机数据干净未触发正向违规）。已知边界：动态调用检测（VSP DYNAMIC 裁定）未实现，dynamic 恒 0 并在 notes 标注。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "analysis.lint",
+   "domain": "analysis",
+   "task": "离线 ABAP 静态分析（abaplint）",
+   "vsp": {
+    "surface": "SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "本地 abaplint 引擎"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。",
+    "liftCondition": "出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "analysis.history",
+   "domain": "analysis",
+   "task": "共同变更、影响面、变更单历史与传输边界分析",
+   "vsp": {
+    "surface": "SAP(action=analyze, params={type:co_change|impact|cr_history|tr_boundaries|cr_boundaries|health|loads|graph_stats|where_used_config|usage_examples})",
+    "source": [
+     "internal/mcp/handlers_analysis.go"
+    ],
+    "requires": [
+     "ADT session",
+     "历史数据可用"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "revisions",
+     "transportInfo",
+     "getCrHistory",
+     "getCoChange"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "cr_history 与 co_change 子集已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/transport-history-real-dev-verified.md）：getCrHistory 对 ZVCL_CAMPAIGN 返回任务 S4HK900010 → 请求 S4HK900009 层级、用户/日期，E070A CR 属性未配置记 notes；getCoChange 返回同请求共现对象频次排行（实测发现锁对象 ENQU EZVLOCK3 等真实共现）。第十八轮记录的 E071/E070 \"datapreview 受限\"实为会话查询预算耗尽假象（详见 img-activity 证据），复测即正常。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/loads/graph_stats 等图引擎类分析（需 pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "git.abapgit",
+   "domain": "git",
+   "task": "abapGit 对象类型查询与包/对象导出",
+   "vsp": {
+    "surface": "system type=git_types|git_export + focused GitTypes/GitExport（ZADT_VSP WebSocket 底座）",
+    "source": [
+     "internal/mcp/handlers_git.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "SAP 端已安装 ZADT_VSP helper",
+     "SAP 端 abapGit"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "gitRepos",
+     "gitExternalRepoInfo",
+     "checkRepo",
+     "remoteRepoInfo"
+    ],
+    "profiles": [
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。真机实测（2026-09-17，checkInstallPrerequisites）：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装），abapGit 对齐在当前环境无从验证，前置现状可经 checkInstallPrerequisites 只读发现。",
+    "liftCondition": "abapgit-export-alignment 任务确定只读导出路径后晋级。"
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": "abapgit-export-alignment"
+  },
+  {
+   "id": "install.zadt-vsp",
+   "domain": "install",
+   "task": "向 SAP 端部署 ZADT_VSP WebSocket helper",
+   "vsp": {
+    "surface": "system type=install_zadt_vsp + focused InstallZADTVSP",
+    "source": [
+     "internal/mcp/handlers_install.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "开发授权",
+     "SAP 端对象创建权限"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "本项目不自动在 SAP 端安装/部署对象；helper 部署属于有业务副作用的系统变更。",
+    "liftCondition": "用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "install.abapgit",
+   "domain": "install",
+   "task": "向 SAP 端部署 abapGit（standalone/dev edition）",
+   "vsp": {
+    "surface": "system type=install_abapgit + focused InstallAbapGit",
+    "source": [
+     "internal/mcp/handlers_install.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "开发授权",
+     "SAP 端对象创建权限"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "本项目不自动在 SAP 端安装/部署对象；abapGit 部署属于有业务副作用的系统变更。",
+    "liftCondition": "用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "install.deploy-zip",
+   "domain": "install",
+   "task": "从 abapGit 格式 ZIP 批量导入对象到包",
+   "vsp": {
+    "surface": "system type=deploy_zip + focused DeployZip",
+    "source": [
+     "internal/mcp/handlers_install.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "开发授权",
+     "目标包写入权限"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "批量对象导入属于高风险写入，未经受控导入工作流（immutable plan + 原生确认 + readback）评审。",
+    "liftCondition": "受控导入工作流设计评审通过后另立任务，禁止一次性开放。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "install.diagnostics",
+   "domain": "install",
+   "task": "安装依赖清单与安装自检",
+   "vsp": {
+    "surface": "system type=list_dependencies|install_dummy_test + focused ListDependencies/InstallDummyTest；system FEATURES",
+    "source": [
+     "internal/mcp/handlers_install.go",
+     "internal/mcp/handlers_system.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "本地依赖"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "healthcheck",
+     "featureDetails",
+     "checkInstallPrerequisites"
+    ],
+    "profiles": [
+     "development",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "checkInstallPrerequisites 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/install-diagnostics-real-dev-verified.md）：ZADT_VSP helper TADIR 探测 installed=false（该系统从未安装 helper，探测含瞬时 500 重试）；abapGit ADT 服务（/sap/bc/adt/abapgit/repos，v2 Accept）分类 not_installed（资源不存在语义识别）；本地 Node v22 运行时报告；notes 明确不做任何安装动作。本地进程与 ADT 特性诊断由 healthcheck/featureDetails 继续覆盖。",
+    "liftCondition": "helper 前置检查任务（只读 discovery）完成后晋级。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "fileio.import-export",
+   "domain": "fileio",
+   "task": "本地文件与 SAP 对象的批量导入/导出及文件侧重命名",
+   "vsp": {
+    "surface": "SAP(action=system|edit, params={fileType:deploy_from_file|save_to_file|rename}) + focused ImportFromFile/ExportToFile",
+    "source": [
+     "internal/mcp/handlers_fileio.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "本地文件系统访问",
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "INTENTIONAL_RESTRICTION",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "本地文件往返与批量导入导出涉及工作区副作用与批量 SAP 写入，未纳入受控工作流。",
+    "liftCondition": "按对象粒度设计受控导入/导出任务并通过安全评审后另立任务。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "refactor.rename",
+   "domain": "refactor",
+   "task": "对象/元素重命名（评估、预览、执行）",
+   "vsp": {
+    "surface": "SAP(action=system|edit, params={fileType:rename})",
+    "source": [
+     "internal/mcp/handlers_fileio.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewControlledRename",
+     "applyControlledRename",
+     "getControlledRenameStatus"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "受控对象重命名一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/rename-controlled-real-dev-smoke.mjs，sap-demo）：preview 只读读源快照+声明改名冻结（按对象类型精确锚定，拒绝 VSP 全文 ReplaceAll 误伤面）→ 单确认两步执行：克隆工作流落地新对象（受控创建链保证）+ 受控清理链删除旧对象 → readback 逐字一致 → absence 零残留。防御语义：创建失败绝不触碰旧对象；删除侧失败时缺席复核（按状态码判定，兼容 ADT 客户端 err 字段与本地化消息）证实旧对象已不在则收敛 SUCCEEDED，否则 PARTIAL_RENAME 保留现场。比 VSP RenameObject 多 immutable plan、重放拒绝、原生确认与失败补偿。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ]
+  },
+  {
+   "id": "ui5.read",
+   "domain": "ui5",
+   "task": "UI5/Fiori BSP 应用发现与文件读取",
+   "vsp": {
+    "surface": "SAP(action=read, target=\"UI5_LIST|UI5_APP|UI5_FILE\") + focused UI5ListApps/UI5GetApp/UI5GetFileContent",
+    "source": [
+     "internal/mcp/handlers_ui5.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT filestore 权限"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "ui5ListApps",
+     "ui5GetApp",
+     "ui5GetFileContent"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "ui5-readonly 三工具已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/ui5-readonly-real-dev-verified.md）：ui5ListApps 解析 filestore Atom feed 3105 条、返回 200 应用（含命名空间 /SAM4U/DASHBRD 形态）；客户端 Z* 通配符过滤正确；ui5GetApp 对 /SAM4U/DASHBRD 返回 17 条文件树（file/folder、路径相对应用根）；ui5GetFileContent 真实读回 .Ui5RepositoryBinaryFiles（92 bytes）；路径穿越输入在参数层被 InvalidParams 拒绝（零网络往返）。应用名单级命名空间白名单 + 文件路径穿越拒绝，URL 由名称拼接整体转义。已知行为：系统忽略 name 查询参数（VSP 同受影响），query 另做客户端通配符过滤（行为增强）。ui5.write 方向维持缺口。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "ui5.write",
+   "domain": "ui5",
+   "task": "UI5 应用与文件的创建/上传/删除",
+   "vsp": {
+    "surface": "SAP(action=create|edit|delete, target=\"UI5_APP|UI5_FILE\")",
+    "source": [
+     "internal/mcp/handlers_ui5.go"
+    ],
+    "requires": [
+     "ADT filestore 写权限"
+    ]
+   },
+   "mcp": {
+    "status": "GAP",
+    "taskPath": [],
+    "profiles": [],
+    "systemRoles": [],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "i18n.read",
+   "domain": "i18n",
+   "task": "按语言读取对象文本、数据元素标签、消息文本与语言对比",
+   "vsp": {
+    "surface": "SAP(action=i18n, params={op:texts|data_element_labels|message_class_texts|text_pool|compare_languages}) + focused GetObjectTextsInLanguage/GetDataElementLabels/GetMessageClassTexts/GetTextPool/CompareLanguages",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "目标语言已维护"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "getTextElements",
+     "getDomainProperties",
+     "getDataElementProperties",
+     "getMessages",
+     "getObjectContentInLanguage",
+     "getDataElementLabels",
+     "getTextPoolInLanguage",
+     "compareObjectLanguages"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "i18n-language-read 四工具已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/i18n-language-read-real-dev-verified.md）：getDataElementLabels 对标准元素 LANGU 读回四段标签（EN/DE，含主语言回退行为标注）；getTextPoolInLanguage 对 RFITEMAP 解析 106 条文本池条目（symbols/selections/headings，missing=[]）；getObjectContentInLanguage 读回 1412 行内容；compareObjectLanguages 双语行级对比结构完整（differing 与 entries 一致）；getMessages 的 sap-language 覆盖亦已验证（read.message-class-texts 轮）。注入负例参数层拒绝。消息文本写入方向（i18n.write）维持缺口。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "i18n.write",
+   "domain": "i18n",
+   "task": "写入数据元素标签与消息类文本",
+   "vsp": {
+    "surface": "SAP(action=i18n, params={op:write_labels|write_message_texts})",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go"
+    ],
+    "requires": [
+     "ADT session",
+     "对象可锁"
+    ]
+   },
+   "mcp": {
+    "status": "PARTIAL",
+    "taskPath": [
+     "previewDdicPropertyChange",
+     "applyDdicPropertyChange"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "write_labels（数据元素四段标签）已由受控 DDIC 工作流（SET_DATA_ELEMENT_PROPERTIES：immutable plan→原生确认→部分更新+回填感知的逐路径 verify）真机验证（2026-09-22，test:ddic-text-real-dev，SAP 回填字段不参与比对）。write_message_texts（消息类文本写入）仍无任务路径——消息类受控创建已有，文本修改待立项。",
+    "liftCondition": "消息类文本受控写入任务（复用同一 immutable plan 模板）设计评审后晋级。"
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "revisions.list",
+   "domain": "revisions",
+   "task": "查询对象版本历史",
+   "vsp": {
+    "surface": "SAP(action=revisions, params={op:list}) + focused GetRevisions",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "版本管理可用"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "revisions"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "revisions.source",
+   "domain": "revisions",
+   "task": "读取指定历史版本的源码",
+   "vsp": {
+    "surface": "SAP(action=revisions, params={op:source}) + focused GetRevisionSource",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "版本管理可用"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "revisions",
+     "getRevisionSource"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "getRevisionSource 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/revision-source-real-dev-verified.md）：发现模式返回版本清单（ZVCL_CAMPAIGN 版本标签为传输号 S4HK900009）；index=1 与标签（大小写不敏感）双路径读到同一版本源码（14 行，内容一致）；未知标签/非法名字/非法 objectType 均参数层拒绝。与 VSP 的安全差异：不接受调用方 version_uri，版本与源 URI 全部服务端解析；operations-readonly 已收录 getRevisionSource（与 revisions 清单同级运维诊断）。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "revisions.compare",
+   "domain": "revisions",
+   "task": "对比两个版本差异",
+   "vsp": {
+    "surface": "SAP(action=revisions, params={op:compare}) + focused CompareVersions",
+    "source": [
+     "internal/mcp/handlers_route_eleven.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session",
+     "版本管理可用"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "revisions",
+     "getRevisionSource",
+     "compareRevisions"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "operations-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "compareRevisions 已在真实 DEV 端到端验证（2026-09-17，证据 docs/evidence/revision-compare-real-dev-verified.md）：ZVCL_CAMPAIGN 版本 S4HK900009 vs current 检出真实差异（+1/-1，hunk @@ -10,5 +10,5 @@——对象激活后被修改）；相同版本对比 identical=true 无 diff 体；标签大小写不敏感与序号双选择器路径一致；未知版本/缺 version1 参数层拒绝。与 VSP 的安全差异：不接受 version_uri 直传，版本与源 URI 服务端解析；version2 缺省 current 与 VSP 一致。",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "service-binding.publish",
+   "domain": "service-binding",
+   "task": "发布/取消发布服务绑定",
+   "vsp": {
+    "surface": "SAP(action=edit, target=\"PUBLISH_SERVICE|UNPUBLISH_SERVICE\")",
+    "source": [
+     "internal/mcp/handlers_servicebinding.go"
+    ],
+    "requires": [
+     "ADT session",
+     "服务绑定可发布"
+    ]
+   },
+   "mcp": {
+    "status": "MCP_SUPERSET",
+    "taskPath": [
+     "previewRapOperation",
+     "applyRapOperation"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV"
+    ],
+    "restrictionReason": "",
+    "liftCondition": "",
+    "alternatePaths": [
+     {
+      "purpose": "专家原生发布入口",
+      "tools": [
+       "publishServiceBinding",
+       "unPublishServiceBinding",
+       "bindingDetails"
+      ],
+      "profiles": [
+       "legacy-full"
+      ],
+      "systemRoles": [
+       "DEV"
+      ]
+     }
+    ]
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "system.info",
+   "domain": "system",
+   "task": "系统信息、组件清单、连接与特性自检",
+   "vsp": {
+    "surface": "SAP() 空调用 info + SAP(action=system, target=\"INFO|COMPONENTS|CONNECTION|FEATURES\") + focused GetSystemInfo/GetInstalledComponents",
+    "source": [
+     "internal/mcp/handlers_system.go",
+     "internal/mcp/handlers_info.go",
+     "internal/mcp/tools_focused.go"
+    ],
+    "requires": [
+     "ADT session"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "inspectSapSystem",
+     "healthcheck",
+     "sapDoctor"
+    ],
+    "profiles": [
+     "development-workbench",
+     "business-readonly",
+     "operations-readonly"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P0",
+   "evidence": [
+    "source-audit",
+    "automation"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "system.help",
+   "domain": "system",
+   "task": "使用帮助与下一步指引",
+   "vsp": {
+    "surface": "SAP(action=help, target=tips) + SAP(action=info)",
+    "source": [
+     "internal/mcp/handlers_help.go",
+     "internal/mcp/handlers_info.go"
+    ],
+    "requires": []
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "sap",
+     "sapDoctor"
+    ],
+    "profiles": [
+     "development-workbench"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "",
+    "liftCondition": ""
+   },
+   "priority": "P2",
+   "evidence": [
+    "source-audit"
+   ],
+   "nextMilestone": ""
+  },
+  {
+   "id": "rfc.remote-enabled.read-table",
+   "domain": "rfc",
+   "task": "经 RFC 直读 DDIC 表（fields/where/top）",
+   "vsp": {
+    "surface": "SAP(action=rfc, target=\"<TABLE>\", params={op:read_table,fields,where,top})",
+    "source": [
+     "internal/mcp/handlers_rfc.go"
+    ],
+    "requires": [
+     "direct RFC gateway connectivity"
+    ]
+   },
+   "mcp": {
+    "status": "EQUIVALENT",
+    "taskPath": [
+     "tableContents",
+     "runQuery",
+     "describeClassicTable",
+     "readRfcTable"
+    ],
+    "profiles": [
+     "development",
+     "development-workbench",
+     "diagnostic-readonly",
+     "legacy-full"
+    ],
+    "systemRoles": [
+     "DEV",
+     "QAS",
+     "PRD"
+    ],
+    "restrictionReason": "readRfcTable 已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/read-table-real-dev-verified.md）：open-rfc 直链调用 RFC_READ_TABLE——T001 全量 10 行、WHERE 过滤（该 client 无 BUKRS=1000，0 行属正确行为）、列投影（BUKRS/BUTXT）、注入负例参数层拒绝。三项真机缺陷已修复并有单测：① open-rfc 递归序列化器决策门（OpenRfcTransport 缺省注入 classic-xRFC 观测策略，options 可覆盖）；② DELIMITER 为 CHAR1，双字符分隔串被拒，改回 VSP 同款单字符 |；③ WHERE 引号按原样透传（OPTIONS TEXT 是动态 Open SQL 片段，翻倍触发 ABAP DB_Error；此前注释中的 VSP sqlQuote 系误记）。另适配 S/4 增强形态：该 DEV 的 RFC_READ_TABLE 含 USE_ET_DATA_4_RETURN/ET_DATA（经典 DATA 回填已死），经 TransportAdapter.getFunctionInterface（新增可选传输能力）探测双路径并按适配器缓存，旧系统不发开关。已知限制：DELIMITER 单字符下列值含 | 会串列（VSP 同面）；增强系统无投影时不回传 FIELDS 列目录。",
+    "liftCondition": ""
+   },
+   "priority": "P1",
+   "evidence": [
+    "source-audit",
+    "automation",
+    "real-dev-verified"
+   ],
+   "nextMilestone": ""
+  }
+ ]
 }

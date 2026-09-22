@@ -67,6 +67,10 @@ export function stableHash(value: unknown): string {
 }
 
 export function stableJson(value: unknown): string {
+  // undefined 显式归一为 'null'：JSON.stringify(undefined) 返回 undefined（非字符串），
+  // 会让 stableHash 的 Hash.update 抛 ERR_INVALID_ARG_TYPE——changedFieldPaths 深对比
+  // 一侧键缺失时会走到这里（真机 SET_DATA_ELEMENT_PROPERTIES 标签场景实测触发）。
+  if (value === undefined) return 'null';
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
