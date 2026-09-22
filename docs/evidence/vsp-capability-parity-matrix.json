@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-18",
+  "generatedAt": "2026-09-22",
   "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
   "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
   "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
@@ -1035,18 +1035,31 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
+        "status": "PARTIAL",
+        "taskPath": [
+          "getObjectSource",
+          "previewRepositoryObjectCreation",
+          "applyRepositoryObjectCreation",
+          "previewRepositoryObjectCleanup",
+          "applyRepositoryObjectCleanup"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench"
+        ],
+        "systemRoles": [
+          "DEV"
+        ],
+        "restrictionReason": "组合任务路径已真机端到端验证（2026-09-18，scripts/clone-object-real-dev-smoke.mjs）：读源→声明行改名（对齐 VSP CloneObject 的 REPORT/CLASS/INTERFACE 正则语义）→受控创建（immutable plan+原生确认+readback 比对）→受控清理，PROGRAM 类全链路通过；一站式受控克隆工作流（单 plan 冻结源快照+自动改名+比对）待立项，届时可晋级 EQUIVALENT/MCP_SUPERSET。",
         "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": ""
+      "nextMilestone": "clone-controlled-workflow"
     },
     {
       "id": "crud.move-package",
@@ -1179,10 +1192,11 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "MCP_SUPERSET",
         "taskPath": [
-          "previewDdicPropertyChange",
-          "applyDdicPropertyChange"
+          "previewDescriptionChange",
+          "applyDescriptionChange",
+          "getDescriptionChangeStatus"
         ],
         "profiles": [
           "development",
@@ -1191,15 +1205,16 @@
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "仅 DDIC 域/数据元素描述有受控变更链；类/程序等对象描述无受控任务路径。",
+        "restrictionReason": "受控描述修改链已在真实 DEV 系统端到端验证（2026-09-21，scripts/description-verify-smoke.mjs）：预检冻结（old→new + payloadHash）→ 原生确认 → 锁链单次执行 → readback 一致 → 同值短路 → 受控清理零残留。比 VSP SetDescription 多 immutable plan、原生确认与 readback 保证；长度限制按元数据 descriptionTextLimit 动态校验。",
         "liftCondition": "把描述变更扩展为通用受控文本变更任务后晋级。"
       },
       "priority": "P2",
       "evidence": [
         "source-audit",
-        "automation"
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "description-controlled-write"
+      "nextMilestone": ""
     },
     {
       "id": "transport.read",
@@ -1599,18 +1614,31 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
+        "status": "PARTIAL",
+        "taskPath": [
+          "checkAmdpDebugger"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench",
+          "diagnostic-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "discovery 前置已真机验证（2026-09-18）：checkAmdpDebugger 探得目标 DEV 具备 ADT 原生 AMDP 调试资源（GET /sap/bc/adt/amdp/debugger/main → 400 \"Parameter mainId could not be found\"，与 VSP probeAMDP 的存在性判据一致，服务端零安装）。AMDP 调试会话本体（AMDP_ADT_START/BREAKPOINT/AWAIT/STOP）未实现：调试句柄存于 ABAP 会话内存（class-data），必须复用同一有状态会话，属后续受控调试工作流立项范围。",
         "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
-      "nextMilestone": "amdp-discovery-spike"
+      "nextMilestone": "amdp-debugger-controlled-workflow"
     },
     {
       "id": "debug.amdp-helper",
@@ -1814,7 +1842,7 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "窗口列表/分组聚合/同类检索已全链路真机验证：groupRuntimeDumps 对 7 天 50 条真实 dump 聚合出 22 组（频次+最近排序），findSimilarDumps 对 DBSQL_SQL_ERROR 检索出 28 次历史与用户集（2026-09-16）；跨源关联（explain/impact）已部分由 analyzeRuntimeErrors（ST22+SM21）承担，AI 级解释属增值差异。",
+        "restrictionReason": "窗口列表/分组聚合/同类检索已全链路真机验证（2026-09-18）；轮四遗留的服务端 runtimeError 过滤缺陷已清账（2026-09-20 真机复验：feed 协议仅支持时间窗谓词，其余过滤改为客户端匹配，带 runtimeError 查询返回 30 条且 100% 为目标异常）；跨源关联（explain/impact）已部分由 analyzeRuntimeErrors（ST22+SM21）承担，AI 级解释属增值差异。",
         "liftCondition": "dump 分析增强任务（分组/相似/影响）完成后晋级。"
       },
       "priority": "P1",

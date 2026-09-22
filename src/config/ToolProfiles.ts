@@ -67,6 +67,10 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'ui5ListApps', 'ui5GetApp', 'ui5GetFileContent',
   // SPOOL/后台作业只读二工具（diagnostics.spool-jobs 只读子集）：自由 SQL 查询
   'listSpoolRequests', 'listJobs', 'readSpoolContent',
+  // AMDP 调试可用性探测（debug.amdp-adt discovery 前置）：只读
+  'checkAmdpDebugger',
+  // 受控描述修改链（crud.set-description）：受控写，workbench 面显式收录
+  'previewDescriptionChange', 'applyDescriptionChange', 'getDescriptionChangeStatus',
   // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET
   'getMessages',
   // 版本源码只读工具（revisions.source）：按版本标签/序号读取历史版本源码
@@ -120,7 +124,9 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   // 版本源码只读（与 revisions 清单同级的运维诊断：核对运行版本与历史差异）
   'getRevisionSource',
   // 版本对比只读（版本间 diff，运维核对运行版本变化）
-  'compareRevisions'
+  'compareRevisions',
+  // 传输历史与共同变更只读（analysis.history 行：E071/E070 运维诊断）
+  'getCrHistory', 'getCoChange'
 ]);
 
 export function selectProfileTools(

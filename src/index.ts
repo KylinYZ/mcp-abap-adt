@@ -121,6 +121,10 @@ import {
 import { createContextAnalysisClient } from './adt/ContextCompressionApi.js';
 import { createUi5FilestoreClient } from './adt/Ui5FilestoreApi.js';
 import { createSpoolJobClient, bindSpoolJobQueryRunner } from './adt/SpoolJobApi.js';
+import { createAmdpDiscoveryClient } from './adt/AmdpDiscoveryApi.js';
+import { AmdpDiscoveryHandlers } from './handlers/AmdpDiscoveryHandlers.js';
+import { DescriptionChangeHandlers } from './handlers/DescriptionChangeHandlers.js';
+import { DescriptionChangeWorkflow, bindDescriptionPorts } from './safe/DescriptionChangeWorkflow.js';
 import { createMessageClassReadClient } from './adt/MessageClassReadApi.js';
 import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
 import { createI18nReadClient } from './adt/I18nReadApi.js';
@@ -189,6 +193,8 @@ export class AbapAdtServer extends Server {
   private contextAnalysisHandlers: ContextAnalysisHandlers;
   private ui5Handlers: Ui5Handlers;
   private spoolJobHandlers: SpoolJobHandlers;
+  private amdpDiscoveryHandlers: AmdpDiscoveryHandlers;
+  private descriptionChangeHandlers: DescriptionChangeHandlers;
   private messageClassReadHandlers: MessageClassReadHandlers;
   private revisionSourceHandlers: RevisionSourceHandlers;
   private i18nReadHandlers: I18nReadHandlers;
@@ -361,6 +367,9 @@ export class AbapAdtServer extends Server {
     // 查询 TSP01/TST01/TBTCP/TBTCO（与 getCallees 的 bindRunSqlToAdtQuery 同底座，
     // decode=true，补零标识依赖解码），逐次查询传入各自行数限额。
     this.spoolJobHandlers = new SpoolJobHandlers(createSpoolJobClient(bindSpoolJobQueryRunner(readClient)));
+    // AMDP 调试可用性探测（debug.amdp-adt 的 discovery 前置）：无状态只读 GET，
+    // 复用 readClient 会话（discovery 不受 AMDP 调试的会话保持约束）。
+    this.amdpDiscoveryHandlers = new AmdpDiscoveryHandlers(createAmdpDiscoveryClient(readClient.httpClient));
     // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET，
     // 与 CDS 分析同型绑定 readClient 的 AdtHTTP 会话。
     this.messageClassReadHandlers = new MessageClassReadHandlers(createMessageClassReadClient(readClient.httpClient));
@@ -422,6 +431,19 @@ export class AbapAdtServer extends Server {
     const auditLogger = new AuditLogger(
       this.safetyPolicy.auditPath || path.resolve(process.cwd(), '.sap-mcp-audit-disabled')
     );
+    // 受控描述修改（crud.set-description）：与 DDIC 属性受控链同面的写工作流
+    //（plan + 原生确认 + 锁链单次执行 + readback），仅 DEV 受控 profiles。
+    const descriptionPorts = bindDescriptionPorts(this.adtClient as never);
+    const descriptionWorkflow = new DescriptionChangeWorkflow({
+      ...descriptionPorts,
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    } as never);
+    this.descriptionChangeHandlers = new DescriptionChangeHandlers(descriptionWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+    });
+
     const changeWorkflow = new AbapChangeWorkflow(
       this.adtClient,
       objectResolver,
@@ -763,7 +785,8 @@ export class AbapAdtServer extends Server {
     const safeDebugTools = this.safeDebugHandlers.getTools();
     const completeControlledAdvancedTools = [
       ...this.safeAdvancedHandlers.getTools(),
-      ...this.repositoryObjectCreationHandlers.getTools(true)
+      ...this.repositoryObjectCreationHandlers.getTools(true),
+      ...this.descriptionChangeHandlers.getTools()
     ];
     const controlledAdvancedTools = completeControlledAdvancedTools;
     const qualityTools = this.safeQualityHandlers.getTools();
@@ -789,6 +812,7 @@ export class AbapAdtServer extends Server {
       ...this.contextAnalysisHandlers.getTools(),
       ...this.ui5Handlers.getTools(),
       ...this.spoolJobHandlers.getTools(),
+      ...this.amdpDiscoveryHandlers.getTools(),
       ...this.messageClassReadHandlers.getTools(),
       ...this.revisionSourceHandlers.getTools(),
       ...this.i18nReadHandlers.getTools(),
@@ -937,6 +961,9 @@ export class AbapAdtServer extends Server {
         if (this.safetyPolicy.toolProfile !== 'safe' && this.spoolJobHandlers.supports(toolName)) {
           return this.spoolJobHandlers.handle(toolName, limitedArguments);
         }
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.amdpDiscoveryHandlers.supports(toolName)) {
+          return this.amdpDiscoveryHandlers.handle(toolName, limitedArguments);
+        }
         // 消息类文本只读工具（read.message-class-texts）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.messageClassReadHandlers.supports(toolName)) {
           return this.messageClassReadHandlers.handle(toolName, limitedArguments);
@@ -994,6 +1021,10 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.safeAdvancedHandlers.supports(toolName)) {
           return this.safeAdvancedHandlers.handle(toolName, limitedArguments);
+        }
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.descriptionChangeHandlers.supports(toolName)) {
+          return this.descriptionChangeHandlers.handle(toolName, limitedArguments);
         }
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.safeDebugHandlers.supports(toolName)) {

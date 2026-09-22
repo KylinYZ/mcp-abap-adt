@@ -51,7 +51,7 @@ export const CONTROLLED_ACTIVATION_TOOL_NAMES = new Set([
 
 const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
-  'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus',
+  'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
   'getObjectActivationStatus'
 ]);
@@ -101,6 +101,10 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // SPOOL/后台作业只读工具（矩阵 diagnostics.spool-jobs）：自由 SQL
   // 查询 TSP01/TST01/TBTCP/TBTCO/TST03；作业日志（RFC/XBP）不在内
   'listSpoolRequests', 'listJobs', 'readSpoolContent',
+  // AMDP 调试可用性探测：无状态 GET（400/200/405 可用、404 缺失）
+  'checkAmdpDebugger',
+  // 受控描述修改 preview（crud.set-description）：只读预检，不触碰写路径
+  'previewDescriptionChange',
   // 消息类文本只读工具（矩阵 read.message-class-texts 行）：messageclass 资源
   // GET，可选 sap-language 语言覆盖；文本写入方向（i18n.write）不开放
   'getMessages',
@@ -171,7 +175,9 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   // 受控激活的 apply 属于对象生命周期变更（不动源码），归入 advanced-mutation 而非 source-mutation
   'applyObjectActivation',
   // runUnitCoverage 运行被测对象的用户代码，是执行行为（与 unitTestRun 同级，非只读）
-  'runUnitCoverage'
+  'runUnitCoverage',
+  // 受控描述修改 apply（crud.set-description）：repository 写入，受控链单次执行
+  'applyDescriptionChange'
 ]);
 
 const QUALITY_EXECUTION_TOOL_NAMES = new Set([

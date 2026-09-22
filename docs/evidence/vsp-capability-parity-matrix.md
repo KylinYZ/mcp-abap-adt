@@ -12,7 +12,7 @@
 | VSP（只读对照） | `9886d2727f47506368b0a3c2f1c1766f1200f747` | dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪） |
 | 本项目 | `a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef` | dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等） |
 
-生成日期：2026-09-18；矩阵行数：71。
+生成日期：2026-09-22；矩阵行数：71。
 profile 别名：focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。
 
 ## 状态与证据词汇
@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 3 | 13 | 3 | 1 | 5 | 0 | 25 |
-| P2 | 0 | 11 | 6 | 3 | 5 | 0 | 25 |
-| 合计 | 7 | 41 | 9 | 4 | 10 | 0 | 71 |
+| P1 | 3 | 13 | 4 | 0 | 5 | 0 | 25 |
+| P2 | 1 | 11 | 6 | 2 | 5 | 0 | 25 |
+| 合计 | 8 | 41 | 10 | 2 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**48/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**49/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -95,11 +95,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `crud.create-object` | 创建仓库对象（包/表/程序/类/函数组/DDIC 域/数据元素/结构/CDS 等） | SAP(action=create, target="OBJECT\|DEVC\|TABL") + workflow create PROGRAM/CLASS_WITH_TESTS + focused CreatePackage/CreateTable | MCP_SUPERSET | P0 | `listRepositoryObjectCreationCapabilities`、`describeRepositoryObjectCreation`、`previewRepositoryObjectCreation`、`applyRepositoryObjectCreation`、`getRepositoryObjectCreationStatus` | development, development-workbench | DEV |
 | `crud.delete-object` | 删除仓库对象 | SAP(action=delete, target="OBJECT ...") | MCP_SUPERSET | P0 | `previewRepositoryObjectCleanup`、`applyRepositoryObjectCleanup`、`getRepositoryObjectCleanupStatus` | development, development-workbench | DEV |
-| `crud.clone-object` | 复制对象到新名称 | SAP(action=create, target="CLONE ...") + focused CloneObject | GAP | P2 | （无） | （无） | （无） |
+| `crud.clone-object` | 复制对象到新名称 | SAP(action=create, target="CLONE ...") + focused CloneObject | PARTIAL | P2 | `getObjectSource`、`previewRepositoryObjectCreation`、`applyRepositoryObjectCreation`、`previewRepositoryObjectCleanup`、`applyRepositoryObjectCleanup` | development, development-workbench | DEV |
 | `crud.move-package` | 把对象移动到其他包 | SAP(action=edit, target="MOVE ...") + focused MoveObject | EQUIVALENT | P1 | `previewPackageChange`、`applyPackageChange` | development, development-workbench | DEV |
 | `crud.recover-failed-create` | 恢复/清理一次失败的创建留下的半成品对象 | SAP(action=edit, target="RECOVER_FAILED_CREATE ...") | PARTIAL | P1 | `previewRepositoryObjectCleanup`、`getRepositoryObjectCleanupStatus` | development, development-workbench | DEV |
 | `crud.compare-source` | 对比两个对象的源码差异 | SAP(action=edit, target="COMPARE_SOURCE ...") + focused CompareSource | EQUIVALENT | P2 | `compareSourceObjects` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `crud.set-description` | 修改对象描述/短文本 | SAP(action=edit, params={editType:set_description}) | PARTIAL | P2 | `previewDdicPropertyChange`、`applyDdicPropertyChange` | development, development-workbench | DEV |
+| `crud.set-description` | 修改对象描述/短文本 | SAP(action=edit, params={editType:set_description}) | MCP_SUPERSET | P2 | `previewDescriptionChange`、`applyDescriptionChange`、`getDescriptionChangeStatus` | development, development-workbench | DEV |
 
 ### transport
 
@@ -125,7 +125,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `debug.session` | 调试会话生命周期：监听、附加、分离、单步、调用栈、变量查看 | SAP(action=debug, target="LISTEN\|ATTACH\|DETACH\|STEP\|GET_STACK\|GET_VARIABLES") + focused Debugger* | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`authorizeDebugSession`、`executeDebugCommand`、`getDebugOperationStatus`、`revokeDebugSession` | development, development-workbench | DEV |
 | `debug.breakpoints` | 外部断点的设置、查询与删除 | SAP(action=debug, target="SET_BREAKPOINT\|GET_BREAKPOINTS\|DELETE_BREAKPOINT") + focused Set/Get/DeleteBreakpoint | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`debuggerListeners` | development, development-workbench | DEV |
-| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | GAP | P1 | （无） | （无） | （无） |
+| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | PARTIAL | P1 | `checkAmdpDebugger` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `debug.amdp-helper` | AMDP 调试（ZADT_VSP helper WebSocket 路径） | SAP(action=debug, target="AMDP_START\|AMDP_RESUME\|AMDP_STOP\|AMDP_STEP\|AMDP_GET_VARIABLES\|AMDP_SET_BREAKPOINT\|AMDP_GET_BREAKPOINTS") | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 
 ### report

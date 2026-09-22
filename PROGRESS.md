@@ -281,3 +281,43 @@
 - 矩阵现状：MCP_SUPERSET=7、EQUIVALENT=41、PARTIAL=9、GAP=4、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 48/71。证据：docs/evidence/transport-history-real-dev-verified.md。
 - 接线同步：ToolProfiles（workbench +2）+ ToolOperationPolicy（read-only +2）+ ToolCatalogIntegrity 计数（development=169、diagnostic-readonly=138、legacy-full=201、development-workbench=136）+ AGENTS.md 基线（154/1455）。
 - 遗留：无系统残留。剩余 GAP 4 行全为写方向或环境前置（clone-object、merge-move、amdp-adt、ui5.write）；PARTIAL 9 行中可推进项为知识查询集群解析器工程轮（fm_test_data/cluster_read）与写方向受控工作流批次（均需授权/大轮）。
+
+## 2026-09-18 闲时轮：debug.amdp-adt discovery spike——GAP → PARTIAL（真机确认 ADT 原生 AMDP 调试资源存在）
+
+- 本轮工作（P1 GAP 的 amdp-discovery-spike）：新增 `checkAmdpDebugger`（无状态只读 GET /sap/bc/adt/amdp/debugger/main，语义对齐 VSP probeAMDP：400/200/405 可用、404 缺失、其余 unknown），单工具处理器接入 runtimeTools 面（workbench 名单 +1）。12 个 mock 用例含真机业务错误形态。
+- 真机结果（只读，326ms）：目标 DEV 具备 ADT 原生 AMDP 调试资源（400 "Parameter mainId could not be found"——资源在要求参数，即存在性证据；服务端零安装，非 helper 路径）。
+- 真机缺陷修复：本项目 ADT 客户端把非 2xx 转成业务 Error（无 response.status），最初状态码分支全落空归 unknown——改按消息内容分类并用 includes 子串判定（顺带消除多轮工具写入把正则转义损坏为控制字符的风险，已删 tsbuildinfo 强制重建）。
+- 关键事实记录：AMDP 调试句柄在 ABAP 会话内存（class-data），未来调试会话必须复用同一有状态会话（本项目 ADTClient 默认 stateful 满足）。
+- 本地门禁全绿：Jest 155 suites / 1478 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：debug.amdp-adt GAP → PARTIAL（discovery 真机可用；调试会话本体待受控工作流立项，nextMilestone=amdp-debugger-controlled-workflow）。顺带修复轮二十遗留：analysis.history 行声明的 operations-readonly 口径与实际名单不符（getCrHistory/getCoChange 未入 operations 名单），已补齐（operations 46→48）。现状：MCP_SUPERSET=7、EQUIVALENT=41、PARTIAL=10、GAP=3、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 48/71。证据：docs/evidence/amdp-discovery-real-dev-verified.md。
+- 剩余 GAP 3 行：clone-object、merge-move（传输写方向）、ui5.write（写方向）——均需受控工作流立项或属 RESTRICTION。下一轮起点建议：P2 PARTIAL 的受控写批次（set-description/clone-object/report.text-elements/i18n.write——需大轮设计受控链）或 diagnostics.knowledge-queries 的集群解析器工程轮。
+
+## 2026-09-18 闲时轮：crud.clone-object GAP → PARTIAL——组合任务路径真机闭环
+
+- 选型甄别：P1 三项（execute-abap 任意执行面/recover-failed-create 语义边界/git.abapgit 环境受限）均不满足完整可行链，落到 P2 的 crud.clone-object（GAP）。中途放弃一站式受控克隆工作流的大轮设计（半成品风险），改为组合任务路径的真机闭环推进——全部走既有受控工具，零新代码。
+- 真机闭环（scripts/clone-object-real-dev-smoke.mjs，已注册 test:clone-real-dev）：受控创建源对象 → getObjectSource 读源 → REPORT 声明行改名（对齐 VSP CloneObject 正则语义）→ 受控创建目标（携带改名源码，immutable plan+原生确认）→ readback 比对一致 → 双对象受控清理 absence 零残留。工程要点：ENQ 锁释放延迟用时间戳后缀新名绕开；getObjectSource 源码在 result.source 字段。
+- 矩阵：crud.clone-object GAP → PARTIAL（evidence + real-dev-verified，nextMilestone=clone-controlled-workflow——一站式受控克隆工作流立项后晋级）。矩阵守卫修正：组合 taskPath 的 profiles 不含 legacy-full（受控创建链不在专家面，Wave 1 口径）。现状：MCP_SUPERSET=7、EQUIVALENT=41、PARTIAL=11、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 48/71。证据：docs/evidence/clone-object-real-dev-verified.md。
+- 本地门禁全绿：Jest 156 suites / 1476 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。无系统残留。
+- 剩余 GAP 2 行：transport.merge-move（传输写方向 RESTRICTION）、ui5.write（写方向 RESTRICTION）。下一轮起点建议：受控写工作流大轮（clone-controlled-workflow 或 set-description/i18n.write）或 diagnostics.knowledge-queries 集群解析器工程轮——均需整轮预算。
+
+## 2026-09-20 闲时轮：保真维护——轮四遗留缺陷清账（readRuntimeDumps 服务端过滤）
+
+- 本轮形态（无大轮授权，按保真维护推进）：清账轮四遗留缺陷——readRuntimeDumps 带 runtimeError/exception/objectName/user 服务端过滤在该 DEV InternalError。
+- 根因：本项目把四项过滤拼成 feed search 谓词（`and ( contains ( runtimeError , ... ) )`），而该 ADT dumps feed 协议只支持 between datetime 谓词（对照 VSP Dumps：服务端仅 from/to，其余全为客户端 matches）。
+- 修复：buildRuntimeDumpQuery 只保留时间窗；user/objectName/runtimeError/exception 改为客户端过滤（对齐 VSP matches 的大小写不敏感语义 + 本项目既有 contains 契约），注入形态的过滤值降级为无害文本（客户端匹配不到即空结果，无 SQL 面）。测试按新契约重写并补客户端过滤与注入无害化用例（6 个）。
+- 真机复验（只读，7 天窗口）：带 runtimeError=DBSQL_SQL_ERROR 返回 30 条且 100% 为目标异常（修复前同参数 InternalError）；无过滤对照 50 条；耗时 59s（系统慢但在预算内）。
+- 矩阵保真：diagnostics.dumps restrictionReason 补缺陷清账事实（无状态变化）。findSimilarDumps 的客户端匹配路径与本次修复同语义，无需改动。
+- 本地门禁全绿：Jest 156 suites / 1478 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。AGENTS.md 基线同步（156/1478，2026-09-20）。
+- 矩阵现状：MCP_SUPERSET=7、EQUIVALENT=41、PARTIAL=11、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 48/71（无变化——本轮为缺陷清账）。
+- 下一轮起点建议：全部剩余项为大轮（受控写工作流批次/集群解析器工程轮/AMDP 调试会话工作流），无大轮授权时继续保真维护形态（守卫巡检/遗留清账/依赖健康检查）。
+
+## 2026-09-22 闲时轮：crud.set-description 受控写链落地——PARTIAL → MCP_SUPERSET（大轮）
+
+- 本轮启动受控写批次第一个工作流（description-controlled-write）：受控描述修改链（PROG/CLAS/INTF/INCL 四类）。
+- 构件：src/adt/DescriptionApi.ts（metadata GET/descriptionAttr 替换/PUT(corrNr)/URL 映射/长度限制，语义对齐 VSP SetDescription）+ src/safe/DescriptionChangeWorkflow.ts（immutable plan + 上下文绑定 + 同值短路 + UNKNOWN_OUTCOME 终止 + readback 核验）+ DescriptionChangeHandlers（preview/apply/status 三工具，apply 仅 DEV+development/workbench，原生 elicitation 确认）。
+- 真机闭环（scripts/description-real-dev-smoke.mjs + description-verify-smoke.mjs）：自建 PROGRAM → 预检冻结 → 确认 apply → readback 一致 → 同值短路 → 清理零残留，全部 PASS。真机动态 limit=70 按 descriptionTextLimit 校验。
+- 真机修复三缺陷：① stateful 会话要求（锁句柄会话绑定，stateless PUT 报错）；② lock 原始行大写列名（LOCK_HANDLE）提取归一化 + 提取失败时 raw 键兜底解锁（防 ENQ 泄漏）；③ JSDoc 内 */* 注释截断。
+- 本地门禁全绿：Jest 157 suites / 1490 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：crud.set-description PARTIAL → MCP_SUPERSET（evidence + real-dev-verified）。现状：MCP_SUPERSET=8、EQUIVALENT=41、PARTIAL=9、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 49/71。证据：docs/evidence/description-controlled-real-dev-verified.md。
+- 接线同步：ToolProfiles（workbench +3）+ ToolOperationPolicy（READ_ONLY +1/LOCAL +1/ADVANCED +1/CONTROLLED_DESCRIPTION 集合与 role/profile 门控）+ ToolCatalogIntegrity 计数（development=173、development-workbench=140）+ AGENTS.md 基线（157/1490，2026-09-22）。
+- 下一轮起点建议：受控写批次继续（clone-controlled-workflow 一站式工作流：本轮 DescriptionApi/锁链经验直接复用）或 report.text-elements/i18n.write。
