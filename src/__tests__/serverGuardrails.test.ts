@@ -331,6 +331,10 @@ describe('server guardrail integration helpers', () => {
     //（否则 maxConcurrentTools=1 时自我死锁，真机已复现 60s 客户端超时）
     ['applyObjectActivation', false],
     ['getObjectActivationStatus', false],
+    // 受控克隆 apply 在确认后委托受控创建链（内部自持 executionGate），必须豁免
+    // 外层 gate（否则 maxConcurrentTools=1 自我死锁）；status 是纯本地读取同豁免
+    ['applyCloneObject', false],
+    ['getCloneObjectStatus', false],
     ['previewObjectActivation', true],
     ['healthcheck', false],
     ['sap', false],

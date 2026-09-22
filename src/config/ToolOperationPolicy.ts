@@ -36,6 +36,14 @@ export const CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES = new Set([
   'getRepositoryObjectCleanupStatus'
 ]);
 
+// 受控对象克隆链（crud.clone-object 一站式工作流）：与受控创建/激活同面的
+// DEV 受控 profiles 专属链，任何一环不在 QAS/PRD/未知角色下面世。
+export const CONTROLLED_CLONE_TOOL_NAMES = new Set([
+  'previewCloneObject',
+  'applyCloneObject',
+  'getCloneObjectStatus'
+]);
+
 /**
  * 受控对象激活工具集合（关闭矩阵缺口 devtools.activate）。
  * 三个工具构成完整受控链：preview（只读收集+冻结 plan）→
@@ -53,7 +61,7 @@ const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
   'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
-  'getObjectActivationStatus'
+  'getObjectActivationStatus', 'getCloneObjectStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -105,6 +113,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'checkAmdpDebugger',
   // 受控描述修改 preview（crud.set-description）：只读预检，不触碰写路径
   'previewDescriptionChange',
+  // 受控对象克隆 preview（crud.clone-object 一站式）：只读预检（源码快照+
+  // 本地声明改名），不触碰写路径
+  'previewCloneObject',
   // 消息类文本只读工具（矩阵 read.message-class-texts 行）：messageclass 资源
   // GET，可选 sap-language 语言覆盖；文本写入方向（i18n.write）不开放
   'getMessages',
@@ -177,7 +188,10 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   // runUnitCoverage 运行被测对象的用户代码，是执行行为（与 unitTestRun 同级，非只读）
   'runUnitCoverage',
   // 受控描述修改 apply（crud.set-description）：repository 写入，受控链单次执行
-  'applyDescriptionChange'
+  'applyDescriptionChange',
+  // 受控对象克隆 apply（crud.clone-object 一站式）：委托受控创建链的 repository
+  // 写入，单确认单执行
+  'applyCloneObject'
 ]);
 
 const QUALITY_EXECUTION_TOOL_NAMES = new Set([
@@ -210,6 +224,7 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   // 任务链的任何一环都不应在 QAS/PRD/未知角色下面世。
   if (CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_ACTIVATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  if (CONTROLLED_CLONE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
@@ -268,6 +283,17 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled object activation requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控对象克隆链（crud.clone-object 一站式）：仅 DEV + development/
+  // development-workbench。apply 委托受控创建链（其确认与执行门控已内建），
+  // 不进入 legacy-full 专家面。
+  if (CONTROLLED_CLONE_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled object clone requires DEV development or development-workbench profile.'
     );
   }
   if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)

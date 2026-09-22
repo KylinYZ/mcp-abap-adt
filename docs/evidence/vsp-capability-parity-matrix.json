@@ -1035,13 +1035,11 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "MCP_SUPERSET",
         "taskPath": [
-          "getObjectSource",
-          "previewRepositoryObjectCreation",
-          "applyRepositoryObjectCreation",
-          "previewRepositoryObjectCleanup",
-          "applyRepositoryObjectCleanup"
+          "previewCloneObject",
+          "applyCloneObject",
+          "getCloneObjectStatus"
         ],
         "profiles": [
           "development",
@@ -1050,7 +1048,7 @@
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "组合任务路径已真机端到端验证（2026-09-18，scripts/clone-object-real-dev-smoke.mjs）：读源→声明行改名（对齐 VSP CloneObject 的 REPORT/CLASS/INTERFACE 正则语义）→受控创建（immutable plan+原生确认+readback 比对）→受控清理，PROGRAM 类全链路通过；一站式受控克隆工作流（单 plan 冻结源快照+自动改名+比对）待立项，届时可晋级 EQUIVALENT/MCP_SUPERSET。",
+        "restrictionReason": "受控对象克隆一站式工作流已在真实 DEV 端到端验证（2026-09-22，scripts/clone-controlled-real-dev-smoke.mjs）：preview 只读读源快照+本地声明改名冻结（sourceHash/payloadHash/declarationChanges）→ 原生确认 → apply 委托受控创建链（壳创建/锁/写/语法检查/激活/源码 hash 比对/失败补偿，APPLIED）→ readback 独立直读一致 → 双清理零残留。比 VSP CloneObject 多 immutable plan、上下文绑定重放拒绝、原生确认与失败补偿；类源码改名要求 DEFINITION/IMPLEMENTATION 两处同步（VSP 只替换首个匹配，多声明漏改）。",
         "liftCondition": ""
       },
       "priority": "P2",
@@ -1058,8 +1056,7 @@
         "source-audit",
         "automation",
         "real-dev-verified"
-      ],
-      "nextMilestone": "clone-controlled-workflow"
+      ]
     },
     {
       "id": "crud.move-package",

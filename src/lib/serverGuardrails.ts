@@ -33,6 +33,11 @@ export function usesSapExecutionGate(toolName: string): boolean {
     // getObjectActivationStatus 是纯本地 plan 读取，与同构 status 工具一并豁免。
     && toolName !== 'applyObjectActivation'
     && toolName !== 'getObjectActivationStatus'
+    // 受控克隆：apply 在原生确认后委托受控创建链（其确认层内部自持 executionGate），
+    // 外层 dispatch 若先占唯一槽位同样会自我死锁，与受控激活同豁免；
+    // getCloneObjectStatus 是纯本地 plan 读取，与同构 status 工具一并豁免。
+    && toolName !== 'applyCloneObject'
+    && toolName !== 'getCloneObjectStatus'
     && toolName !== 'healthcheck';
 }
 

@@ -71,6 +71,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'checkAmdpDebugger',
   // 受控描述修改链（crud.set-description）：受控写，workbench 面显式收录
   'previewDescriptionChange', 'applyDescriptionChange', 'getDescriptionChangeStatus',
+  // 受控对象克隆链（crud.clone-object 一站式）：受控写（apply 委托受控创建链），
+  // workbench 面显式收录
+  'previewCloneObject', 'applyCloneObject', 'getCloneObjectStatus',
   // 消息类文本只读工具（read.message-class-texts）：messageclass 资源 GET
   'getMessages',
   // 版本源码只读工具（revisions.source）：按版本标签/序号读取历史版本源码

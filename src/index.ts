@@ -125,6 +125,8 @@ import { createAmdpDiscoveryClient } from './adt/AmdpDiscoveryApi.js';
 import { AmdpDiscoveryHandlers } from './handlers/AmdpDiscoveryHandlers.js';
 import { DescriptionChangeHandlers } from './handlers/DescriptionChangeHandlers.js';
 import { DescriptionChangeWorkflow, bindDescriptionPorts } from './safe/DescriptionChangeWorkflow.js';
+import { CloneObjectHandlers } from './handlers/CloneObjectHandlers.js';
+import { CloneObjectWorkflow } from './safe/CloneObjectWorkflow.js';
 import { createMessageClassReadClient } from './adt/MessageClassReadApi.js';
 import { createRevisionSourceClient } from './adt/RevisionSourceApi.js';
 import { createI18nReadClient } from './adt/I18nReadApi.js';
@@ -195,6 +197,7 @@ export class AbapAdtServer extends Server {
   private spoolJobHandlers: SpoolJobHandlers;
   private amdpDiscoveryHandlers: AmdpDiscoveryHandlers;
   private descriptionChangeHandlers: DescriptionChangeHandlers;
+  private cloneObjectHandlers: CloneObjectHandlers;
   private messageClassReadHandlers: MessageClassReadHandlers;
   private revisionSourceHandlers: RevisionSourceHandlers;
   private i18nReadHandlers: I18nReadHandlers;
@@ -576,6 +579,20 @@ export class AbapAdtServer extends Server {
         })
       }
     );
+    // 受控对象克隆（crud.clone-object 一站式工作流）：preview 只做源码快照与
+    // 声明改名（只读 GET + 本地字符串操作），apply 委托既有受控创建链
+    //（壳创建/锁/写/语法检查/激活/源码 hash 比对/失败补偿，单确认单执行）。
+    // 创建链在确认层内部自持 executionGate，本层不重复过 gate。
+    const cloneWorkflow = new CloneObjectWorkflow({
+      http: this.adtClient.httpClient as never,
+      creation: repositoryCreationWorkflow as never,
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    } as never);
+    this.cloneObjectHandlers = new CloneObjectHandlers(cloneWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+    });
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
@@ -786,7 +803,8 @@ export class AbapAdtServer extends Server {
     const completeControlledAdvancedTools = [
       ...this.safeAdvancedHandlers.getTools(),
       ...this.repositoryObjectCreationHandlers.getTools(true),
-      ...this.descriptionChangeHandlers.getTools()
+      ...this.descriptionChangeHandlers.getTools(),
+      ...this.cloneObjectHandlers.getTools()
     ];
     const controlledAdvancedTools = completeControlledAdvancedTools;
     const qualityTools = this.safeQualityHandlers.getTools();
@@ -1025,6 +1043,12 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.descriptionChangeHandlers.supports(toolName)) {
           return this.descriptionChangeHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控对象克隆链：profile/role 门控已由 assertToolOperationAllowed 前置把关，
+        // catalog 成员检查保证非 development/development-workbench profile 不可见。
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.cloneObjectHandlers.supports(toolName)) {
+          return this.cloneObjectHandlers.handle(toolName, limitedArguments);
         }
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.safeDebugHandlers.supports(toolName)) {

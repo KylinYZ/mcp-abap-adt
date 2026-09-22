@@ -63,6 +63,8 @@ export interface AuditEvent {
   activationPlanId?: string;
   activationObjectCount?: number;
   activationPayloadHash?: string;
+  // 受控对象克隆工作流（CloneObject）专用字段：planId 关联审计链。
+  clonePlanId?: string;
 }
 
 export class AuditLogger {
