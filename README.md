@@ -6,19 +6,19 @@
 
 ## Current release
 
-- Version `0.6.0`, published as `@kylinyz/mcp-abap-abap-adt-api@0.6.0`.
+- Version `0.8.0`, published as `@kylinyz/mcp-abap-abap-adt-api@0.8.0`.
 - Repository: [`KylinYZ/mcp-abap-adt`](https://github.com/KylinYZ/mcp-abap-adt).
 - The unscoped upstream package is a separate project; always use the scoped name.
-- Role entry points: `focused`/`developer` (90 development tools), `business` (18 read-only tools), `operations` (41 read-only tools), and `expert` (161 compatibility tools). Legacy profile names remain supported; see [`docs/产品定位.md`](docs/产品定位.md).
+- Role entry points: `focused`/`developer` (146 development tools), `business` (18 read-only tools), `operations` (48 read-only tools), and `expert` (202 compatibility tools). Legacy profile names remain supported; see [`docs/产品定位.md`](docs/产品定位.md).
 - Repository creation catalog: 31 kinds; `REAL_DEV_VERIFIED=28`, `CONTROLLED_IMPLEMENTED=1`, `AUTOMATION_VERIFIED=2`. The checked-in maturity manifest is the authority: [`docs/evidence/repository-creation-maturity-evidence.json`](docs/evidence/repository-creation-maturity-evidence.json).
-- Automation baseline (2026-09-04): 109 Jest suites, 793 tests.
+- Automation baseline (2026-09-22): 159 Jest suites, 1526 tests.
 
 ## Install
 
 ### npm (recommended)
 
 ```bash
-npx -y @kylinyz/mcp-abap-abap-adt-api@0.6.0
+npx -y @kylinyz/mcp-abap-abap-adt-api@0.8.0
 ```
 
 Example MCP configuration:
@@ -28,7 +28,7 @@ Example MCP configuration:
   "mcpServers": {
     "mcp-abap-abap-adt-api": {
       "command": "npx",
-      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.6.0"],
+      "args": ["-y", "@kylinyz/mcp-abap-abap-adt-api@0.8.0"],
       "env": { "SAP_MCP_ENV_FILE": "C:\\path\\to\\sap-dev.env" }
     }
   }

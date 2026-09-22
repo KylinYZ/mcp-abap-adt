@@ -8,7 +8,7 @@
 新用户入口与能力分层见 `docs/产品定位.md`；不要把兼容 profile 名称重新写成产品入口。
 ## 当前发布与事实基线
 
-- 当前版本：`0.6.0`；npm 包：`@kylinyz/mcp-abap-abap-adt-api@0.6.0`。
+- 当前版本：`0.8.0`；npm 包：`@kylinyz/mcp-abap-abap-adt-api@0.8.0`。
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
 - profile 目录：`safe=7`、`development=179`、`diagnostic-readonly=139`、`legacy-full=202`、`development-workbench=146`、`business-readonly=18`、`operations-readonly=48`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。

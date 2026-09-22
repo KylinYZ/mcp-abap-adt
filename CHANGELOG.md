@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-22
+- VSP capability alignment advances from 39/71 to 51/71 (`MCP_SUPERSET=10`, `EQUIVALENT=41`, `PARTIAL=8`, `GAP=2`, `INTENTIONAL_RESTRICTION=10`, `UNVERIFIED=0`), with every promotion backed by real-DEV evidence under `docs/evidence/`.
+- Add the classic-RFC transport layer on `open-rfc` (no NW RFC SDK): read-only `probeRfcSystem`, `readRfcTable` (with S/4-enhanced `RFC_READ_TABLE` dual-path adaptation), `describeRfm`, and `callRfm` behind a read-only FM allowlist — closing both P0 RFC gaps.
+- Add three controlled write workflows sharing one safety model (immutable plan, context-bound replay rejection, one native confirmation, single execution, readback/absence verification, defensive convergence): `set-description` (`MCP_SUPERSET`), one-shot object clone (`clone-object`), and one-shot object rename (`rename`, which delegates creation to the controlled creation chain and deletion to the controlled cleanup chain, and converges via an absence recheck when the delete landed but transport evidence is unavailable).
+- Add the AMDP debugger discovery probe `checkAmdpDebugger` and the object-activation chain promotion to `EQUIVALENT`.
+- Add read-only analysis and diagnostics tool families: transport history (`getCrHistory`, `getCoChange`), IMG activity detail, dump grouping/similarity, dependency context (4 tools), package boundary check, UI5 filestore reads, spool/job reads incl. content decoding, transaction metadata, message-class texts, i18n language reads (4 tools), revision source/compare, cross-object source compare, install prerequisite discovery, ABAP documentation and IMG search.
+- Add the offline abapGit deployment engine stage 1 (zero-dependency ZIP reader, serialization grouping, deployment plan builder) as the local foundation for stage 2 controlled batch deployment.
+- Hardening from real-DEV findings: datapreview per-session query budget discovery and doc updates, `readRuntimeDumps` server-side filter fix (time-window-only feed predicates, client-side matching), spool UTF-16LE decoding, `getImgActivity` recursive menu paths, and guardrail exemptions for confirmation-style tools to prevent single-slot self-deadlock.
+- Real-DEV smoke tests now run against the dedicated `sap-demo.env` system by owner decision (transport `S4HK900009`); automation baseline grows to 159 suites / 1526 tests.
+
 ## [0.7.0] - 2026-09-04
 - Verify the real DEV focused source-preview path end to end using a temporary local audit directory; `sap(edit)` now returns the delegated preview's `status`, `plan`, and `diff` without an extra MCP-result wrapper.
 - Add a real DEV read-only focused-entrypoint smoke test covering MCP stdio startup, `sapDoctor`, `sap(read)`, `sap(search)`, and automatic table diagnosis routing without emitting source or business rows.
