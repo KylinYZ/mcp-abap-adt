@@ -1,4 +1,4 @@
-import { Client, languageIsoToSap, type RfcClientOptions } from 'open-rfc';
+import { Client, languageIsoToSap, type RfcClientOptions } from '@kylinyz/open-rfc';
 
 import { FmCallResult } from './call';
 import { RfcError, RfcTransportError } from './errors';

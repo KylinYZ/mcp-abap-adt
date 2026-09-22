@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-09-22
+- Switch the RFC transport dependency to the published fork `@kylinyz/open-rfc@0.2.4-kylin.1`, which carries the numeric/lowercase SAP logon-language-key fix (ZH -> "1" acceptance and case-preserving CPIC encoding). Behavior on this project's ISO two-character language path is unchanged; the fork package makes the fix available to direct-SAP-key callers as well.
+
 ## [0.8.2] - 2026-09-22
 - Include `.env.example` in the npm package (the `files` allowlist omitted it, so 0.8.0/0.8.1 shipped without the configuration field reference). Copy it to a private path outside any repository and point `SAP_MCP_ENV_FILE` at it.
 

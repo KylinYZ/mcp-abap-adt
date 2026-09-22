@@ -18,7 +18,7 @@ import { jest } from '@jest/globals';
 
 // mock 掉 open-rfc 的 Client：捕获构造参数，open/call/close 返回最小桩
 const clientConstructs: Array<Record<string, unknown>> = [];
-jest.mock('open-rfc', () => ({
+jest.mock('@kylinyz/open-rfc', () => ({
   // languageIsoToSap 在构造器中未用到，但保留同签名以防后续接线
   languageIsoToSap: (value: string) => value,
   Client: jest.fn().mockImplementation(function (...args: unknown[]) {
@@ -31,7 +31,7 @@ jest.mock('open-rfc', () => ({
   })
 }));
 
-import { Client } from 'open-rfc';
+import { Client } from '@kylinyz/open-rfc';
 import { OpenRfcTransport } from '../rfc/open-rfc-transport.js';
 import { normalizeRfcConnectionParams } from '../rfc/connection.js';
 

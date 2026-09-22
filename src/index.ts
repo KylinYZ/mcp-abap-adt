@@ -244,7 +244,7 @@ export class AbapAdtServer extends Server {
     super(
       {
         name: "abap-ai-workbench-mcp",
-        version: "0.8.2",
+        version: "0.8.3",
       },
       {
         capabilities: {
