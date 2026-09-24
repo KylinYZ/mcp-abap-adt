@@ -101,7 +101,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
   'getCrHistory', 'getCoChange',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）：编译期加载关系
-  'getLoadGraph',
+  'getLoadGraph', 'buildLoadDependencyGraph', 'getTransportScope',
+  // 离线依赖图快照：反向影响面和图统计，无 SAP 调用。
+  'analyzeDependencyGraph',
   // RFC 直链四工具（rfc.remote-enabled.discovery/read-table/call/describe）：
   // 探测指纹、只读表读取、FM 接口描述、受控只读 RFM 调用
   'probeRfcSystem',
@@ -138,7 +140,7 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   // 传输历史与共同变更只读（analysis.history 行：E071/E070 运维诊断）
   'getCrHistory', 'getCoChange',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）
-  'getLoadGraph'
+  'getLoadGraph', 'buildLoadDependencyGraph', 'analyzeDependencyGraph', 'getTransportScope'
 ]);
 
 export function selectProfileTools(

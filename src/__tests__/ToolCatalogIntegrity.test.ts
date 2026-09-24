@@ -30,12 +30,12 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 183],
-    ['diagnostic-readonly', 140],
-    ['legacy-full', 203],
-    ['development-workbench', 150],
+    ['development', 186],
+    ['diagnostic-readonly', 143],
+    ['legacy-full', 206],
+    ['development-workbench', 153],
     ['business-readonly', 18],
-    ['operations-readonly', 49]
+    ['operations-readonly', 52]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;
@@ -85,6 +85,80 @@ describe('tool catalog integrity and raw advanced role policy', () => {
       .toEqual(expect.arrayContaining(['inspectSapSystem', 'describeClassicTable']));
     expect((configureServer('DEV', 'operations-readonly') as any).toolCatalog.map((tool: { name: string }) => tool.name))
       .toEqual(expect.arrayContaining(['inspectSapSystem', 'readRuntimeDumps']));
+  });
+
+  it.each(['DEV', 'QAS', 'PRD', '', 'UNKNOWN'])('dispatches offline graph analysis without SAP for role %p', async role => {
+    for (const profile of ['development', 'development-workbench', 'diagnostic-readonly', 'operations-readonly', 'legacy-full']) {
+      const server = configureServer(role, profile);
+      const client = (server as any).adtClient;
+      const query = jest.spyOn(client, 'runQuery').mockRejectedValue(new Error('SAP calls forbidden'));
+      const response = await (server as any).dispatchTool('analyzeDependencyGraph', {
+        operation: 'stats', graph: { nodes: [], edges: [] }
+      });
+      expect(response.structuredContent.result).toMatchObject({
+        scope: 'caller-supplied-snapshot', sapConnectionVerified: false, analysis: { nodeCount: 0 }
+      });
+      const boundaries = await (server as any).dispatchTool('analyzeDependencyGraph', {
+        operation: 'boundaries', graph: { nodes: [{ id: 'CLAS:ZROOT', name: 'ZROOT', type: 'CLAS' }], edges: [] },
+        boundaryScope: { label: 'CR-OFFLINE', objectIds: ['CLAS:ZROOT'] }
+      });
+      expect(boundaries.structuredContent.result.analysis).toMatchObject({ objectCount: 1, transportMembershipVerified: false });
+      expect(query).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(['safe', 'business-readonly'])('hides and rejects offline graph analysis in %s', async profile => {
+    const server = configureServer('DEV', profile);
+    expect((server as any).toolCatalog.map((tool: { name: string }) => tool.name)).not.toContain('analyzeDependencyGraph');
+    const handle = jest.spyOn((server as any).dependencyGraphHandlers, 'handle');
+    await expect((server as any).dispatchTool('analyzeDependencyGraph', {
+      operation: 'stats', graph: { nodes: [], edges: [] }
+    })).rejects.toMatchObject({ code: -32601 });
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it.each(['DEV', 'QAS', 'PRD', '', 'UNKNOWN'])('exposes serial load graph reads for role %p without enabling writes', async role => {
+    for (const profile of ['development', 'development-workbench', 'diagnostic-readonly', 'operations-readonly', 'legacy-full']) {
+      const server = configureServer(role, profile);
+      const get = jest.spyOn((server as any).loadGraphHandlers.loadGraph, 'getLoadGraph').mockResolvedValue({
+        objectName: 'ZTEST', direction: 'loaded_by', loads: [], loadedBy: [], notes: [],
+        collection: { loaded_by: { status: 'ok', rowCount: 0, rowLimit: 2000 } }
+      });
+      const result = await (server as any).dispatchTool('buildLoadDependencyGraph', { objectType: 'CLAS', objectName: 'ZTEST' });
+      expect(result.structuredContent.result.collection.queryCount).toBe(1);
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(toolOperationClass('buildLoadDependencyGraph')).toBe('read-only');
+    }
+  });
+
+  it.each(['safe', 'business-readonly'])('hides and rejects load graph builder in %s before reads', async profile => {
+    const server = configureServer('DEV', profile);
+    const get = jest.spyOn((server as any).loadGraphHandlers.loadGraph, 'getLoadGraph');
+    expect((server as any).toolCatalog.map((tool: { name: string }) => tool.name)).not.toContain('buildLoadDependencyGraph');
+    await expect((server as any).dispatchTool('buildLoadDependencyGraph', {
+      objectType: 'CLAS', objectName: 'ZTEST'
+    })).rejects.toMatchObject({ code: -32601 });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it.each(['DEV', 'QAS', 'PRD', '', 'UNKNOWN'])('dispatches transport scope as read-only for role %p', async role => {
+    for (const profile of ['development', 'development-workbench', 'diagnostic-readonly', 'operations-readonly', 'legacy-full']) {
+      const server = configureServer(role, profile);
+      const query = jest.fn().mockResolvedValue({ values: [] });
+      (server as any).transportScopeHandlers.runQuery = query;
+      const result = await (server as any).dispatchTool('getTransportScope', { transports: ['DEVK900001'] });
+      expect(result.structuredContent.result.collection.status).toBe('partial');
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(toolOperationClass('getTransportScope')).toBe('read-only');
+    }
+  });
+
+  it.each(['safe', 'business-readonly'])('hides and rejects transport scope in %s before I/O', async profile => {
+    const server = configureServer('DEV', profile);
+    const handler = jest.spyOn((server as any).transportScopeHandlers, 'handle');
+    expect((server as any).toolCatalog.map((tool: { name: string }) => tool.name)).not.toContain('getTransportScope');
+    await expect((server as any).dispatchTool('getTransportScope', { transports: ['DEVK900001'] })).rejects.toMatchObject({ code: -32601 });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('exposes direct URL source reads only in development and diagnostic profiles', () => {

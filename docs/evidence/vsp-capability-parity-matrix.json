@@ -2198,7 +2198,10 @@
      "transportInfo",
      "getCrHistory",
      "getCoChange",
-     "getLoadGraph"
+     "getLoadGraph",
+     "analyzeDependencyGraph",
+     "buildLoadDependencyGraph",
+     "getTransportScope"
     ],
     "profiles": [
      "development",
@@ -2212,14 +2215,14 @@
      "QAS",
      "PRD"
     ],
-    "restrictionReason": "cr_history、co_change 与 loads 三个子操作已在真实 DEV 端到端验证。cr_history/co_change（2026-09-18，docs/evidence/transport-history-real-dev-verified.md）：E071 R3TR+LIMU → E070 任务→请求层级 → 同请求共现频次排行。loads（2026-09-24，scripts/load-graph-real-dev-smoke.mjs，npm run test:load-graph-real-dev）：D010INC 编译期加载图——ZCL_MCP_SM21_ADT_HTTP 真机读回 26 条对象间加载边，填充池名归一化（ZCL_X====CP→CLAS、L<组>TOP→FUGR）、内核机器行（<SYSINI>/%_CABAP/~伴随池）与自包含行全过滤、up 方向全包含时 notes 如实标注；语义对照 VSP pkg/adt/loads.go + pkg/graph/builder_loads.go 逐函数移植。loads 是加载不是调用（INCLUDE 拆分依赖只在 D010INC 出现），notes 恒带语义声明。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 等图引擎类分析（pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
+    "restrictionReason": "cr_history、co_change 与 loads 三个子操作已在真实 DEV 端到端验证。cr_history/co_change（2026-09-18，docs/evidence/transport-history-real-dev-verified.md）：E071 R3TR+LIMU → E070 任务→请求层级 → 同请求共现频次排行。loads（2026-09-24，scripts/load-graph-real-dev-smoke.mjs，npm run test:load-graph-real-dev）：D010INC 编译期加载图——ZCL_MCP_SM21_ADT_HTTP 真机读回 26 条对象间加载边，填充池名归一化（ZCL_X====CP→CLAS、L<组>TOP→FUGR）、内核机器行（<SYSINI>/%_CABAP/~伴随池）与自包含行全过滤、up 方向全包含时 notes 如实标注；语义对照 VSP pkg/adt/loads.go + pkg/graph/builder_loads.go 逐函数移植。loads 是加载不是调用（INCLUDE 拆分依赖只在 D010INC 出现），notes 恒带语义声明。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 等图引擎类分析（pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。 2026-09-24 离线推进：analyzeDependencyGraph 提供调用方快照的 impact 反向 BFS 与 stats 统计（VSP pkg/graph/queries_impact.go + graph.go 对齐）；无 SAP 数据采集、无远端图构建，不能视为系统级 impact/graph_stats 等价。证据与边界见 docs/evidence/dependency-graph-offline-alignment.md；本行维持 PARTIAL。 后续离线接线：buildLoadDependencyGraph 将已有 D010INC 只读单跳查询串行组合成有界多跳图，输出结构化采集状态、预算截断和未展开节点，并附 LOADS 快照影响面；FUGR 反向展开显式限制。只完成 mock/fixtures 验证，未做多跳真机验证，不能视为系统级对齐；见 docs/evidence/load-dependency-graph-offline-alignment.md。 对象集合边界离线子集：analyzeDependencyGraph 的 boundaries 操作支持显式 TR/CR 成员集合的对外结构依赖分类，严格身份匹配、动态/命名空间/包未知显式报告、明细有界；未采集真实传输成员，不证明可释放，仍 PARTIAL。见 docs/evidence/transport-boundaries-offline-alignment.md。 显式传输成员只读采集：getTransportScope 使用既有 E070/E071 SQL 通道，任务归并父请求及兄弟任务，只输出 R3TR 成员；LIMU、缺失、冲突及截断显式 partial。离线 fixture/MCP 分派验证，不包含 E070A CR 分组或真机验证；见 docs/evidence/transport-scope-offline-alignment.md。",
     "liftCondition": ""
    },
    "priority": "P2",
    "evidence": [
     "source-audit"
    ],
-   "nextMilestone": ""
+   "nextMilestone": "transport-structural-dependency-composition"
   },
   {
    "id": "git.abapgit",

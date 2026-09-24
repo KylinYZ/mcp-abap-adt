@@ -77,6 +77,7 @@ export const CONTROLLED_ACTIVATION_TOOL_NAMES = new Set([
 ]);
 
 const LOCAL_TOOL_NAMES = new Set([
+  'analyzeDependencyGraph',
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
   'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
@@ -173,7 +174,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   //（真机复测可用）；VSP 图引擎类 impact/boundaries 不在子集
   'getCrHistory', 'getCoChange',
   // D010INC 加载图只读（analysis.history 的 loads 子操作，纯 SQL 无图引擎）
-  'getLoadGraph',
+  'getLoadGraph', 'buildLoadDependencyGraph', 'getTransportScope',
   // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
   // 无副作用系统 RFM 探测、只读表读取、FM 接口元数据描述、受控只读 RFM 调用
   //（callRfm 的安全面由协议层只读 allowlist 硬门收窄，白名单外一律拒绝）

@@ -1,11 +1,13 @@
 # 当前进度
 
-更新时间：2026-09-04
+更新时间：2026-09-24
 
 ## 结论
 
-- 代码版本：`0.6.0`。
-- 自动化门禁：109 个 Jest suites、793 个 tests；`npm run build` 与成熟度 coverage 检查通过。
+- 代码版本：`0.8.4`；本地新增图分析与只读采集接线尚未发布。
+- 自动化门禁：168 个 Jest suites、1765 个 tests（离线全量及默认覆盖率均通过）；构建、创建成熟度检查、矩阵检查和离线 MCP 进程 smoke 通过。
+- 当前推进：新增 `getTransportScope`，沿用 E070/E071 只读通道，把显式传输/任务展开为父请求与兄弟任务的 R3TR 成员并集；缺失、冲突、LIMU 未解析及截断均报告 partial。离线 stdio 已串联成员采集、加载图与 boundaries；零 SAP 调用，矩阵仍 PARTIAL、对齐仍 54/71。详见 [`传输成员离线对齐`](docs/evidence/transport-scope-offline-alignment.md)。
+- 下一步：将传输成员与有界结构依赖采集合成，保留采集缺口，避免仅凭成员边误报完整；E070A CR 分组及 LIMU 映射不猜身份。未知 ADT 协议先请求脱敏 Eclipse 抓包。新增链路待真实环境验证，用户 MCP 客户端部署未完成。
 - 仓库对象目录：31 类；`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`。
 - 真实 DEV 验证固定使用专用配置、现有未释放传输和一次原生确认；QAS/PRD 不写。
 - 所有历史 `OUTCOME_UNKNOWN`、`COMPENSATED`、`COMPENSATION_FAILED` 计划均不可重放；新验证必须使用新身份和新 preview。

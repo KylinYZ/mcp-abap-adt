@@ -9,6 +9,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { LoadGraphClient } from '../adt/LoadGraphApi.js';
+import { buildLoadDependencyGraph, LoadDependencyInputError, type LoadDependencyInput } from '../adt/LoadDependencyGraph.js';
 
 type LoadGraphToolDefinition = ToolDefinition & {
   annotations: {
@@ -23,7 +24,7 @@ type LoadGraphToolDefinition = ToolDefinition & {
   };
 };
 
-const LOAD_GRAPH_TOOL_NAMES = new Set(['getLoadGraph']);
+const LOAD_GRAPH_TOOL_NAMES = new Set(['getLoadGraph', 'buildLoadDependencyGraph']);
 
 export class LoadGraphHandlers {
   constructor(private readonly loadGraph: LoadGraphClient) {}
@@ -34,6 +35,24 @@ export class LoadGraphHandlers {
 
   getTools(): LoadGraphToolDefinition[] {
     return [
+      {
+        name: 'buildLoadDependencyGraph',
+        description: 'Build a bounded multi-hop D010INC LOADS graph using serial read-only queries. loaded_by (default) follows reverse loads and includes snapshot impact; loads follows dependencies. Not CALLS, not system-wide impact. Always inspect collection issues/unexpanded nodes and limits; empty results do not prove no impact. FUGR reverse expansion is unsupported. No new writes, locks or automatic retries.',
+        inputSchema: {
+          type: 'object', additionalProperties: false, required: ['objectType', 'objectName'],
+          properties: {
+            objectType: { type: 'string', enum: ['CLAS', 'INTF', 'PROG', 'FUGR'] },
+            objectName: { type: 'string', minLength: 1, maxLength: 40 },
+            direction: { type: 'string', enum: ['loads', 'loaded_by'], description: 'Default loaded_by. FUGR root requires loads.' },
+            maxDepth: { type: 'integer', minimum: 1, maximum: 3, description: 'Default 2. Frontier nodes are returned as unexpanded.' },
+            maxQueries: { type: 'integer', minimum: 1, maximum: 10, description: 'Default 5, strict total sequential query budget.' },
+            maxNodes: { type: 'integer', minimum: 1, maximum: 500, description: 'Default 100, including root.' },
+            maxEdges: { type: 'integer', minimum: 1, maximum: 2000, description: 'Default 200.' }
+          }
+        },
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        _meta: { operationClass: 'read-only tenant', approvalRequired: false }
+      },
       {
         name: 'getLoadGraph',
         description:
@@ -65,6 +84,14 @@ export class LoadGraphHandlers {
 
   async handle(toolName: string, argumentsValue: Record<string, unknown> = {}): Promise<Record<string, any>> {
     try {
+      if (toolName === 'buildLoadDependencyGraph') {
+        const allowed = ['objectType', 'objectName', 'direction', 'maxDepth', 'maxQueries', 'maxNodes', 'maxEdges'];
+        if (!argumentsValue || typeof argumentsValue !== 'object' || Array.isArray(argumentsValue)
+          || Object.keys(argumentsValue).some(key => !allowed.includes(key))) throw invalid('Unsupported load dependency graph arguments.');
+        const result = await buildLoadDependencyGraph(this.loadGraph, argumentsValue as unknown as LoadDependencyInput);
+        const structuredContent = { status: 'success', result };
+        return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
+      }
       if (toolName !== 'getLoadGraph') {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown load-graph tool: ${toolName}`);
       }
@@ -80,6 +107,7 @@ export class LoadGraphHandlers {
       };
     } catch (error) {
       if (error instanceof McpError) throw error;
+      if (error instanceof LoadDependencyInputError) throw invalid(error.message);
       // API 层的参数校验错误（direction/token 语义）按 InvalidParams 透传，
       // 其余底层异常脱敏为 InternalError
       const message = error instanceof Error ? error.message : String(error);

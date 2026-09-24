@@ -8,6 +8,7 @@ export function adtClientOptions(guardrails: RuntimeGuardrailValues): { timeout:
 
 export function usesSapExecutionGate(toolName: string): boolean {
   return toolName !== 'sap'
+    && toolName !== 'analyzeDependencyGraph'
     && toolName !== 'sapDoctor'
     && toolName !== 'applyAbapChange'
     && toolName !== 'getAbapChangeStatus'

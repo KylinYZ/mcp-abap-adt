@@ -140,6 +140,7 @@ import { createTransactionReadClient } from './adt/TransactionReadApi.js';
 import { createInstallDiagnosticsClient } from './adt/InstallDiagnosticsApi.js';
 import { createKnowledgeQueriesClient } from './adt/KnowledgeQueriesApi.js';
 import { createTransportHistoryClient } from './adt/TransportHistoryApi.js';
+import { TransportScopeHandlers } from './handlers/TransportScopeHandlers.js';
 import { RfcProbeHandlers } from './handlers/RfcProbeHandlers.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
@@ -157,6 +158,7 @@ import { InstallDiagnosticsHandlers } from './handlers/InstallDiagnosticsHandler
 import { KnowledgeQueriesHandlers } from './handlers/KnowledgeQueriesHandlers.js';
 import { TransportHistoryHandlers } from './handlers/TransportHistoryHandlers.js';
 import { LoadGraphHandlers } from './handlers/LoadGraphHandlers.js';
+import { DependencyGraphHandlers } from './handlers/DependencyGraphHandlers.js';
 import { createLoadGraphClient } from './adt/LoadGraphApi.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
@@ -215,7 +217,9 @@ export class AbapAdtServer extends Server {
   private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
   private knowledgeQueriesHandlers: KnowledgeQueriesHandlers;
   private transportHistoryHandlers: TransportHistoryHandlers;
+  private transportScopeHandlers: TransportScopeHandlers;
   private loadGraphHandlers: LoadGraphHandlers;
+  private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
@@ -417,6 +421,10 @@ export class AbapAdtServer extends Server {
     // 传输历史只读二工具（analysis.history 子集）：E071/E070 自由 SQL（真机
     // 复测可用——早前"受限"为 datapreview 会话预算耗尽的叠加假象）。
     this.transportHistoryHandlers = new TransportHistoryHandlers(createTransportHistoryClient(readClient));
+    this.transportScopeHandlers = new TransportScopeHandlers(async (sql, limit) => {
+      const result = await readClient.runQuery(sql, limit, true);
+      return result ?? {};
+    });
     // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：编译期加载
     // 关系（INCLUDE 拆分依赖），datapreview SQL 通道同款只读。
     this.loadGraphHandlers = new LoadGraphHandlers(createLoadGraphClient(readClient));
@@ -885,7 +893,9 @@ export class AbapAdtServer extends Server {
       ...this.installDiagnosticsHandlers.getTools(),
       ...this.knowledgeQueriesHandlers.getTools(),
       ...this.transportHistoryHandlers.getTools(),
+      ...this.transportScopeHandlers.getTools(),
       ...this.loadGraphHandlers.getTools(),
+      ...this.dependencyGraphHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
@@ -1061,9 +1071,15 @@ export class AbapAdtServer extends Server {
         if (this.safetyPolicy.toolProfile !== 'safe' && this.transportHistoryHandlers.supports(toolName)) {
           return this.transportHistoryHandlers.handle(toolName, limitedArguments);
         }
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.transportScopeHandlers.supports(toolName)) {
+          return this.transportScopeHandlers.handle(toolName, limitedArguments);
+        }
         // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.loadGraphHandlers.supports(toolName)) {
           return this.loadGraphHandlers.handle(toolName, limitedArguments);
+        }
+        if (this.dependencyGraphHandlers.supports(toolName)) {
+          return this.dependencyGraphHandlers.handle(toolName, limitedArguments);
         }
         // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.rfcProbeHandlers.supports(toolName)) {

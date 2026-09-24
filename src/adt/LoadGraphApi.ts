@@ -57,6 +57,15 @@ export interface GetLoadGraphResult {
   loadedByTotal: number
   /** 有原始行但全部被过滤（自包含/内核机器行）时的提示。 */
   notes: string[]
+  /** Machine-readable acquisition state; never infer completeness from notes. */
+  collection: Partial<Record<'loads' | 'loaded_by', LoadCollectionStatus>>
+}
+
+export interface LoadCollectionStatus {
+  status: 'ok' | 'failed' | 'truncated' | 'partial'
+  rowCount: number
+  rowLimit: number
+  invalidRowCount?: number
 }
 
 /** D010INC 单次查询行数上限（VSP loadRowLimit 同值——防内核程序拖全表）。 */
@@ -84,8 +93,10 @@ export async function getLoadGraph(
     'source: D010INC, the compile-time load table. These are loads, not calls: what must be present for this to run, which is not the same as what it names.'
   ]
 
-  const loads = direction === 'loaded_by' ? [] : await loadDirection(runQuery, objectName, 'down', notes)
-  const loadedBy = direction === 'loads' ? [] : await loadDirection(runQuery, objectName, 'up', notes)
+  const down = direction === 'loaded_by' ? undefined : await loadDirection(runQuery, objectName, 'down', notes)
+  const up = direction === 'loads' ? undefined : await loadDirection(runQuery, objectName, 'up', notes)
+  const loads = down?.edges ?? []
+  const loadedBy = up?.edges ?? []
 
   return {
     objectName,
@@ -95,7 +106,8 @@ export async function getLoadGraph(
     loadedBy,
     loadsTotal: loads.length,
     loadedByTotal: loadedBy.length,
-    notes: notes.slice(1)
+    notes: notes.slice(1),
+    collection: { ...(down ? { loads: down.collection } : {}), ...(up ? { loaded_by: up.collection } : {}) }
   }
 }
 
@@ -105,7 +117,7 @@ async function loadDirection(
   objectName: string,
   direction: 'down' | 'up',
   notes: string[]
-): Promise<LoadGraphEdge[]> {
+): Promise<{ edges: LoadGraphEdge[]; collection: LoadCollectionStatus }> {
   // 一个编译单元在表里的 master 形态：程序=本名、类池=填充名、函数组=SAPL<组>。
   // 一次查询覆盖三种形态，省掉调用方先判断对象类型。
   const sql = direction === 'down'
@@ -116,17 +128,26 @@ async function loadDirection(
 
   let rows: Record<string, unknown>[]
   try {
-    rows = (await runQuery(sql, LOAD_ROW_LIMIT)).values ?? []
+    const response = await runQuery(sql, LOAD_ROW_LIMIT)
+    if (!Array.isArray(response?.values)) throw new Error('Missing row array')
+    rows = response.values
   } catch (error) {
-    // datapreview 通道异常不拖垮主语义：记 notes 返回空（VSP 同款降级）
-    notes.push(`D010INC lookup failed and was skipped: ${shortError(error)}`)
-    return []
+    // Keep partial-read behavior, but do not leak remote response/credentials.
+    notes.push('D010INC lookup failed; this direction was not searched.')
+    return { edges: [], collection: { status: 'failed', rowCount: 0, rowLimit: LOAD_ROW_LIMIT } }
   }
 
   const edges = new Map<string, LoadGraphEdge>()
   let rowsWithObjectPairs = false
-  for (const row of rows) {
+  let invalidRowCount = 0
+  for (const row of rows.slice(0, LOAD_ROW_LIMIT)) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) { invalidRowCount++; continue }
+    const rawMasterValue = Object.entries(row).find(([key]) => key.toUpperCase() === 'MASTER')?.[1]
+    const rawIncludeValue = Object.entries(row).find(([key]) => key.toUpperCase() === 'INCLUDE')?.[1]
+    if (typeof rawMasterValue !== 'string' || typeof rawIncludeValue !== 'string'
+      || !rawMasterValue.trim() || !rawIncludeValue.trim()) { invalidRowCount++; continue }
     const obsolete = Number(cellLoadText(row, 'OBSOLETE_IN_VERSION') || 0)
+    if (!Number.isFinite(obsolete)) { invalidRowCount++; continue }
     if (obsolete !== 0) continue
     const rawMaster = cellLoadText(row, 'MASTER')
     const rawInclude = cellLoadText(row, 'INCLUDE')
@@ -161,7 +182,12 @@ async function loadDirection(
   if (rows.length >= LOAD_ROW_LIMIT) {
     notes.push(`D010INC result hit the ${LOAD_ROW_LIMIT}-row cap; narrow the query for a complete picture.`)
   }
-  return [...edges.values()]
+  if (invalidRowCount) notes.push('Malformed D010INC rows were skipped; this read is incomplete.')
+  return {
+    edges: [...edges.values()],
+    collection: { status: rows.length >= LOAD_ROW_LIMIT ? 'truncated' : invalidRowCount ? 'partial' : 'ok',
+      rowCount: rows.length, rowLimit: LOAD_ROW_LIMIT, ...(invalidRowCount ? { invalidRowCount } : {}) }
+  }
 }
 
 /** 对象名 token 校验（大写 A-Z 0-9 _ /，与传输历史 API 同口径）。 */
@@ -184,11 +210,6 @@ function cellLoadText(row: Record<string, unknown>, columnName: string): string 
 /** SQL 字面量引用（token 已过白名单，引号包裹为纵深防御）。 */
 function quoteLoadToken(token: string): string {
   return `'${token.replace(/'/g, "''")}'`
-}
-
-function shortError(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error)
-  return text.length > 160 ? `${text.slice(0, 160)}…` : text
 }
 
 /**
@@ -271,7 +292,7 @@ export function createLoadGraphClient(client: {
   runQuery(sqlQuery: string, rowNumber?: number, decode?: boolean): Promise<{ values?: Record<string, unknown>[] }>
 }): LoadGraphClient {
   const runner: LoadGraphQueryRunner = async (sql, rowLimit) =>
-    (await client.runQuery(sql, rowLimit, true)) ?? { values: [] }
+    await client.runQuery(sql, rowLimit, true)
   return {
     getLoadGraph: input => getLoadGraph(runner, input)
   }

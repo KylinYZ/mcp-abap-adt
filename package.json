@@ -55,7 +55,8 @@
     "test:ddic-text-real-dev": "node ./scripts/ddic-text-elements-real-dev-smoke.mjs",
     "test:message-text-real-dev": "node ./scripts/message-text-real-dev-smoke.mjs",
     "test:recover-real-dev": "node ./scripts/recover-failed-create-real-dev-smoke.mjs",
-    "test:load-graph-real-dev": "node ./scripts/load-graph-real-dev-smoke.mjs"
+    "test:load-graph-real-dev": "node ./scripts/load-graph-real-dev-smoke.mjs",
+    "test:dependency-graph:offline": "node ./scripts/dependency-graph-offline-smoke.mjs"
   },
   "keywords": [
     "abap",
