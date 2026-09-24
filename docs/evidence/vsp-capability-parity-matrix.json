@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "generatedAt": "2026-09-22",
+ "generatedAt": "2026-09-24",
  "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
  "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
  "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
@@ -1111,10 +1111,12 @@
     ]
    },
    "mcp": {
-    "status": "PARTIAL",
+    "status": "MCP_SUPERSET",
     "taskPath": [
      "previewRepositoryObjectCleanup",
-     "getRepositoryObjectCleanupStatus"
+     "applyRepositoryObjectCleanup",
+     "getRepositoryObjectCleanupStatus",
+     "getRepositoryObjectCreationStatus"
     ],
     "profiles": [
      "development",
@@ -1123,15 +1125,16 @@
     "systemRoles": [
      "DEV"
     ],
-    "restrictionReason": "受控清理只针对已知 plan 与已验证对象；对来源不明的半成品遵循『结果未知即停止』边界，不做自动恢复删除。",
-    "liftCondition": "在保持未知结果停止边界的前提下，为失败创建补齐显式恢复任务后晋级。"
+    "restrictionReason": "recover-failed-create 受控恢复链已在真实 DEV 端到端验证（2026-09-24，scripts/recover-failed-create-real-dev-smoke.mjs，npm run test:recover-real-dev）：previewRepositoryObjectCleanup 新增 creationPlanId 绑定——必须命中本地失败创建计划（FAILED/OUTCOME_UNKNOWN/COMPENSATION_FAILED 三态，PREVIEWED/APPLYING/APPLIED/COMPENSATED/EXPIRED 一律 POLICY_DENIED）、目标身份与计划一致，才允许对半成品做 inactive 容错解析；apply 走同一受控删除链（重验证→锁→删→缺席→传输证据）。半成品删除后传输零登记以 NO_TRANSPORT_ENTRY_VERIFIED 收敛（仅恢复绑定计划放行，常规清理仍要求显式 D/中性登记）。比 VSP RECOVER_FAILED_CREATE 多 immutable plan、原生确认、absence 复核与来源计划溯源（recoveryOf）防误删来源不明对象。",
+    "liftCondition": ""
    },
    "priority": "P1",
    "evidence": [
     "source-audit",
-    "automation"
+    "automation",
+    "real-dev-verified"
    ],
-   "nextMilestone": "recover-failed-create-alignment"
+   "nextMilestone": ""
   },
   {
    "id": "crud.compare-source",
@@ -2194,7 +2197,8 @@
      "revisions",
      "transportInfo",
      "getCrHistory",
-     "getCoChange"
+     "getCoChange",
+     "getLoadGraph"
     ],
     "profiles": [
      "development",
@@ -2208,7 +2212,7 @@
      "QAS",
      "PRD"
     ],
-    "restrictionReason": "cr_history 与 co_change 子集已在真实 DEV 端到端验证（2026-09-18，证据 docs/evidence/transport-history-real-dev-verified.md）：getCrHistory 对 ZVCL_CAMPAIGN 返回任务 S4HK900010 → 请求 S4HK900009 层级、用户/日期，E070A CR 属性未配置记 notes；getCoChange 返回同请求共现对象频次排行（实测发现锁对象 ENQU EZVLOCK3 等真实共现）。第十八轮记录的 E071/E070 \"datapreview 受限\"实为会话查询预算耗尽假象（详见 img-activity 证据），复测即正常。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/loads/graph_stats 等图引擎类分析（需 pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
+    "restrictionReason": "cr_history、co_change 与 loads 三个子操作已在真实 DEV 端到端验证。cr_history/co_change（2026-09-18，docs/evidence/transport-history-real-dev-verified.md）：E071 R3TR+LIMU → E070 任务→请求层级 → 同请求共现频次排行。loads（2026-09-24，scripts/load-graph-real-dev-smoke.mjs，npm run test:load-graph-real-dev）：D010INC 编译期加载图——ZCL_MCP_SM21_ADT_HTTP 真机读回 26 条对象间加载边，填充池名归一化（ZCL_X====CP→CLAS、L<组>TOP→FUGR）、内核机器行（<SYSINI>/%_CABAP/~伴随池）与自包含行全过滤、up 方向全包含时 notes 如实标注；语义对照 VSP pkg/adt/loads.go + pkg/graph/builder_loads.go 逐函数移植。loads 是加载不是调用（INCLUDE 拆分依赖只在 D010INC 出现），notes 恒带语义声明。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 等图引擎类分析（pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。",
     "liftCondition": ""
    },
    "priority": "P2",
@@ -2586,10 +2590,11 @@
     ]
    },
    "mcp": {
-    "status": "PARTIAL",
+    "status": "MCP_SUPERSET",
     "taskPath": [
-     "previewDdicPropertyChange",
-     "applyDdicPropertyChange"
+     "previewMessageTextChange",
+     "applyMessageTextChange",
+     "getMessageTextChangeStatus"
     ],
     "profiles": [
      "development",
@@ -2598,12 +2603,14 @@
     "systemRoles": [
      "DEV"
     ],
-    "restrictionReason": "write_labels（数据元素四段标签）已由受控 DDIC 工作流（SET_DATA_ELEMENT_PROPERTIES：immutable plan→原生确认→部分更新+回填感知的逐路径 verify）真机验证（2026-09-22，test:ddic-text-real-dev，SAP 回填字段不参与比对）。write_message_texts（消息类文本写入）仍无任务路径——消息类受控创建已有，文本修改待立项。",
-    "liftCondition": "消息类文本受控写入任务（复用同一 immutable plan 模板）设计评审后晋级。"
+    "restrictionReason": "write_labels（数据元素四段标签）由受控 DDIC 工作流覆盖；write_message_texts 受控链（previewMessageTextChange/applyMessageTextChange/getMessageTextChangeStatus，MessageClassApi + MessageTextWorkflow）已在真实 DEV 端到端验证（2026-09-24，docs/evidence/message-text-write-real-dev-verified.md）：受控创建 → plan 冻结 → 对象 LOCK → PUT（application/* + query 对象锁句柄）→ readback → 同值短路 → 受控清理零残留。比 VSP WriteMessageClassTexts 多 immutable plan、原生确认、readback 核验与 UNKNOWN_OUTCOME 终止语义。真机协议实证：消息级 LOCK_MSG 与对象锁双向 EU510 互斥；PUT 的 Content-Type 必须为 application/*（mc 专用媒体类型会被服务端静默忽略）；GET Accept 须为裸媒体类型。",
+    "liftCondition": "把消息文本写入扩展为通用仓库文本变更任务（复用同一 immutable plan 模板）后进一步收敛。"
    },
    "priority": "P2",
    "evidence": [
-    "source-audit"
+    "source-audit",
+    "automation",
+    "real-dev-verified"
    ],
    "nextMilestone": ""
   },

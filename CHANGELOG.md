@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-09-24
+- VSP capability alignment advances from 51/71 to 54/71 (`MCP_SUPERSET=13`, `EQUIVALENT=41`, `PARTIAL=5`, `GAP=2`, `INTENTIONAL_RESTRICTION=10`, `UNVERIFIED=0`).
+- Add the controlled message-text write chain (`previewMessageTextChange` / `applyMessageTextChange` / `getMessageTextChangeStatus`): immutable plan, one native confirmation, object-lock + `application/*` PUT, readback verification, same-value short-circuit, and `UNKNOWN_OUTCOME` termination — promoting `i18n.write` to `MCP_SUPERSET` (evidence: `docs/evidence/message-text-write-real-dev-verified.md`). The real-DEV protocol findings are baked into the API: message-class PUT requires the object-level lock handle and a bare `application/*` content type (the mc-specific media type is silently ignored with HTTP 200), and message-level `LOCK_MSG` is mutually exclusive with the object lock in both directions.
+- Bind repository cleanup to failed creation plans: `previewRepositoryObjectCleanup` accepts an optional `creationPlanId` (state-gated to FAILED/OUTCOME_UNKNOWN/COMPENSATION_FAILED with target-identity matching) enabling recovery of half-created objects, including inactive-only shells via a frozen `recoveryVersion` resolution; deletion transport evidence converges as `NO_TRANSPORT_ENTRY_VERIFIED` for plan-bound recovery only — promoting `crud.recover-failed-create` to `MCP_SUPERSET` (evidence: `docs/evidence/recover-failed-create-real-dev-verified.md`). The unknown-outcome stop boundary is unchanged for objects without a plan binding.
+- Add `getLoadGraph` (read-only): the D010INC compile-time load graph with padded-pool normalization, sibling/containment/kernel-machinery row filtering, and both load directions — the `loads` sub-operation of `analysis.history`, verified on real DEV (script `npm run test:load-graph-real-dev`).
+- Bump the RFC transport fork dependency to `@kylinyz/open-rfc@0.2.4-kylin.2` (version-constant alignment in the node-rfc compatibility facade; no behavioral change).
+
 ## [0.8.3] - 2026-09-22
 - Switch the RFC transport dependency to the published fork `@kylinyz/open-rfc@0.2.4-kylin.1`, which carries the numeric/lowercase SAP logon-language-key fix (ZH -> "1" acceptance and case-preserving CPIC encoding). Behavior on this project's ISO two-character language path is unchanged; the fork package makes the fix available to direct-SAP-key callers as well.
 

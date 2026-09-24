@@ -219,7 +219,11 @@ function cleanupPreviewSchema(): ToolDefinition['inputSchema'] {
     properties: {
       objectKind: { type: 'string', enum: [...REPOSITORY_OBJECT_KINDS] },
       name: { type: 'string', minLength: 1, maxLength: 128 },
-      parentName: { type: 'string', minLength: 1, maxLength: 128, optional: true }
+      parentName: { type: 'string', minLength: 1, maxLength: 128, optional: true },
+      creationPlanId: {
+        type: 'string', minLength: 8, maxLength: 64, optional: true,
+        description: 'Bind this cleanup to one FAILED/OUTCOME_UNKNOWN/COMPENSATION_FAILED creation plan to recover its leftover (identity must match the plan target).'
+      }
     },
     required: ['objectKind', 'name'],
     additionalProperties: false

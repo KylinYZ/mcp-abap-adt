@@ -467,3 +467,138 @@ function cleanupClient(initial: Array<{ name: string; type: string; url: string 
   };
   return client as any;
 }
+
+describe('RepositoryObjectCleanupWorkflow recovery binding (recover-failed-create)', () => {
+  // 失败创建计划查询的 mock：按 planId 返回不同状态的计划（字面量联合，不拓宽）
+  const creationPlans = {
+    view: jest.fn((id: string) => {
+      const plans = {
+        'aaaaaaaa-1111-4111-8111-0000000000f1': { status: 'FAILED' as const, target: { objectKind: 'PROGRAM' as const, objectName: 'ZVPROG9' }, primaryError: { code: 'REMOTE_WRITE_FAILED' } },
+        'bbbbbbbb-2222-4222-8222-0000000000f2': { status: 'OUTCOME_UNKNOWN' as const, target: { objectKind: 'PROGRAM' as const, objectName: 'ZVPROG9' }, primaryError: { code: 'UNKNOWN_OUTCOME' } },
+        'cccccccc-3333-4333-8333-0000000000f3': { status: 'COMPENSATION_FAILED' as const, target: { objectKind: 'PROGRAM' as const, objectName: 'ZVPROG9' } },
+        'dddddddd-4444-4444-8444-0000000000f4': { status: 'APPLIED' as const, target: { objectKind: 'PROGRAM' as const, objectName: 'ZVPROG9' } },
+        'eeeeeeee-5555-4555-8555-0000000000f5': { status: 'FAILED' as const, target: { objectKind: 'PROGRAM' as const, objectName: 'ZVOTHER' } }
+      };
+      const plan = plans[id as keyof typeof plans];
+      if (!plan) {
+        throw Object.assign(new Error('Repository creation plan was not found.'), { code: 'PLAN_NOT_FOUND', stage: 'creation-plan' });
+      }
+      return plan;
+    })
+  };
+
+  function recoveryWorkflow(client: ReturnType<typeof cleanupClient>, planId: string) {
+    return new RepositoryObjectCleanupWorkflow(
+      client,
+      new RepositoryObjectCreationRegistry(INITIAL_REPOSITORY_CREATION_CAPABILITIES),
+      validationContext,
+      new RepositoryObjectCleanupPlanStore(60_000, () => 1_000, () => planId),
+      creationPlans
+    );
+  }
+
+  beforeEach(() => creationPlans.view.mockClear());
+
+  it('binds a FAILED creation plan, freezes inactive-only leftovers, and records recovery provenance', async () => {
+    // 半成品从未激活：active 结构读取失败，容错回退 inactive 并冻结 recoveryVersion
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    const originalStructure = client.objectStructure.getMockImplementation()!;
+    client.objectStructure.mockImplementation(async (url: string, version?: string) => {
+      if (version === 'active') throw new Error('Object ZVPROG9 has no active version');
+      return originalStructure(url, version);
+    });
+    const workflow = recoveryWorkflow(client, 'recovery-1');
+
+    const preview = await workflow.preview({
+      objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1'
+    }) as any;
+    expect(preview.plan.recoveryOf).toMatchObject({
+      creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1', creationPlanStatus: 'FAILED', primaryErrorCode: 'REMOTE_WRITE_FAILED'
+    });
+    expect(preview.review.recoveryOf).toMatchObject({ creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1' });
+    expect(preview.plan.target).toMatchObject({ objectName: 'ZVPROG9', recoveryVersion: 'inactive' });
+
+    // apply：按冻结的 inactive 版本重解析（不再触发 active 回退），删除 + 缺席 + 传输证据
+    await expect(workflow.apply('recovery-1')).resolves.toMatchObject({ status: 'success', plan: { status: 'COMPLETED' } });
+    expect(client.objectStructure.mock.calls.some(([, version]: any) => version === 'inactive')).toBe(true);
+    expect(client.deleteObject).toHaveBeenCalledTimes(1);
+    expect(workflow.status('recovery-1')).toMatchObject({
+      status: 'COMPLETED',
+      recoveryOf: { creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1', creationPlanStatus: 'FAILED' }
+    });
+  });
+
+  it('binds OUTCOME_UNKNOWN and COMPENSATION_FAILED plans without an inactive fallback when active exists', async () => {
+    for (const planId of ['bbbbbbbb-2222-4222-8222-0000000000f2', 'cccccccc-3333-4333-8333-0000000000f3']) {
+      const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+      const workflow = recoveryWorkflow(client, `recovery-${planId.slice(0, 8)}`);
+      const preview = await workflow.preview({
+        objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: planId
+      }) as any;
+      expect(preview.plan.recoveryOf.creationPlanStatus).toBe(planId.startsWith('bbbbbbbb') ? 'OUTCOME_UNKNOWN' : 'COMPENSATION_FAILED');
+      // 对象 active 可解析：不回退、不冻结 recoveryVersion
+      expect(preview.plan.target.recoveryVersion).toBeUndefined();
+    }
+  });
+
+  it('rejects binding to plans that are not failed creations', async () => {
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    const workflow = recoveryWorkflow(client, 'recovery-applied');
+    await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'dddddddd-4444-4444-8444-0000000000f4' }))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'cleanup-recovery' });
+    expect(client.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('rejects binding when the cleanup target does not match the plan target', async () => {
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    const workflow = recoveryWorkflow(client, 'recovery-other');
+    await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'eeeeeeee-5555-4555-8555-0000000000f5' }))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', stage: 'cleanup-recovery' });
+    // 清理目标与计划目标不一致时连解析都不该发生
+    expect(client.searchObject).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed plan ids and unknown plans', async () => {
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    const workflow = recoveryWorkflow(client, 'recovery-bad');
+    await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'not a plan id!' }))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', stage: 'cleanup-input' });
+    await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'ffffffff-6666-4666-8666-0000000000f6' }))
+      .rejects.toMatchObject({ code: 'PLAN_NOT_FOUND' });
+  });
+
+  it('accepts zero transport entries as recovery evidence only for plan-bound recovery', async () => {
+    // 半成品（从未激活的创建）删除后传输内容不变：恢复绑定计划以 absence + 零登记收敛；
+    // 常规清理（无绑定）仍拒绝零登记证据。
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    // 删除后传输里完全没有该对象的任何条目
+    client.transportDetails.mockImplementation(async () => ({
+      'tm:status': 'D', objects: [], tasks: []
+    }));
+    const bound = recoveryWorkflow(client, 'recovery-noentry');
+    const preview = await bound.preview({
+      objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1'
+    }) as any;
+    await expect(bound.apply(preview.plan.cleanupPlanId)).resolves.toMatchObject({
+      status: 'success',
+      plan: { status: 'COMPLETED_LOCAL_ABSENCE', transportDisposition: 'NO_TRANSPORT_ENTRY_VERIFIED' }
+    });
+
+    const plainClient = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    plainClient.transportDetails.mockImplementation(async () => ({
+      'tm:status': 'D', objects: [], tasks: []
+    }));
+    const plain = cleanupWorkflow(plainClient, 'plain-noentry');
+    await plain.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9' });
+    await expect(plain.apply('plain-noentry')).rejects.toMatchObject({
+      code: 'VERIFICATION_FAILED', stage: 'cleanup-transport'
+    });
+  });
+
+  it('stays unavailable when no creation plan store is wired', async () => {
+    const client = cleanupClient([{ name: 'ZVPROG9', type: 'PROG/P', url: '/programs/zvprog9' }]);
+    const workflow = cleanupWorkflow(client, 'recovery-unwired');
+    await expect(workflow.preview({ objectKind: 'PROGRAM', name: 'ZVPROG9', creationPlanId: 'aaaaaaaa-1111-4111-8111-0000000000f1' }))
+      .rejects.toMatchObject({ code: 'POLICY_DENIED', stage: 'cleanup-recovery' });
+  });
+});

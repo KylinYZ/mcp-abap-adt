@@ -38,6 +38,17 @@ export const CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES = new Set([
 
 // 受控对象克隆链（crud.clone-object 一站式工作流）：与受控创建/激活同面的
 // DEV 受控 profiles 专属链，任何一环不在 QAS/PRD/未知角色下面世。
+/**
+ * 受控消息类文本写入工具集合（i18n.write 的 write_message_texts）：
+ * preview（只读读现文本+冻结 plan）→ apply（原生确认后 stateful 锁链单次执行）
+ * → status（本地查询）。仅 DEV 角色 + development/development-workbench。
+ */
+export const CONTROLLED_MESSAGE_TEXT_TOOL_NAMES = new Set([
+  'previewMessageTextChange',
+  'applyMessageTextChange',
+  'getMessageTextChangeStatus'
+]);
+
 export const CONTROLLED_CLONE_TOOL_NAMES = new Set([
   'previewCloneObject',
   'applyCloneObject',
@@ -69,7 +80,8 @@ const LOCAL_TOOL_NAMES = new Set([
   'healthcheck', 'getAbapChangeStatus', 'getAbapObjectCreationStatus',
   'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
-  'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus'
+  'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus',
+  'getMessageTextChangeStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -121,6 +133,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'checkAmdpDebugger',
   // 受控描述修改 preview（crud.set-description）：只读预检，不触碰写路径
   'previewDescriptionChange',
+  // 受控消息文本 preview（i18n.write 的 write_message_texts）：只读读现文本+冻结 plan
+  'previewMessageTextChange',
   // 受控对象克隆 preview（crud.clone-object 一站式）：只读预检（源码快照+
   // 本地声明改名），不触碰写路径
   'previewCloneObject',
@@ -158,6 +172,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 传输历史只读二工具（矩阵 analysis.history 行子集）：E071/E070 自由 SQL
   //（真机复测可用）；VSP 图引擎类 impact/boundaries 不在子集
   'getCrHistory', 'getCoChange',
+  // D010INC 加载图只读（analysis.history 的 loads 子操作，纯 SQL 无图引擎）
+  'getLoadGraph',
   // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
   // 无副作用系统 RFM 探测、只读表读取、FM 接口元数据描述、受控只读 RFM 调用
   //（callRfm 的安全面由协议层只读 allowlist 硬门收窄，白名单外一律拒绝）
@@ -200,6 +216,9 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'runUnitCoverage',
   // 受控描述修改 apply（crud.set-description）：repository 写入，受控链单次执行
   'applyDescriptionChange',
+  // 受控消息文本 apply（i18n.write 的 write_message_texts）：repository 写入，
+  // stateful 锁链单次执行
+  'applyMessageTextChange',
   // 受控对象克隆 apply（crud.clone-object 一站式）：委托受控创建链的 repository
   // 写入，单确认单执行
   'applyCloneObject',
@@ -240,6 +259,7 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_ACTIVATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_CLONE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_RENAME_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  if (CONTROLLED_MESSAGE_TEXT_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
@@ -320,6 +340,16 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled object rename requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控消息文本写入链（i18n.write 的 write_message_texts）：仅 DEV +
+  // development/development-workbench；stateful 锁链单次执行。
+  if (CONTROLLED_MESSAGE_TEXT_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled message text write requires DEV development or development-workbench profile.'
     );
   }
   if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)

@@ -125,6 +125,9 @@ import { createAmdpDiscoveryClient } from './adt/AmdpDiscoveryApi.js';
 import { AmdpDiscoveryHandlers } from './handlers/AmdpDiscoveryHandlers.js';
 import { DescriptionChangeHandlers } from './handlers/DescriptionChangeHandlers.js';
 import { DescriptionChangeWorkflow, bindDescriptionPorts } from './safe/DescriptionChangeWorkflow.js';
+import { MessageTextWorkflow } from './safe/MessageTextWorkflow.js';
+import { MessageTextHandlers } from './handlers/MessageTextHandlers.js';
+import { bindMessageClassPorts } from './adt/MessageClassApi.js';
 import { CloneObjectHandlers } from './handlers/CloneObjectHandlers.js';
 import { CloneObjectWorkflow } from './safe/CloneObjectWorkflow.js';
 import { RenameControlledHandlers } from './handlers/RenameControlledHandlers.js';
@@ -153,6 +156,8 @@ import { TransactionReadHandlers } from './handlers/TransactionReadHandlers.js';
 import { InstallDiagnosticsHandlers } from './handlers/InstallDiagnosticsHandlers.js';
 import { KnowledgeQueriesHandlers } from './handlers/KnowledgeQueriesHandlers.js';
 import { TransportHistoryHandlers } from './handlers/TransportHistoryHandlers.js';
+import { LoadGraphHandlers } from './handlers/LoadGraphHandlers.js';
+import { createLoadGraphClient } from './adt/LoadGraphApi.js';
 import { DumpAnalysisHandlers } from './handlers/DumpAnalysisHandlers.js';
 import { selectEnvironmentFile } from './config/EnvironmentFile.js';
 import { RuntimeDumpReader } from './read/RuntimeDumpReader.js';
@@ -199,6 +204,7 @@ export class AbapAdtServer extends Server {
   private spoolJobHandlers: SpoolJobHandlers;
   private amdpDiscoveryHandlers: AmdpDiscoveryHandlers;
   private descriptionChangeHandlers: DescriptionChangeHandlers;
+  private messageTextHandlers: MessageTextHandlers;
   private cloneObjectHandlers: CloneObjectHandlers;
   private renameControlledHandlers: RenameControlledHandlers;
   private messageClassReadHandlers: MessageClassReadHandlers;
@@ -209,6 +215,7 @@ export class AbapAdtServer extends Server {
   private installDiagnosticsHandlers: InstallDiagnosticsHandlers;
   private knowledgeQueriesHandlers: KnowledgeQueriesHandlers;
   private transportHistoryHandlers: TransportHistoryHandlers;
+  private loadGraphHandlers: LoadGraphHandlers;
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
   private focusedTaskHandlers: FocusedTaskHandlers;
@@ -410,6 +417,9 @@ export class AbapAdtServer extends Server {
     // 传输历史只读二工具（analysis.history 子集）：E071/E070 自由 SQL（真机
     // 复测可用——早前"受限"为 datapreview 会话预算耗尽的叠加假象）。
     this.transportHistoryHandlers = new TransportHistoryHandlers(createTransportHistoryClient(readClient));
+    // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：编译期加载
+    // 关系（INCLUDE 拆分依赖），datapreview SQL 通道同款只读。
+    this.loadGraphHandlers = new LoadGraphHandlers(createLoadGraphClient(readClient));
     // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：open-rfc 直连
     // SAP 网关（node:net，无 SDK），连接参数由既有 ADT 环境推导（主机/
     // client/凭据同源，实例号经 RFC_SYSNR 覆盖，缺省 '01' 与专用 DEV
@@ -449,6 +459,18 @@ export class AbapAdtServer extends Server {
       supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
       elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
     });
+    // 受控消息类文本写入（i18n.write 的 write_message_texts）：与描述链同面的
+    // 受控写工作流（plan + 原生确认 + stateful 锁链单次执行 + readback）。
+    const messageTextWorkflow = new MessageTextWorkflow({
+      http: descriptionPorts.http,
+      locks: bindMessageClassPorts(this.adtClient as never).locks,
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    } as never);
+    this.messageTextHandlers = new MessageTextHandlers(messageTextWorkflow, {
+      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+    });
 
     const changeWorkflow = new AbapChangeWorkflow(
       this.adtClient,
@@ -470,15 +492,16 @@ export class AbapAdtServer extends Server {
       ),
       auditLogger
     );
+    const repositoryCreationPlanStore = new RepositoryObjectCreationPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
     const repositoryCreationWorkflow = new RepositoryObjectCreationWorkflow(
       repositoryCreationRegistry,
       repositoryCreationContext,
-      new RepositoryObjectCreationPlanStore(
-        this.safetyPolicy.planTtlMs,
-        () => Date.now(),
-        undefined,
-        this.guardrails.changePlanMaxEntries
-      ),
+      repositoryCreationPlanStore,
       [
         new AbapSourceCreationAdapter('PROGRAM', creationWorkflow),
         new FunctionGroupCreationAdapter(creationWorkflow),
@@ -530,7 +553,8 @@ export class AbapAdtServer extends Server {
         () => Date.now(),
         undefined,
         this.guardrails.changePlanMaxEntries
-      )
+      ),
+      repositoryCreationPlanStore
     );
     this.repositoryObjectCreationHandlers = new RepositoryObjectCreationHandlers(
       repositoryCreationRegistry,
@@ -824,6 +848,7 @@ export class AbapAdtServer extends Server {
       ...this.safeAdvancedHandlers.getTools(),
       ...this.repositoryObjectCreationHandlers.getTools(true),
       ...this.descriptionChangeHandlers.getTools(),
+      ...this.messageTextHandlers.getTools(),
       ...this.cloneObjectHandlers.getTools(),
       ...this.renameControlledHandlers.getTools()
     ];
@@ -860,6 +885,7 @@ export class AbapAdtServer extends Server {
       ...this.installDiagnosticsHandlers.getTools(),
       ...this.knowledgeQueriesHandlers.getTools(),
       ...this.transportHistoryHandlers.getTools(),
+      ...this.loadGraphHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
@@ -1035,6 +1061,10 @@ export class AbapAdtServer extends Server {
         if (this.safetyPolicy.toolProfile !== 'safe' && this.transportHistoryHandlers.supports(toolName)) {
           return this.transportHistoryHandlers.handle(toolName, limitedArguments);
         }
+        // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.loadGraphHandlers.supports(toolName)) {
+          return this.loadGraphHandlers.handle(toolName, limitedArguments);
+        }
         // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：全只读，同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.rfcProbeHandlers.supports(toolName)) {
           return this.rfcProbeHandlers.handle(toolName, limitedArguments);
@@ -1064,6 +1094,10 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.descriptionChangeHandlers.supports(toolName)) {
           return this.descriptionChangeHandlers.handle(toolName, limitedArguments);
+        }
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.messageTextHandlers.supports(toolName)) {
+          return this.messageTextHandlers.handle(toolName, limitedArguments);
         }
         // 受控对象克隆链：profile/role 门控已由 assertToolOperationAllowed 前置把关，
         // catalog 成员检查保证非 development/development-workbench profile 不可见。

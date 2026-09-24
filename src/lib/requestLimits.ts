@@ -34,7 +34,7 @@ const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
   ],
   applyRepositoryObjectCreation: ['creationPlanId'],
   getRepositoryObjectCreationStatus: ['creationPlanId'],
-  previewRepositoryObjectCleanup: ['objectKind', 'name', 'parentName'],
+  previewRepositoryObjectCleanup: ['objectKind', 'name', 'parentName', 'creationPlanId'],
   applyRepositoryObjectCleanup: ['cleanupPlanId'],
   getRepositoryObjectCleanupStatus: ['cleanupPlanId'],
   previewDdicPropertyChange: ['operation'],

@@ -45,7 +45,7 @@ Git 仓库或对话输出：
        "mcpServers": {
          "abap-ai-workbench-mcp": {
            "command": "npx",
-           "args": ["-y", "abap-ai-workbench-mcp@0.8.1"],
+           "args": ["-y", "abap-ai-workbench-mcp@0.8.4"],
            "env": { "SAP_MCP_ENV_FILE": "<第3步的私有环境文件绝对路径>" }
          }
        }
@@ -55,8 +55,8 @@ Git 仓库或对话输出：
 
 5. 验证（不通过不得报告完成）
    - 手动拉起一次服务进程确认能启动（SAP_URL 可达性不阻塞启动）：
-     npx -y abap-ai-workbench-mcp@0.8.1，观察无启动报错后退出。
-   - 重启我的 MCP 客户端后，列出工具清单：focused 入口应有 146 个工具；
+     npx -y abap-ai-workbench-mcp@0.8.4，观察无启动报错后退出。
+   - 重启我的 MCP 客户端后，列出工具清单：focused 入口应有 150 个工具；
      抽查 healthcheck 返回 healthy 且 configuredTarget.toolProfile 正确。
    - 用 healthcheck 与一次最小只读调用（如 searchObject 一个已知对象）做
      连通验证；写类工具一律不得在验证阶段调用。
@@ -72,10 +72,10 @@ Git 仓库或对话输出：
 
 - **给 agent 的最小变体**：如果只想让 agent 改已有配置（例如从旧包名迁移），
   只发第 4-6 步，并附上一句"把现有的 @kylinyz/mcp-abap-abap-adt-api 配置
-  迁移到 abap-ai-workbench-mcp@0.8.1，环境文件路径不变"。
+  迁移到 abap-ai-workbench-mcp@0.8.4，环境文件路径不变"。
 - **旧包名迁移**：`@kylinyz/mcp-abap-abap-adt-api` 已 deprecate，npm 安装时
   会提示改用 `abap-ai-workbench-mcp`；配置迁移只需替换 npx 参数中的包名。
 - **安全边界**：提示词刻意让 agent 把凭据限制在仓库外的私有环境文件中、
   用固定版本号、验证阶段只做只读调用。不要放松这三点。
-- 工具数基线（0.8.1）：focused/developer = development-workbench = 146，
-  business = 18，operations = 48，expert = 202。
+- 工具数基线（0.8.4）：focused/developer = development-workbench = 150，
+  business = 18，operations = 49，expert = 203。

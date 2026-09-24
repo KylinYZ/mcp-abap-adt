@@ -3,8 +3,11 @@ import type { AbapObjectStructure, SearchResult, TransportInfo, TransportObject,
 import { SafeAbapError, errorMessage } from './errors.js';
 import type { RepositoryObjectCleanupPlanStore } from './RepositoryObjectCleanupPlanStore.js';
 import type { RepositoryObjectCreationRegistry } from './RepositoryObjectCreationRegistry.js';
-import type { RepositoryCreationContext, RepositoryObjectKind } from './repositoryCreationTypes.js';
-import type { RepositoryCleanupPlan, RepositoryCleanupPlanView, RepositoryCleanupResource } from './repositoryCleanupTypes.js';
+import type { RepositoryCreationContext, RepositoryCreationPlanStatus, RepositoryObjectKind } from './repositoryCreationTypes.js';
+import type {
+  RepositoryCleanupPlan, RepositoryCleanupPlanView, RepositoryCleanupResource,
+  RepositoryCleanupRecoveryProvenance
+} from './repositoryCleanupTypes.js';
 
 interface RepositoryCleanupAdtClient {
   searchObject(query: string, objType?: string, max?: number): Promise<SearchResult[]>;
@@ -18,15 +21,32 @@ interface RepositoryCleanupAdtClient {
   deleteObject(objectUrl: string, lockHandle: string, transport?: string): Promise<void>;
 }
 
+/** 失败创建计划查询的窄视图（RepositoryObjectCreationPlanStore.view 结构兼容）。 */
+export interface RecoverableCreationPlanLookup {
+  view(creationPlanId: string, context: RepositoryCreationContext): {
+    status: RepositoryCreationPlanStatus;
+    target: { objectKind: RepositoryObjectKind; objectName: string; parentName?: string };
+    primaryError?: { code?: string };
+  };
+}
+
+/** 可恢复的失败创建计划状态：半成品可能残留的终态。
+ *  PREVIEWED/APPLYING 未产生对象；APPLIED 是成功创建（清理由普通清理承担）；
+ *  COMPENSATED 已自愈；EXPIRED 未执行——均不可作为恢复依据。 */
+const RECOVERABLE_CREATION_STATUSES: ReadonlySet<RepositoryCreationPlanStatus> = new Set([
+  'FAILED', 'OUTCOME_UNKNOWN', 'COMPENSATION_FAILED'
+]);
+
 class RepositoryCleanupOutcomeUnknownError extends Error {}
-type CleanupTransportDisposition = 'DELETION_ENTRY_VERIFIED' | 'NEUTRAL_ENTRIES_VERIFIED';
+type CleanupTransportDisposition = 'DELETION_ENTRY_VERIFIED' | 'NEUTRAL_ENTRIES_VERIFIED' | 'NO_TRANSPORT_ENTRY_VERIFIED';
 
 export class RepositoryObjectCleanupWorkflow {
   constructor(
     private readonly client: RepositoryCleanupAdtClient,
     private readonly registry: RepositoryObjectCreationRegistry,
     private readonly context: RepositoryCreationContext,
-    private readonly plans: RepositoryObjectCleanupPlanStore
+    private readonly plans: RepositoryObjectCleanupPlanStore,
+    private readonly creationPlans?: RecoverableCreationPlanLookup
   ) {}
 
   async preview(request: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -35,8 +55,14 @@ export class RepositoryObjectCleanupWorkflow {
     const objectName = repositoryName(request.name, 'name');
     const parentName = request.parentName === undefined ? undefined : repositoryName(request.parentName, 'parentName');
     this.assertValidationIdentity(objectKind, objectName, parentName);
+    // recover-failed-create：显式绑定一次失败的创建计划（可选）。绑定成功才允许
+    // 对半成品做 inactive 容错解析；来源不明对象依旧拒绝（结果未知即停止）。
+    const recovery = this.bindRecoveryPlan(request.creationPlanId, objectKind, objectName, parentName);
     const capability = this.registry.describe(objectKind, this.context);
-    const target = await this.resolveResource(objectKind, objectName, capability.adtType, undefined, parentName);
+    const target = await this.resolveResource(
+      objectKind, objectName, capability.adtType, undefined, parentName,
+      recovery ? { allowInactiveFallback: true } : undefined
+    );
     const resources: RepositoryCleanupResource[] = [];
 
     // A root SAP object type owns its same-name node; freeze child-first deletion server-side.
@@ -67,7 +93,8 @@ export class RepositoryObjectCleanupWorkflow {
       resources,
       transportRequest: String(this.context.realDevValidationTransport || ''),
       dependencySummary: resources.map(resource => `${resource.objectKind} ${resource.objectName}`),
-      summary: `Delete SAP object${resources.length === 1 ? '' : 's'} ${resources.map(resource => `${resource.objectKind} ${resource.objectName}`).join(' -> ')}.`
+      summary: `Delete SAP object${resources.length === 1 ? '' : 's'} ${resources.map(resource => `${resource.objectKind} ${resource.objectName}`).join(' -> ')}.`,
+      ...(recovery ? { recoveryOf: recovery } : {})
     };
     const serialized = JSON.stringify(prepared);
     const plan = this.plans.create(this.context, prepared, {
@@ -82,9 +109,56 @@ export class RepositoryObjectCleanupWorkflow {
         objectName,
         packageName: target.packageName,
         transportRequest: prepared.transportRequest,
-        cleanupOrder: plan.cleanupOrder
+        cleanupOrder: plan.cleanupOrder,
+        ...(recovery ? { recoveryOf: recovery } : {})
       },
       confirmationRequired: true
+    };
+  }
+
+  /** 绑定恢复来源计划：必须存在于本地 plan 记录、处于可恢复失败态、且清理目标
+   *  与计划目标完全一致。三个条件把"来源不明的半成品"挡在门外。 */
+  private bindRecoveryPlan(
+    creationPlanId: unknown,
+    objectKind: RepositoryObjectKind,
+    objectName: string,
+    parentName?: string
+  ): RepositoryCleanupRecoveryProvenance | undefined {
+    if (creationPlanId === undefined || creationPlanId === null || creationPlanId === '') return undefined;
+    const planId = String(creationPlanId).trim();
+    if (!/^[0-9a-fA-F-]{8,64}$/.test(planId)) {
+      throw new SafeAbapError('VALIDATION_FAILED', 'cleanup-input', 'creationPlanId must be a repository creation plan id.');
+    }
+    if (!this.creationPlans) {
+      throw new SafeAbapError('POLICY_DENIED', 'cleanup-recovery', 'Recovery binding is unavailable in this deployment.');
+    }
+    const plan = this.creationPlans.view(planId, this.context);
+    if (!RECOVERABLE_CREATION_STATUSES.has(plan.status)) {
+      throw new SafeAbapError(
+        'POLICY_DENIED', 'cleanup-recovery',
+        `Creation plan is ${plan.status}; recovery binding requires a failed creation (FAILED/OUTCOME_UNKNOWN/COMPENSATION_FAILED).`
+      );
+    }
+    const planParent = plan.target.parentName || '';
+    if (plan.target.objectKind !== objectKind || plan.target.objectName !== objectName) {
+      throw new SafeAbapError(
+        'VALIDATION_FAILED', 'cleanup-recovery',
+        'Cleanup target does not match the bound creation plan target.'
+      );
+    }
+    // legacy 适配器（PROGRAM/FUNCTION_MODULE 等）把包名填进 target.parentName，
+    // 与清理语义的 parentName（函数组父级）不同义——仅在清理请求显式提供且
+    // 与计划不符时拒绝，避免误杀正常恢复绑定。
+    if (parentName !== undefined && planParent !== parentName) {
+      throw new SafeAbapError(
+        'VALIDATION_FAILED', 'cleanup-recovery',
+        'Cleanup parent does not match the bound creation plan parent.'
+      );
+    }
+    return {
+      creationPlanId: planId,
+      creationPlanStatus: plan.status,
+      ...(plan.primaryError?.code ? { primaryErrorCode: plan.primaryError.code } : {})
     };
   }
 
@@ -114,13 +188,15 @@ export class RepositoryObjectCleanupWorkflow {
       }
       const dispositions: CleanupTransportDisposition[] = [];
       for (const resource of resources) {
-        const disposition = await this.classifyTransportEvidence(resource, plan.transportRequest);
+        const disposition = await this.classifyTransportEvidence(resource, plan.transportRequest, Boolean(plan.recoveryOf));
         dispositions.push(disposition);
         this.record(
           plan,
           disposition === 'DELETION_ENTRY_VERIFIED'
             ? 'TRANSPORT_DELETION_ENTRY_VERIFIED'
-            : 'TRANSPORT_NEUTRAL_ENTRY_VERIFIED',
+            : disposition === 'NEUTRAL_ENTRIES_VERIFIED'
+              ? 'TRANSPORT_NEUTRAL_ENTRY_VERIFIED'
+              : 'TRANSPORT_NO_ENTRY_VERIFIED',
           true,
           `${resource.objectKind} ${resource.objectName}`
         );
@@ -141,8 +217,7 @@ export class RepositoryObjectCleanupWorkflow {
           transportDisposition === 'DELETION_ENTRY_VERIFIED' ? 'COMPLETED' : 'COMPLETED_LOCAL_ABSENCE',
           { resultSummary, transportDisposition }
         )
-      };
-    } catch (error) {
+      };    } catch (error) {
       if (error instanceof RepositoryCleanupOutcomeUnknownError) {
         const settled = this.plans.settle(plan.cleanupPlanId, 'OUTCOME_UNKNOWN', {
           primaryError: { code: 'UNKNOWN_OUTCOME', stage: 'cleanup-delete', message: errorMessage(error) }
@@ -187,7 +262,8 @@ export class RepositoryObjectCleanupWorkflow {
     objectName: string,
     adtType: string,
     existing?: SearchResult,
-    parentName?: string
+    parentName?: string,
+    resolution?: { allowInactiveFallback?: boolean; preferredVersion?: 'active' | 'inactive' }
   ): Promise<RepositoryCleanupResource> {
     const result = existing || await this.findExact(objectName, adtType);
     if (!result) {
@@ -210,7 +286,18 @@ export class RepositoryObjectCleanupWorkflow {
       packageName = objectName;
     }
     const objectUrl = result['adtcore:uri'];
-    const structure = await this.client.objectStructure(objectUrl, 'active');
+    // 身份断言版本：恢复清理允许 active 缺失时回退 inactive（半成品通常从未激活）；
+    // 常规清理维持 active-only 语义不放宽。
+    const preferredVersion = resolution?.preferredVersion ?? 'active';
+    let recoveryVersion: 'active' | 'inactive' | undefined;
+    let structure: AbapObjectStructure;
+    try {
+      structure = await this.client.objectStructure(objectUrl, preferredVersion);
+    } catch (error) {
+      if (!(preferredVersion === 'active' && resolution?.allowInactiveFallback)) throw error;
+      structure = await this.client.objectStructure(objectUrl, 'inactive');
+      recoveryVersion = 'inactive';
+    }
     const metadata = structure.metaData;
     if (String(metadata['adtcore:name'] || '').toUpperCase() !== objectName
       || String(metadata['adtcore:type'] || '').toUpperCase() !== adtType) {
@@ -235,7 +322,8 @@ export class RepositoryObjectCleanupWorkflow {
       transportProgramId: String(info.PGMID || info.LOCKS?.OBJECT_KEY?.PGMID || ''),
       transportObjectType: String(info.OBJECT || info.LOCKS?.OBJECT_KEY?.OBJECT || ''),
       transportObjectName: String(info.OBJECTNAME || info.LOCKS?.OBJECT_KEY?.OBJ_NAME || objectName).toUpperCase(),
-      ...(transportIdentityAliases ? { transportIdentityAliases } : {})
+      ...(transportIdentityAliases ? { transportIdentityAliases } : {}),
+      ...(recoveryVersion ? { recoveryVersion } : {})
     };
   }
 
@@ -264,13 +352,20 @@ export class RepositoryObjectCleanupWorkflow {
   }
 
   private async revalidateResource(resource: RepositoryCleanupResource): Promise<void> {
+    // 恢复清理冻结的 inactive 半成品按同一版本偏好重解析（防止 apply 间状态漂移）
     const current = await this.resolveResource(
       resource.objectKind,
       resource.objectName,
       resource.adtType,
       undefined,
-      resource.parentName
+      resource.parentName,
+      resource.recoveryVersion === 'inactive'
+        ? { preferredVersion: 'inactive' }
+        : undefined
     );
+    // 冻结时带 recoveryVersion 的资源，比较口径必须一致（重解析按同一版本偏好
+    // 成功即视为同态；若对象在此期间被激活，inactive 读取会失败并安全终止）
+    if (resource.recoveryVersion) current.recoveryVersion = resource.recoveryVersion;
     current.cleanupMode = resource.cleanupMode || 'DIRECT';
     if (resource.transportCompanionKeys?.length) {
       current.transportCompanionKeys = await this.resolveTransportCompanionKeys(
@@ -343,7 +438,11 @@ export class RepositoryObjectCleanupWorkflow {
     }
   }
 
-  private async classifyTransportEvidence(resource: RepositoryCleanupResource, transportRequest: string): Promise<CleanupTransportDisposition> {
+  private async classifyTransportEvidence(
+    resource: RepositoryCleanupResource,
+    transportRequest: string,
+    allowNoEntryEvidence: boolean
+  ): Promise<CleanupTransportDisposition> {
     const details = await this.client.transportDetails(transportRequest);
     assertTransportOpen(details);
     const entries = [...(details.objects || []), ...(details.tasks || []).flatMap(task => task.objects || [])];
@@ -352,9 +451,10 @@ export class RepositoryObjectCleanupWorkflow {
       objectType: resource.transportObjectType || resource.adtType.split('/')[0],
       objectName: resource.transportObjectName
     }, ...(resource.transportCompanionKeys || [])]);
-    const dispositions = keyGroups.map(keys => classifyTransportKeyGroup(entries, keys));
+    const dispositions = keyGroups.map(keys => classifyTransportKeyGroup(entries, keys, allowNoEntryEvidence));
     if (dispositions.every(item => item === 'DELETION_ENTRY_VERIFIED')) return 'DELETION_ENTRY_VERIFIED';
     if (dispositions.every(item => item === 'NEUTRAL_ENTRIES_VERIFIED')) return 'NEUTRAL_ENTRIES_VERIFIED';
+    if (dispositions.every(item => item === 'NO_TRANSPORT_ENTRY_VERIFIED')) return 'NO_TRANSPORT_ENTRY_VERIFIED';
     throw new SafeAbapError(
       'VERIFICATION_FAILED',
       'cleanup-transport',
@@ -453,11 +553,22 @@ function expandCleanupTransportKeyAliases(
 
 function classifyTransportKeyGroup(
   entries: TransportObject[],
-  keys: Array<{ programId: string; objectType: string; objectName: string }>
+  keys: Array<{ programId: string; objectType: string; objectName: string }>,
+  allowNoEntryEvidence: boolean
 ): CleanupTransportDisposition {
   const matching = entries.filter(entry => (
     keys.some(key => transportKeyMatches(entry, key))
   ));
+  // 零登记：半成品（从未激活的创建）删除后传输内容不变——仅恢复绑定计划接受
+  // 该证据形态（absence 复核已独立证明删除生效），常规清理仍要求显式登记。
+  if (matching.length === 0) {
+    if (allowNoEntryEvidence) return 'NO_TRANSPORT_ENTRY_VERIFIED';
+    throw new SafeAbapError(
+      'VERIFICATION_FAILED',
+      'cleanup-transport',
+      'The validation transport must retain exactly one matching deletion entry or one neutral same-transport entry after cleanup.'
+    );
+  }
   const relevant = matching.filter(entry => {
     const operation = String(entry['tm:obj_func'] || '').toUpperCase();
     return operation === 'D' || operation === '';

@@ -12,7 +12,7 @@
 | VSP（只读对照） | `9886d2727f47506368b0a3c2f1c1766f1200f747` | dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪） |
 | 本项目 | `a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef` | dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等） |
 
-生成日期：2026-09-22；矩阵行数：71。
+生成日期：2026-09-24；矩阵行数：71。
 profile 别名：focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。
 
 ## 状态与证据词汇
@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 3 | 13 | 4 | 0 | 5 | 0 | 25 |
-| P2 | 4 | 11 | 3 | 2 | 5 | 0 | 25 |
-| 合计 | 11 | 41 | 7 | 2 | 10 | 0 | 71 |
+| P1 | 4 | 13 | 3 | 0 | 5 | 0 | 25 |
+| P2 | 5 | 11 | 2 | 2 | 5 | 0 | 25 |
+| 合计 | 13 | 41 | 5 | 2 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**52/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**54/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -97,7 +97,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `crud.delete-object` | 删除仓库对象 | SAP(action=delete, target="OBJECT ...") | MCP_SUPERSET | P0 | `previewRepositoryObjectCleanup`、`applyRepositoryObjectCleanup`、`getRepositoryObjectCleanupStatus` | development, development-workbench | DEV |
 | `crud.clone-object` | 复制对象到新名称 | SAP(action=create, target="CLONE ...") + focused CloneObject | MCP_SUPERSET | P2 | `previewCloneObject`、`applyCloneObject`、`getCloneObjectStatus` | development, development-workbench | DEV |
 | `crud.move-package` | 把对象移动到其他包 | SAP(action=edit, target="MOVE ...") + focused MoveObject | EQUIVALENT | P1 | `previewPackageChange`、`applyPackageChange` | development, development-workbench | DEV |
-| `crud.recover-failed-create` | 恢复/清理一次失败的创建留下的半成品对象 | SAP(action=edit, target="RECOVER_FAILED_CREATE ...") | PARTIAL | P1 | `previewRepositoryObjectCleanup`、`getRepositoryObjectCleanupStatus` | development, development-workbench | DEV |
+| `crud.recover-failed-create` | 恢复/清理一次失败的创建留下的半成品对象 | SAP(action=edit, target="RECOVER_FAILED_CREATE ...") | MCP_SUPERSET | P1 | `previewRepositoryObjectCleanup`、`applyRepositoryObjectCleanup`、`getRepositoryObjectCleanupStatus`、`getRepositoryObjectCreationStatus` | development, development-workbench | DEV |
 | `crud.compare-source` | 对比两个对象的源码差异 | SAP(action=edit, target="COMPARE_SOURCE ...") + focused CompareSource | EQUIVALENT | P2 | `compareSourceObjects` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `crud.set-description` | 修改对象描述/短文本 | SAP(action=edit, params={editType:set_description}) | MCP_SUPERSET | P2 | `previewDescriptionChange`、`applyDescriptionChange`、`getDescriptionChangeStatus` | development, development-workbench | DEV |
 
@@ -155,7 +155,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `analysis.callgraph` | 调用图/调用者/被调用者分析与静态-动态对比 | SAP(action=analyze, params={type:call_graph\|callers\|callees\|analyze_call_graph\|compare_call_graphs\|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution | EQUIVALENT | P0 | `usageReferences`、`usageReferenceSnippets`、`typeHierarchy`、`getCallees` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.boundaries` | 包边界违规检查（clean core） | SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries | EQUIVALENT | P2 | `checkPackageBoundaries` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
-| `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | PARTIAL | P2 | `revisions`、`transportInfo`、`getCrHistory`、`getCoChange` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
+| `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | PARTIAL | P2 | `revisions`、`transportInfo`、`getCrHistory`、`getCoChange`、`getLoadGraph` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 
 ### git
 
@@ -196,7 +196,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `i18n.read` | 按语言读取对象文本、数据元素标签、消息文本与语言对比 | SAP(action=i18n, params={op:texts\|data_element_labels\|message_class_texts\|text_pool\|compare_languages}) + focused GetObjectTextsInLanguage/GetDataElementLabels/GetMessageClassTexts/GetTextPool/CompareLanguages | EQUIVALENT | P2 | `getTextElements`、`getDomainProperties`、`getDataElementProperties`、`getMessages`、`getObjectContentInLanguage`、`getDataElementLabels`、`getTextPoolInLanguage`、`compareObjectLanguages` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `i18n.write` | 写入数据元素标签与消息类文本 | SAP(action=i18n, params={op:write_labels\|write_message_texts}) | PARTIAL | P2 | `previewDdicPropertyChange`、`applyDdicPropertyChange` | development, development-workbench | DEV |
+| `i18n.write` | 写入数据元素标签与消息类文本 | SAP(action=i18n, params={op:write_labels\|write_message_texts}) | MCP_SUPERSET | P2 | `previewMessageTextChange`、`applyMessageTextChange`、`getMessageTextChangeStatus` | development, development-workbench | DEV |
 
 ### revisions
 

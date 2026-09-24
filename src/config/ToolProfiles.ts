@@ -71,6 +71,8 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'checkAmdpDebugger',
   // 受控描述修改链（crud.set-description）：受控写，workbench 面显式收录
   'previewDescriptionChange', 'applyDescriptionChange', 'getDescriptionChangeStatus',
+  // 受控消息文本写入链（i18n.write 的 write_message_texts）：受控写
+  'previewMessageTextChange', 'applyMessageTextChange', 'getMessageTextChangeStatus',
   // 受控对象克隆链（crud.clone-object 一站式）：受控写（apply 委托受控创建链），
   // workbench 面显式收录
   'previewCloneObject', 'applyCloneObject', 'getCloneObjectStatus',
@@ -98,6 +100,8 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
   'getCrHistory', 'getCoChange',
+  // D010INC 加载图只读（analysis.history 的 loads 子操作）：编译期加载关系
+  'getLoadGraph',
   // RFC 直链四工具（rfc.remote-enabled.discovery/read-table/call/describe）：
   // 探测指纹、只读表读取、FM 接口描述、受控只读 RFM 调用
   'probeRfcSystem',
@@ -132,7 +136,9 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   // 版本对比只读（版本间 diff，运维核对运行版本变化）
   'compareRevisions',
   // 传输历史与共同变更只读（analysis.history 行：E071/E070 运维诊断）
-  'getCrHistory', 'getCoChange'
+  'getCrHistory', 'getCoChange',
+  // D010INC 加载图只读（analysis.history 的 loads 子操作）
+  'getLoadGraph'
 ]);
 
 export function selectProfileTools(

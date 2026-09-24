@@ -111,7 +111,7 @@ describe('RepositoryObjectCreationHandlers', () => {
       'applyRepositoryObjectCleanup',
       'getRepositoryObjectCleanupStatus'
     ]);
-    expect(Object.keys(cleanupTools[0].inputSchema.properties)).toEqual(['objectKind', 'name', 'parentName']);
+    expect(Object.keys(cleanupTools[0].inputSchema.properties)).toEqual(['objectKind', 'name', 'parentName', 'creationPlanId']);
     expect(Object.keys(cleanupTools[1].inputSchema.properties)).toEqual(['cleanupPlanId']);
     expect(cleanupTools[1]).toMatchObject({
       annotations: { destructiveHint: true, idempotentHint: false },

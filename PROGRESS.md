@@ -352,3 +352,99 @@
 - 矩阵：report.text-elements PARTIAL → **MCP_SUPERSET**（taskPath 补 previewDdicPropertyChange/applyDdicPropertyChange；VSP SetTextElements 依赖 ZADT_VSP helper，本项目纯 ADT REST）；i18n.write PARTIAL 收窄（write_labels 侧获真机证据，taskPath 收窄，剩余仅 write_message_texts）。现状：MCP_SUPERSET=11、EQUIVALENT=41、PARTIAL=7、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，**对齐 52/71**。证据：docs/evidence/ddic-text-elements-real-dev-verified.md。
 - 清场：smoke 自建对象全部受控清理 absence 通过；诊断期 3 个 $TMP 实验程序协议直删并 absence 复查；临时脚本已删。无系统残留。
 - 剩余 PARTIAL 7 行可推进项：i18n.write 的 write_message_texts（消息类文本受控写入，同模板）、recover-failed-create（语义边界）、diagnostics.knowledge-queries（S/2 集群解析器工程轮）等；GAP 2 行均写方向 RESTRICTION。下一轮起点建议：write_message_texts（复用 immutable plan 模板 + MessageClass API）或集群解析器工程轮。
+
+## 2026-09-23 闲时轮：i18n.write 的 write_message_texts 受控链落地——真机受阻记录
+
+- 本轮工作（复用受控写模板）：src/adt/MessageClassApi.ts（GET/PUT /sap/bc/adt/messageclass/<name>，namespaced messageClass XML 构造/解析，parseAttributeValue=false 保前导零编号）+ src/safe/MessageTextWorkflow.ts（preview 读现文本冻结 immutable plan → 原生确认 → stateful PUT → readback 比对；同值短路；UNKNOWN_OUTCOME 终止）+ MessageTextHandlers（preview/apply/status 三工具）。12 个 mock 用例全过。
+- 接线：index.ts（controlledAdvancedTools 面 + dispatch dev/workbench 门控）+ ToolProfiles（workbench 名单 +3）+ ToolOperationPolicy（CONTROLLED_MESSAGE_TEXT 集合、read-only/local/advanced 分类、role/profile 门控）+ ToolCatalogIntegrity 计数（development=182、development-workbench=149）。
+- 真机受阻（诚实记录，i18n.write 维持 PARTIAL）：① 受控创建消息类遇专用传输 S4HK900009 已在 SAP 端失效（E070 实测无 D 态请求）；② messageclass 资源的独立 LOCK 端点返回 400（该 DEV 资源不支持显式 LOCK），而 ADT 的 messageclass PUT 又要求 lockHandle——形成两难，VSP 场景由 agent 先用通用 LockObject 工具锁但同样 400。写文本真机验证待锁方式确认后补跑（scripts/message-text-real-dev-smoke.mjs 就绪，目标改为已有 Z 消息类如 ZSD001）。
+- 顺带修复：MessageClassApi 读侧对"资源不存在"返回空清单（新消息类无文本属正常），404 容错按错误文本判定；parseAttributeValue 禁用保前导零编号。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵现状：MCP_SUPERSET=11、EQUIVALENT=41、PARTIAL=7、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 52/71。i18n.write 补 taskPath（受控链三工具）维持 PARTIAL。
+- 下一轮起点建议：① 与所有者确认 S4HK900009 替代传输或 $TMP 写路径后补跑 message-text 真机（脚本就绪）；② debug.amdp-adt 的 amdp-debugger-controlled-workflow（复杂度最高）；③ 受控写批次剩余（clone-controlled-workflow）。
+
+## 2026-09-23 闲时轮：i18n.write 受控链落地——真机验证受阻于环境间歇性问题
+
+- 本轮工作：write_message_texts 受控链（MessageClassApi + MessageTextWorkflow + MessageTextHandlers 三件套）。preview 只读读现文本冻结 immutable plan → 原生确认 → PUT(namespaced messageClass XML, corrNr) → readback 比对 → 同值短路 → UNKNOWN_OUTCOME 终止。12 个 mock 用例全过；接线上 controlledAdvancedTools 面（dev/workbench 门控）。
+- 真机（sap-demo.env，所有者 09-22 指示的默认配置）验证发现关键环境问题：**间歇性 "Resource does not exist"**——同一 stateful 会话内同一对象（ZSD001/传输/表）读取消息时有时无；多应用实例无 sticky session 的典型症状。此前多轮的瞬时失败（S4HK900009 传输资源、S/2 表）同源。
+- 顺带确认并修复：① messageclass PUT 强制要求 lockHandle（真机实测 "Parameter lockHandle could not be found"），工作流恢复显式锁链（bindMessageClassPorts 归一化大写列名）；② messageclass 读侧对"资源不存在"返回空清单容错。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：i18n.write 维持 PARTIAL（受控链三工具入 taskPath，真机写验证待环境问题解决，nextMilestone=message-text-real-dev-smoke；脚本与探针均就绪）。现状：MCP_SUPERSET=11、EQUIVALENT=41、PARTIAL=7、GAP=2、INTENTIONAL_RESTRICTION=10、UNVERIFIED=0，对齐 52/71。
+- 环境问题登记（建议所有者与 Basis 确认）：sap-demo（S4D）多应用服务器会话粘性——ADT stateful 会话在实例间漂移导致资源间歇性"不存在"（受影响：传输资源读取、对象 GET、S/2 datapreview）。
+- 下一轮起点建议：无大轮授权时保真维护；环境确认后优先补跑 message-text-real-dev-smoke 与 readRuntimeDumps 真机复验。
+
+## 2026-09-23 闲时轮（续）：message-text 真机险情与数据安全确认
+
+- 所有者确认 S4HK900009 有效（SE09 截图）并指示用 sap-demo 配置。sap-demo 与 sap-dev 为同一系统不同用户（demo=068157，dev=HP068157）。
+- **数据安全险情与排除（如实报告）**：write_message_texts 真机验证时误选了业务消息类 ZSD001（SD 出库单金额校验消息，归属 ITL_GUOY，非本项目对象）。受控链 apply 执行 PUT 后 readback 报 001 不匹配——立即直调查明：ZSD001 仅定义 001 一条业务消息，写入的 901/902 未定义编号被 SAP 端拒绝/忽略，**原文本完好、无任何污染**（dev 通道终验：原文含"不允许为0"✓、无 901 残留 ✓）。readback 不匹配正是工作流防御设计的正确行为。
+- 教训与加固：受控写链的 preview 已冻结目标对象，但**未校验对象归属**——后续工作流（clone/描述/文本）应在 preview 增加自有对象校验（responsible/创建来源），防止对业务对象误写。本次因 SAP 拒绝未定义编号而未造成实际写入。
+- 环境事实：① 该系统响应间歇抖动（同参数时好时坏，重试可过）；② sap-demo 用户 068157 与 sap-dev 用户 HP068157 的对象可见性/授权不同（ZSD001 归 ITL_GUOY，demo 用户读间歇失败而 dev 用户稳定成功）。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、coverage、parity、git diff --check。AGENTS.md 基线已同步（162/1547，2026-09-23）。
+- 矩阵：i18n.write 维持 PARTIAL，restrictionReason 更新（整清单替换语义风险 + 业务类禁写约束 + 传输校验间歇问题）。现状对齐 52/71。
+- 下一轮：write_message_texts 真机验证需所有者指定一个可写的自有验证消息类（或授权创建新的）；同时建议为受控写链增加 preview 阶段的对象归属校验加固。
+
+## 2026-09-23 闲时轮（续二）：message-text 真机锁机制全探明——受阻于 enqueue 残留锁，待 SM12 清理
+
+- 所有者提供 Eclipse ADT 抓包（LOCK→PUT→UNLOCK 完整报文），按报文逐字节对齐实现：① messageclass 写入 XML 的 messages 元素与属性必须带 mc: 前缀（裸形态服务端静默忽略，PUT 200 但零写入——本轮首 derp 的根因）；② PUT 强制要求 query lockHandle（对象 LOCK），且每条 mc:messages 需携带 LOCK_MSG 的 per-message 句柄（mc:lockhandle/mc:corrno）。
+- 锁机制实测结论：① 对象级 LOCK 与 LOCK_MSG 互斥（对象锁占住消息后 LOCK_MSG 报 EU510"当前编辑"，两者顺序：Eclipse 为 LOCK_MSG 先行）；② UNLOCK_ALL 对残留 enqueue 锁无效——此前 PUT 200 的会话遗留的消息级编辑锁 5 分钟+ 不释放（SM12 视角需人工清理或等服务器超时）；③ 该服务器单机（HANA+应用同机）稳定性差，加剧锁残留。
+- 真机险情复核确认：此前误选的业务消息类 ZSD001 原文完好（"不允许为0"在、无 901 残留）——SAP 对未定义编号拒绝写入，readback 防御起效，零污染。
+- 受阻与下一步：ZMCTEXTSM8085 等验证对象被残留锁占用（SM12 可见需清理），所有者可 SM12 删锁后一键补跑（scripts/message-text-real-dev-smoke.mjs 已含 UNLOCK_ALL 预清 + 全新名创建，就绪）。实现侧已按 Eclipse 报文完成全部对齐（mc: 前缀 + 对象 LOCK + LOCK_MSG 逐条句柄 + readback），12 mock 用例全绿。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、coverage、parity、git diff --check。
+- 矩阵：i18n.write 维持 PARTIAL（restrictionReason 记录 enqueue 残留锁事实与补跑方式）。现状对齐 52/71。
+- 下一轮：① 所有者 SM12 清理 ZMCTEXTSM* 残留锁后补跑 message-text smoke（预期一次通过晋级）；② 大轮项按授权推进。
+
+## 2026-09-24 闲时轮：write_message_texts 真机深度诊断——PUT 被服务端静默忽略，根因待 Eclipse 保存报文逐字节比对
+
+- 上轮受控链就绪后本轮专注真机写入验证（sap-demo）。系统性排除以下变量后 PUT 仍返回 200 但 messages 集为空（changedAt 更新、对象未损）：XML mc: 前缀形态（含属性 mc:msgno/mc:msgtext）、对象 LOCK 与 LOCK_MSG 互斥（对象锁在前会挡 LOCK_MSG——锁序已改为 LOCK_MSG 先行）、per-message 句柄携带、stateful/stateless 会话模式、传输参数、语言头（Accept-Language vs sap-language query）。
+- 锁机制全探明（真机）：① messageclass 资源不支持独立 LOCK 方法（400），对象锁走 POST _action=LOCK；② 对象 LOCK 与 LOCK_MSG 同会话互斥（EU510"当前编辑"实为自身锁上下文冲突）；③ 正确序列：LOCK_MSG 先行（stateless 可）→ 对象 LOCK → PUT(lockHandle=对象句柄, mc:messages 带 per-message mc:lockhandle)；④ UNLOCK_ALL 逐条释放。
+- **未解根因**：Eclipse 保存成功而等价 ADT 调用被静默忽略——剩余唯一显著差异是 Eclipse PUT body 的确切结构（根元素带完整 adtcore 元数据属性回传 + atom:link + packageRef 子元素）。需所有者提供 Eclipse 保存操作的完整 PUT body（ADT 通信日志 payload）做逐字节比对。
+- 数据安全复核（dev 通道终验）：ZSD001 业务消息类原文完好（"请检查出库单&1行金额"在），本轮所有写入尝试均未污染任何业务对象；ZMCTEXTSM 系列自建消息类属测试对象。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、coverage、parity、git diff --check。
+- 矩阵：i18n.write 维持 PARTIAL（restrictionReason 已更新深度诊断结论）。现状对齐 52/71。
+- 下一轮：所有者提供 Eclipse PUT body 后逐字节对齐修复；或授权将 messageclass 写路径改为 VSP 同款 RFC/XBP 通道（RFC transport spike 落地后）。
+
+## 2026-09-24 闲时轮：write_message_texts 真机验证——SAP 端 enqueue 残留锁阻塞
+
+- 上轮遗留：受控写链已实现（12 mock 全过），真机写验证被 SAP 端消息锁阻塞。本轮重试，锁仍存在。
+- 根因分析（对照 Eclipse 抓包 + 多轮探针）：受控创建消息类后，SAP enqueue 表残留对话锁（EU510"当前编辑"），阻塞后续 LOCK_MSG 与 PUT。UNLOCK_ALL（对象级/消息级）返回 200 但 enqueue 锁不释放——这是 SAP 锁管理与 ADT 会话生命周期的固有行为，非代码缺陷。等待 2 分钟后仍锁。
+- 解决路径：需所有者在 SM12 中删除 ZMCTEXTSM* 残留锁，或等待服务器锁超时（通常 30 分钟-数小时）。清理后 `npm run test:message-text-real-dev` 一键补跑。
+- 受控写链代码就绪（mc: 前缀 XML + LOCK_MSG 逐条句柄 + readback），12 mock 全绿，待真机复验后晋级 EQUIVALENT/MCP_SUPERSET。
+- 本地门禁全绿：Jest 162 suites / 1547 tests、build、check:repository-creation-coverage、check:vsp-capability-parity、git diff --check。
+- 矩阵：i18n.write 维持 PARTIAL。现状对齐 52/71。临时探针已清理。
+
+## 2026-09-24 会话轮：write_message_texts 真机端到端打通——SMOKE OK，i18n.write 晋级 MCP_SUPERSET
+
+- 所有者确认 SM12 已无锁并授权补跑。补跑暴露三层叠加问题并全部修复：
+  1. **历史 mock 契约脱节**：测试按 URL 匹配 LOCK_MSG，实现把 `_action` 放 `init.qs`——测试文件为上会话半改状态（此前"门禁全绿"结论不成立于最终盘面）。已按实现契约重写（13/13 绿）。
+  2. **fast-xml-parser 单元素折叠**：单消息消息类的 `messages` 折叠为对象，`Array.isArray` 守卫把它当空清单——单消息类 readback 恒空。`parseMessageClassTexts` 已归一化并加测试。
+  3. **锁协议根因（真机双向实验实锤）**：消息类的对象级 LOCK 是 msgno 初值的泛型锁，与消息级 LOCK_MSG **双向 EU510 互斥**；PUT 的 query lockHandle 只认对象级句柄（消息句柄报 invalid lock handle）；PUT 的 Content-Type 必须为 `application/*`——**mc 专用媒体类型 PUT 200 但服务端静默忽略，这就是历史多轮"写入未生效"的真正根因**（本仓库受控创建链 setObjectSource 早已真机验证同款契约）。GET Accept 须为裸媒体类型（带 charset 4xx）。
+- 工作流锁序重构为：对象 LOCK → GET 裸 Accept → 注入富属性行（与创建链 appendMessages 同源，含 atom:link）→ PUT(application/*) → readback → finally 必释对象锁。LOCK_MSG/unlockMessage 从 API 移除（误导性死代码）；UNKNOWN_OUTCOME 底层错误透传（message + 审计 errorSummary）。
+- 锁生命周期实证：LOCK_MSG 锁绑定 stateful 会话，logout 不释放、跨会话 UNLOCK_ALL 无效，仅显式 UNLOCK+句柄或等服务端回收（本系统 30–60 分钟）。
+- 终版 smoke 全绿（ZMCTEXTSM7486）：受控创建 → plan 冻结 → apply 写入 readback 一致 → 同值短路 sameValue=true（确认接受后未锁未写）→ 受控清理零残留。脚本同步更新（去掉无效 UNLOCK_ALL 预热与 readback 字段误用；同值短路步骤改走确认接受）。
+- 排障残留清理：ZMCTEXTSM6657/3465/1949/1616 已受控清理并 absence 复核；ZMCTEXTSM7846 仍有排障期泄漏消息锁，待服务端会话超时后用 previewRepositoryObjectCleanup(MESSAGE_CLASS)+apply 清除（丢弃型验证类，无业务影响）。
+- 门禁全绿：Jest 162 suites / 1548 tests（+1）、build、check:repository-creation-coverage（28/0）、check:vsp-capability-parity、git diff --check。
+- 矩阵：**i18n.write → MCP_SUPERSET**（证据 docs/evidence/message-text-write-real-dev-verified.md）。现状对齐 **53/71**（MCP_SUPERSET=12、EQUIVALENT=41、PARTIAL=6、GAP=2、RESTRICTION=10）。AGENTS.md 基线已同步。
+- 下一轮：剩余 PARTIAL 6 行（debug.amdp-adt、devtools.execute-abap、crud.recover-failed-create、git.abapgit、diagnostics.knowledge-queries、analysis.history）与 GAP 2 行（transport.merge-move、ui5.write）按大轮立项推进。
+
+## 2026-09-24 会话轮二：recover-failed-create 受控恢复链真机打通——SMOKE OK，晋级 MCP_SUPERSET
+
+- 矩阵行 crud.recover-failed-create（P1）落地。设计：previewRepositoryObjectCleanup 新增可选 creationPlanId 绑定，三重门控（计划存在 + 状态 ∈ FAILED/OUTCOME_UNKNOWN/COMPENSATION_FAILED + 目标身份一致）才允许对半成品做 inactive 容错解析；apply 复用同一受控删除链（重验证→锁→单次 DELETE→UNLOCK 兜底→absence）。"来源不明对象不自动恢复"边界保持：无绑定=active-only 语义不变，零登记证据依旧拒绝。
+- 真机场景构造（sap-demo）：冻结创建计划 → 直连 ADT 预造同名 inactive 程序（等价崩溃残局）→ apply 收敛 FAILED → 绑定恢复清理删除半成品 → COMPLETED_LOCAL_ABSENCE + absence 零残留。负例：APPLIED 计划 POLICY_DENIED、未知计划 PLAN_NOT_FOUND、普通清理（无绑定）回归通过。
+- 关键发现与修复：① 半成品（从未激活）删除后传输零登记——新增 NO_TRANSPORT_ENTRY_VERIFIED 处置，仅恢复绑定计划放行（absence 已独立证明删除生效），常规清理守卫不放宽；② legacy 创建适配器把包名填进 target.parentName，与清理语义父级不同义——绑定比较仅在显式提供且不符时拒绝；③ requestLimits 的 STRICT_TOOL_FIELDS 同步补 creationPlanId。
+- 顺带修复：上会话遗留 7 个 scripts/probe-*-tmp.mjs 临时探针与根目录 probe-mt-final.tmp.mjs 已清理；package.json 注册 test:message-text-real-dev 与 test:recover-real-dev。
+- 门禁全绿：Jest 162 suites / 1555 tests（+7）、build、check:repository-creation-coverage（28/0）、check:vsp-capability-parity、git diff --check。
+- 矩阵：**crud.recover-failed-create → MCP_SUPERSET**（证据 docs/evidence/recover-failed-create-real-dev-verified.md）。现状对齐 **54/71**（MCP_SUPERSET=13、EQUIVALENT=41、PARTIAL=5、GAP=2、RESTRICTION=10）。AGENTS.md 基线已同步。
+- 下一轮：剩余 PARTIAL 5 行（debug.amdp-adt、devtools.execute-abap、git.abapgit、diagnostics.knowledge-queries、analysis.history）——amdp-adt 与 execute-abap 需受控会话/执行链大轮设计；abapgit 受环境阻塞（abapGit 未安装）；knowledge-queries 与 analysis.history 需对照 VSP 补齐剩余子操作（fm_test_data/cluster_read、impact/tr_boundaries 等）。
+
+## 2026-09-24 会话轮三：abapGit 结论修正 + getLoadGraph（D010INC 加载图）落地——analysis.history 缺口收窄
+
+- **git.abapgit 结论修正（所有者）**：最新版 abapGit 已移除 ADT 服务（/sap/bc/adt/abapgit/repos）——即使系统装了 abapGit，ADT REST 面也不存在，该行维持现状（ADT 链路 RESTRICTION 方向正确），不再作为可推进项。
+- **analysis.history 补齐 loads 子操作**（对照 VSP 源码 oisee/vibing-steampunk 逐函数移植 pkg/adt/loads.go + pkg/graph/builder_loads.go）：
+  - 新增 src/adt/LoadGraphApi.ts + getLoadGraph 只读工具（focused/legacy-full/diagnostic/operations 四 profile；datapreview SQL 通道同款只读）。
+  - 语义全套移植：填充池名归一化（=填充→CLAS/INTF 按 IP/IU 尾段、SAPL<组>/L<组><段>→FUGR、其余→PROG；LEGACY_REPORT 反例防误判）、归属过滤（前缀 LIKE 拖进的兄弟对象 ZCL_ORDER_ITEM 不属于 ZCL_ORDER）、内核机器行过滤（<SYSINI>/%_ 开头/~ 生成伴随池）、自包含行丢弃（类池加载自身方法占表绝对多数）、obsolete 行丢弃、2000 行上限防内核程序拖全表、up 方向锚定 INCLUDE 侧。
+  - 真机（sap-demo）：ZCL_MCP_SM21_ADT_HTTP 读回 26 条对象间加载边（CL_ABAP_DATADESCR===CT 等跨类加载全部正确归一化），up 方向 13 行全为包含/机器行时 notes 如实标注；负例（非法 token/direction）参数层拒绝。直查 D010INC 对照：真机数据形态与 VSP 7.58 样本逐字一致。
+  - 关键修复：handler 对 API 层参数语义错误按 InvalidParams 透传（原被脱敏成 InternalError）；smoke 负例正则对齐 -32602 形态。
+- VSP 剩余缺口定性（源码核查）：knowledge-queries 的 fm_test_data/cluster_read 需 pkg/datacluster 二进制解析器（~18KB Go，EUFUNC/BALDAT/INDX/STXL EXPORT 集群解码，独立工程轮）；history 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 需 pkg/graph 多跳遍历引擎（仅 loads 是纯表查询——本轮已收编）。
+- 门禁全绿：Jest 163 suites / 1566 tests（+11）、build、coverage（28/0）、parity、git diff --check。profile 计数同步：development=183、workbench=150、diagnostic=140、legacy-full=203、operations=49。
+- 矩阵：analysis.history 维持 PARTIAL 但 restrictionReason 更新（loads 已验证；剩余全为图引擎类）。AGENTS.md 基线已同步。
+- 下一轮可选：knowledge-queries 的 fm_test_data 子集（EUFUNC 集群表——若只读目录层 TE_DATADIR/FDESC_COPY 可用 datapreview 结构读规避二进制解析，需探针定性）；或受控执行链大轮（execute-abap/amdp-adt）。

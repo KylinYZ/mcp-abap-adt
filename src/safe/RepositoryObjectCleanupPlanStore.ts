@@ -47,6 +47,7 @@ export class RepositoryObjectCleanupPlanStore {
         cleanupMode: resource.cleanupMode || 'DIRECT'
       })),
       resources: clone(prepared.resources),
+      ...(prepared.recoveryOf ? { recoveryOf: { ...prepared.recoveryOf } } : {}),
       stages: []
     };
     this.plans.set(plan.cleanupPlanId, plan);
@@ -157,7 +158,8 @@ function view(plan: RepositoryCleanupPlan): RepositoryCleanupPlanView {
     stages: plan.stages,
     resultSummary: plan.resultSummary,
     transportDisposition: plan.transportDisposition,
-    primaryError: plan.primaryError
+    primaryError: plan.primaryError,
+    recoveryOf: plan.recoveryOf
   });
 }
 

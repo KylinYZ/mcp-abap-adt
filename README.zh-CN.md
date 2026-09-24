@@ -6,19 +6,19 @@
 
 ## 当前版本
 
-- 版本 `0.6.0`，npm 包为 `abap-ai-workbench-mcp@0.8.1`。
+- 版本 `0.8.4`，npm 包为 `abap-ai-workbench-mcp@0.8.4`。
 - 代码仓库：[`KylinYZ/mcp-abap-adt`](https://github.com/KylinYZ/mcp-abap-adt)。
 - 始终使用带作用域的包名；不带作用域的包属于上游独立项目。
-- 角色入口：`focused` / `developer`（90 个开发工具）、`business`（18 个只读工具）、`operations`（41 个只读工具）、`expert`（161 个兼容工具）。旧 profile 名称继续支持，完整目录见[产品定位](docs/产品定位.md)。
+- 角色入口：`focused` / `developer`（150 个开发工具）、`business`（18 个只读工具）、`operations`（49 个只读工具）、`expert`（203 个兼容工具）。旧 profile 名称继续支持，完整目录见[产品定位](docs/产品定位.md)。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`。权威成熟度文件为 [`docs/evidence/repository-creation-maturity-evidence.json`](docs/evidence/repository-creation-maturity-evidence.json)。
-- 自动化基线（2026-09-04）：109 个 Jest suites、793 个 tests。
+- 自动化基线（2026-09-24）：163 个 Jest suites、1566 个 tests。
 
 ## 安装
 
 ### npm（推荐）
 
 ```bash
-npx -y abap-ai-workbench-mcp@0.8.1
+npx -y abap-ai-workbench-mcp@0.8.4
 ```
 
 MCP 配置示例：
@@ -28,7 +28,7 @@ MCP 配置示例：
   "mcpServers": {
     "abap-ai-workbench-mcp": {
       "command": "npx",
-      "args": ["-y", "abap-ai-workbench-mcp@0.8.1"],
+      "args": ["-y", "abap-ai-workbench-mcp@0.8.4"],
       "env": { "SAP_MCP_ENV_FILE": "D:\\path\\to\\sap-dev.env" }
     }
   }

@@ -32,6 +32,15 @@ export interface RepositoryCleanupResource {
     objectType: string;
     objectName: string;
   }>;
+  /** 恢复清理（recover-failed-create）中对象仅以 inactive 版本可解析时冻结的版本偏好。 */
+  recoveryVersion?: 'active' | 'inactive';
+}
+
+/** 恢复清理的溯源信息：绑定触发恢复的那次失败创建计划（plan 与 review 均可见）。 */
+export interface RepositoryCleanupRecoveryProvenance {
+  creationPlanId: string;
+  creationPlanStatus: string;
+  primaryErrorCode?: string;
 }
 
 export interface PreparedRepositoryCleanup {
@@ -40,6 +49,7 @@ export interface PreparedRepositoryCleanup {
   transportRequest: string;
   dependencySummary: string[];
   summary: string;
+  recoveryOf?: RepositoryCleanupRecoveryProvenance;
 }
 
 export interface RepositoryCleanupStageResult {
@@ -66,8 +76,10 @@ export interface RepositoryCleanupPlan {
   resources?: RepositoryCleanupResource[];
   stages: RepositoryCleanupStageResult[];
   resultSummary?: string;
-  transportDisposition?: 'DELETION_ENTRY_VERIFIED' | 'NEUTRAL_ENTRIES_VERIFIED';
+  transportDisposition?: 'DELETION_ENTRY_VERIFIED' | 'NEUTRAL_ENTRIES_VERIFIED' | 'NO_TRANSPORT_ENTRY_VERIFIED';
   primaryError?: { code: string; stage: string; message: string };
+  /** 恢复清理溯源（仅 previewRepositoryObjectCleanup 携带 creationPlanId 时存在）。 */
+  recoveryOf?: RepositoryCleanupRecoveryProvenance;
 }
 
 export type RepositoryCleanupPlanView = Omit<RepositoryCleanupPlan, 'createdAt' | 'expiresAt' | 'terminalAt' | 'resources' | 'context'> & {

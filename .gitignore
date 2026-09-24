@@ -8,3 +8,4 @@ package-lock.json
 .codegraph/
 .claude/settings.local.json
 .tmp-audit-final/
+.zcodeignore

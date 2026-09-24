@@ -30,12 +30,12 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 179],
-    ['diagnostic-readonly', 139],
-    ['legacy-full', 202],
-    ['development-workbench', 146],
+    ['development', 183],
+    ['diagnostic-readonly', 140],
+    ['legacy-full', 203],
+    ['development-workbench', 150],
     ['business-readonly', 18],
-    ['operations-readonly', 48]
+    ['operations-readonly', 49]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;

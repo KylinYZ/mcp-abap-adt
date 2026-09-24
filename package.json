@@ -1,6 +1,6 @@
 {
   "name": "abap-ai-workbench-mcp",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "mcpName": "io.github.kylinyz/abap-ai-workbench-mcp",
   "main": "dist/index.js",
   "bin": {
@@ -52,7 +52,10 @@
     "test:clone-real-dev": "node ./scripts/clone-object-real-dev-smoke.mjs",
     "test:clone-controlled-real-dev": "node ./scripts/clone-controlled-real-dev-smoke.mjs",
     "test:rename-controlled-real-dev": "node ./scripts/rename-controlled-real-dev-smoke.mjs",
-    "test:ddic-text-real-dev": "node ./scripts/ddic-text-elements-real-dev-smoke.mjs"
+    "test:ddic-text-real-dev": "node ./scripts/ddic-text-elements-real-dev-smoke.mjs",
+    "test:message-text-real-dev": "node ./scripts/message-text-real-dev-smoke.mjs",
+    "test:recover-real-dev": "node ./scripts/recover-failed-create-real-dev-smoke.mjs",
+    "test:load-graph-real-dev": "node ./scripts/load-graph-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",
@@ -92,7 +95,7 @@
     "io-ts": "^2.2.21",
     "io-ts-reporters": "^2.0.1",
     "sprintf-js": "^1.1.3",
-    "@kylinyz/open-rfc": "^0.2.4-kylin.1"
+    "@kylinyz/open-rfc": "^0.2.4-kylin.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
