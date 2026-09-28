@@ -155,4 +155,39 @@ describe('isolated EUFUNC version 5 decoder prototype', () => {
     ]
     expect(() => decodeEufuncV5Prototype(cluster(Uint8Array.from(rows), 1))).toThrow(/row limit/)
   })
+
+  it('accepts kind 6 (deep table) with a flat line type — VSP normalizes 05/06 to Structure/Table', () => {
+    // 真机实证（2026-09-28，fm-test-data-clustd-real-dev-verified）：V5 集群
+    // 存在 kind 6 对象；VSP legacy 枚举值本身 Table=6，与 kind 3 同路处理。
+    const deepTable = [
+      ...header(6, 0x0e, 1, 'DEEP'),
+      0xad, 0x0e, ...u16(1),
+      0xaa, 0x00, ...u16(1),
+      0xae, 0x0e, ...u16(1),
+      0xbb, 0x43,
+      0x04
+    ]
+    const result = decodeEufuncV5Prototype(cluster(Uint8Array.from(deepTable), 1))
+    expect(result.objects).toHaveLength(1)
+    expect(result.objects[0]).toMatchObject({ name: 'DEEP', kind: 'table', rows: [['C']] })
+  })
+
+  it('rejects a nested table descriptor (0xAD inside a line type) — 真机 deep 形态，VSP 上游同样 fail-closed', () => {
+    // 真机发现（2026-09-28）：C162 999 集群第 3 对象（kind 6）的 line type 内
+    // 嵌套子表 descriptor（0xAD...0xAE）。VSP legacyChildren 对 0xAD 走 default
+    // 拒绝，V5 legacy 亦声明 "not expected to hold tables"——上游与本项目共同
+    // 能力边界。此处锁定 fail-closed，防止未来静默放行未审形态。
+    const nested = [
+      ...header(6, 0x0e, 2, 'NEST'),
+      0xad, 0x0e, ...u16(2),
+      0xaa, 0x00, ...u16(1),
+      0xad, 0x0e, ...u16(1),   // line type 内嵌套的子表 descriptor open
+      0xaa, 0x00, ...u16(1),
+      0xae, 0x0e, ...u16(1),
+      0xae, 0x0e, ...u16(2),
+      0x04
+    ]
+    expect(() => decodeEufuncV5Prototype(cluster(Uint8Array.from(nested), 1)))
+      .toThrow(/unsupported descriptor marker 0xad/)
+  })
 })

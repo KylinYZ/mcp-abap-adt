@@ -29,6 +29,20 @@
 
 真机 999 目录集群 bytes（422 字节，trim 后）送入隔离原型 `EufuncV5DecoderPrototype`：header/LZH inflate 阶段通过，解析器以 `unexpected trailing SAP LZH bytes` **fail-closed 拒绝**——原型的严格白名单/流终态校验未覆盖真机集群的尾部形态（可能为填充/尾标语义差异）。**这不证明 payload 不可解码**（真实格式已到手、拒绝点在解析尾部而非头部），但接入前必须以真机 bytes 扩展原型容错边界并建立 oracle 对照。
 
+## oracle 解码轮（同日第二轮，追加授权范围内只读探针 ×3 次查询）
+
+对照 VSP oracle 源码修正原型两处后，真机集群解码推进到对象级：
+
+1. **inflate 尾部校验放宽为 VSP 语义**（`pkg/sapcompress inflate`）：VSP 只要求解压输出精确等于头部长度承诺，**忽略 DEFLATE 终块后的尾随字节**（真实 SAP 流的常态）；原型的"剩余压缩字节 ≤1"校验过严导致误拒。修正后真机集群 LZH 流完整解出（1089/1089 字节精确匹配）。
+2. **kind 5/6（deep structure/table）接受**：VSP legacy 枚举值本身 Structure=5/Table=6，与 flat 2/3 同路处理、descriptor marker 相同；真机对象层曾以 kind 6 被原型拒绝。
+3. **解析终态与上游共同边界**：真机第 3 对象（kind 6 deep table，`%_I*/%_V*` 类输入输出对象）的 line type 内**嵌套子表 descriptor（0xAD）**——VSP `legacyChildren` 对 0xAD 走 default 拒绝，V5 legacy 并声明 "version 5 cluster was not expected to hold tables/strings"。**原型 fail-closed 保持与上游一致，不强行放行未审形态**；错误消息已带 marker/offset 诊断上下文（格式契约字段，无业务数据）。
+
+**对象级 oracle 判定**：999 目录集群核心两对象 **TE_DATADIR**（offset 0，kind 3，rowLength 88，8 个 leaf 字段 descriptor 正常收口）与 **FDESC_COPY**（offset 57，rowLength 156，fields sum=rowLength 校验通过、行区自洽）**全部符合 V5 legacy/VSP 语义并可解码**——目录行语义（标题+接口快照载体）已达可解码状态；对象布局位置（57+461=518）与原型游标精确吻合。全 cluster 整体解码止于上述上游共同边界；输入输出对象（`%_I*`/`%_V*`）解码需扩展 parser（上游同样不支持），为独立工程轮。
+
+**验收矩阵更新**：目录读取 ✓｜CLUSTD 可读取 ✓｜单片段重组 ✓｜**payload 可解码：目录语义对象级 ✓ / 全量解码 ✗（上游共同边界，如实记录）**。
+
+原型回归：新增合成用例 2 个（kind 6 flat line type 接受、嵌套 0xad 拒绝锁定），20/20 通过。探针脚本 `scripts/fm-test-data-clustd-probe3.mjs` 内置对象级 oracle 判定，可复跑。
+
 ## 阶段 A 契约假设与真机的对照汇总
 
 - 成立：RAW hex 原样、decode 不转码、前导零/大小写保留、字节可逆。

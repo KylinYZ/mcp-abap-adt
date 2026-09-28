@@ -95,12 +95,16 @@ export function decodeEufuncV5Prototype(input: Uint8Array): EufuncV5PrototypeClu
     let root: Node
     // Kind is initialized from the raw byte into the VSP enum, where
     // Elementary itself is 1; VSP additionally normalizes legacy marker 7.
+    // 02/03 are the flat structure/table forms and 05/06 the deep ones
+    // (strings or nesting inside); the VSP oracle normalizes both pairs to
+    // Structure/Table because only the descriptor carries the real layout,
+    // and the descriptor markers are identical for flat and deep.
     if (kindByte === 1 || kindByte === 7) {
       kind = 'elementary'
       ensureSupportedType(typeCode, rowLength)
       root = { path: '1', code: typeCode, length: rowLength }
-    } else if (kindByte === 2 || kindByte === 3) {
-      kind = kindByte === 2 ? 'structure' : 'table'
+    } else if (kindByte === 2 || kindByte === 3 || kindByte === 5 || kindByte === 6) {
+      kind = kindByte === 2 || kindByte === 5 ? 'structure' : 'table'
       const open = kind === 'structure' ? 0xab : 0xad
       const close = kind === 'structure' ? 0xac : 0xae
       const descriptor = cursor.take(4)
@@ -150,25 +154,28 @@ export function decodeEufuncV5Prototype(input: Uint8Array): EufuncV5PrototypeClu
 function parseChildren(cursor: Cursor, parent: Node, close: number, depth: number, countNode: () => void): void {
   if (depth >= MAX_DEPTH) throw new Error('descriptor nesting limit exceeded')
   while (true) {
+    const entryStart = cursor.position
     const marker = cursor.u8()
     const code = cursor.u8()
     const length = cursor.u16()
     if (marker === close) {
-      if (length !== parent.length) throw new Error('descriptor close does not match its opening')
+      if (length !== parent.length) throw new Error(`descriptor close does not match its opening (0x${marker.toString(16).padStart(2, '0')} length ${length}, opened ${parent.length} at offset ${entryStart})`)
       return
     }
     countNode()
     if (marker === 0xaa || marker === 0xaf) {
-      if (length < 1 || length > MAX_ROW_BYTES) throw new Error('field length outside supported bounds')
+      if (length < 1 || length > MAX_ROW_BYTES) throw new Error(`field length outside supported bounds (marker 0x${marker.toString(16).padStart(2, '0')} length ${length} at offset ${entryStart})`)
       parent.children!.push({ path: `${parent.path}${parent.path ? '.' : ''}${parent.children!.length + 1}`, code, length, filler: marker === 0xaf })
     } else if (marker === 0xa0 || marker === 0xab) {
-      if (length < 1 || length > MAX_ROW_BYTES) throw new Error('nested descriptor length outside supported bounds')
+      if (length < 1 || length > MAX_ROW_BYTES) throw new Error(`nested descriptor length outside supported bounds (marker 0x${marker.toString(16).padStart(2, '0')} length ${length} at offset ${entryStart})`)
       const child: Node = { path: `${parent.path}${parent.path ? '.' : ''}${parent.children!.length + 1}`, code, length, children: [] }
       parent.children!.push(child)
       parseChildren(cursor, child, marker === 0xab ? 0xac : 0xa1, depth + 1, countNode)
       if (child.children!.reduce((sum, n) => sum + n.length, 0) !== child.length) throw new Error('nested descriptor lengths do not match')
     } else {
-      throw new Error('unsupported descriptor marker')
+      // 诊断上下文对齐 VSP（unknown descriptor marker %#02x at offset %d）：
+      // marker/offset 是格式契约信息，不含业务数据
+      throw new Error(`unsupported descriptor marker 0x${marker.toString(16).padStart(2, '0')} (code 0x${code.toString(16).padStart(2, '0')}, length ${length}) at offset ${entryStart}`)
     }
   }
 }
@@ -239,9 +246,13 @@ function inflateSapLzh(stream: Uint8Array): Uint8Array {
     buffer: Buffer
     engine: { bytesWritten: number }
   }
+  // Real SAP streams legitimately carry bytes after the DEFLATE end block
+  // (termination/alignment); the VSP oracle (pkg/sapcompress inflate) ignores
+  // them and holds the decoder only to the promised output length. Fidelity
+  // is still enforced exactly: output must equal `expected` bytes, and
+  // maxOutputLength bounds expansion.
   if (result.buffer.byteLength !== expected) throw new Error('SAP LZH length does not match its header')
-  const consumed = result.engine.bytesWritten
-  if (consumed > shifted.length || shifted.length - consumed > 1) throw new Error('unexpected trailing SAP LZH bytes')
+  void result.engine
   return Uint8Array.from(result.buffer)
 }
 
