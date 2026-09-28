@@ -43,6 +43,19 @@
 
 原型回归：新增合成用例 2 个（kind 6 flat line type 接受、嵌套 0xad 拒绝锁定），20/20 通过。探针脚本 `scripts/fm-test-data-clustd-probe3.mjs` 内置对象级 oracle 判定，可复跑。
 
+## 多片段完整性轮（同日第三轮，追加只读探针 ×2 次查询）
+
+**多片段（SRTF2 续块）完整性策略在真机实证通过**，样本 `RSZ_X_COMPONENT_GET`（标准 BW FM）的 999 目录集群：
+
+- **6 片段 SRTF2 序列 0..5：连续、无缺、无重**（完整性检测的现实正例）；
+- 前五片 CLUSTR=3800（LRAW 满宽）、末片 407（有效尾部）——「满宽+尾部有效」模型与单片段轮一致；
+- `assembleEufuncV5ClusterFragments`（本轮新增的离线组装器，VSP Join 语义：排序/重复缺片拒绝/CLUSTR trim/1MB 预算）将 6 片精确重组为 **19407 字节**（5×3800+407，零回退）；
+- 解码尝试被原型以 "only cluster version 5 is supported" 拒绝——**该集群为 version 6**。VSP 上游支持 V5/V6，原型是声明过的受限子集（V5+codepage 1100）；V6 路径（32 字节对象头/UTF16 名称/7 字节 descriptor entry）属后续扩展，不夸大原型覆盖。
+
+**验收矩阵终态**：目录读取 ✓｜CLUSTD 可读取 ✓｜**多片段完整性 ✓（真机 6 片样本实证）**｜payload 可解码：目录语义对象级 ✓（V5）／全量解码 ✗（V6 与 deep 嵌套为已声明边界）。
+
+组装器离线回归 +6（乱序串联正例、缺片、重复、CLUSTR 回退标记、非法/空白 hex、超限与非整数序号），原型测试 26/26。探针脚本 `scripts/fm-test-data-clustd-probe4.mjs` 可复跑。
+
 ## 阶段 A 契约假设与真机的对照汇总
 
 - 成立：RAW hex 原样、decode 不转码、前导零/大小写保留、字节可逆。

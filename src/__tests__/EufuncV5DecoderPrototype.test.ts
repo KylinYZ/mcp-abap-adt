@@ -1,5 +1,5 @@
 import { deflateRawSync } from 'node:zlib'
-import { decodeEufuncV5Prototype } from '../adt/EufuncV5DecoderPrototype'
+import { decodeEufuncV5Prototype, assembleEufuncV5ClusterFragments } from '../adt/EufuncV5DecoderPrototype'
 
 function u16(value: number): number[] { return [(value >>> 8) & 0xff, value & 0xff] }
 
@@ -189,5 +189,80 @@ describe('isolated EUFUNC version 5 decoder prototype', () => {
     ]
     expect(() => decodeEufuncV5Prototype(cluster(Uint8Array.from(nested), 1)))
       .toThrow(/unsupported descriptor marker 0xad/)
+  })
+})
+
+describe('assembleEufuncV5ClusterFragments（SRTF2 续块组装，VSP Join 语义）', () => {
+  // 合成一个 12 字节的 V5 单对象集群体，切成 3 个 LRAW 片段（前两片满宽
+  // 4 字节、末片 4 字节），模拟真机 wire：每片段 CLUSTD 为固定宽度 hex，
+  // 有效字节数由 CLUSTR 给出，其余为全零 padding。
+  function fragmentsFromBody(body: number[], chunk = 4): Array<{ srtf2: number; clustrBytes: number; clustdHex: string }> {
+    const fragments: Array<{ srtf2: number; clustrBytes: number; clustdHex: string }> = []
+    for (let i = 0; i < body.length; i += chunk) {
+      const effective = body.slice(i, i + chunk)
+      const cell = [...effective, ...new Array(chunk - effective.length).fill(0)]
+      fragments.push({
+        srtf2: fragments.length,
+        clustrBytes: effective.length,
+        clustdHex: Buffer.from(cell).toString('hex')
+      })
+    }
+    return fragments
+  }
+
+  const sampleBody = [...Buffer.from('CLUSTERFRAGS', 'ascii'), 0x04] // 12 字节有效 + 终标
+  const elementary = [
+    ...header(7, 0, 12, 'WHOLE'),
+    0xbb, ...Buffer.from('CLUSTERFRAGS', 'ascii')
+  ]
+  // 组装器输入是 cluster body 的片段（不含 16 字节 cluster header），对照物同样只含 body
+  const wired = Uint8Array.from([...elementary, 0x04])
+
+  it('multi-fragment out-of-order input reassembles correctly and feeds the decoder (串联正例)', () => {
+    const fragments = fragmentsFromBody([...elementary, 0x04]).reverse() // 乱序送达
+    const assembled = assembleEufuncV5ClusterFragments(fragments)
+    expect(assembled.fragmentCount).toBe(fragments.length)
+    expect(assembled.lengthFallbackFragments).toEqual([])
+    expect(Buffer.from(assembled.bytes).equals(Buffer.from(wired))).toBe(true)
+    // 组装产物经 cluster() 套上 V5 header 后必须能直接通过 decoder
+    const result = decodeEufuncV5Prototype(cluster(assembled.bytes, 1))
+    expect(result.objects).toHaveLength(1)
+    expect(result.objects[0]).toMatchObject({ name: 'WHOLE', kind: 'elementary' })
+  })
+
+  it('rejects a gap in the sequence (0,2 → missing 1)', () => {
+    const fragments = fragmentsFromBody(sampleBody).filter(f => f.srtf2 !== 1)
+    expect(() => assembleEufuncV5ClusterFragments(fragments)).toThrow(/missing/)
+  })
+
+  it('rejects a duplicated fragment', () => {
+    const fragments = fragmentsFromBody(sampleBody)
+    expect(() => assembleEufuncV5ClusterFragments([fragments[0]!, fragments[0]!, fragments[1]!])).toThrow(/twice/)
+  })
+
+  it('falls back to the full cell when CLUSTR is unusable and surfaces the fallback (VSP 宽容语义)', () => {
+    const fragments = fragmentsFromBody(sampleBody)
+    const degraded = fragments.map((f, i) => (i === 2 ? { ...f, clustrBytes: 0 } : f)) // 末片段 CLUSTR 无效
+    const assembled = assembleEufuncV5ClusterFragments(degraded)
+    expect(assembled.lengthFallbackFragments).toEqual([2])
+    // 回退保留整格（含 padding），与 VSP Join 行为一致——调用方据此感知尾部 padding 风险
+    expect(assembled.bytes.length).toBe(sampleBody.length)
+  })
+
+  it('rejects non-hex cells and strips whitespace before decoding (DecodeHex 语义)', () => {
+    const fragments = fragmentsFromBody(sampleBody)
+    expect(() => assembleEufuncV5ClusterFragments([{ ...fragments[0]!, clustdHex: 'NOTHEX!!' }, ...fragments.slice(1)]))
+      .toThrow(/not hex/)
+    const spaced = assembleEufuncV5ClusterFragments([{ ...fragments[0]!, clustdHex: fragments[0]!.clustdHex.replace(/(..)/g, '$1 ') }, ...fragments.slice(1)])
+    expect(spaced.bytes.length).toBe(sampleBody.length)
+  })
+
+  it('rejects negative/non-integer sequences and over-budget totals', () => {
+    const fragments = fragmentsFromBody(sampleBody)
+    expect(() => assembleEufuncV5ClusterFragments([{ ...fragments[0]!, srtf2: -1 }, ...fragments.slice(1)])).toThrow(/non-negative integer/)
+    // 超限：单片 CLUSTD 覆盖 1.1MB 字节，超过原型 1MB 预算
+    const big = '00'.repeat(1100 * 1024)
+    expect(() => assembleEufuncV5ClusterFragments([{ srtf2: 0, clustrBytes: 1100 * 1024, clustdHex: big }]))
+      .toThrow(/byte limit/)
   })
 })

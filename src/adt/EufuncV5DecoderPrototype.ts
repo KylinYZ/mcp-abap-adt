@@ -26,6 +26,73 @@ export interface EufuncV5PrototypeCluster {
   objects: EufuncV5PrototypeObject[]
 }
 
+/**
+ * One EUFUNC cluster-table row: the SRTF2 sequence number, the CLUSTR byte
+ * count valid in this row, and the CLUSTD cell as delivered by the data
+ * preview (real wire contract, 2026-09-28: continuous mixed-case hex, fixed
+ * LRAW width, zero padding — see fm-test-data-clustd-real-dev-verified.md).
+ * Callers extract these from parsed datapreview rows; this module never
+ * queries SAP and never stores payload bytes.
+ */
+export interface EufuncClusterFragment {
+  srtf2: number
+  clustrBytes: number
+  clustdHex: string
+}
+
+export interface EufuncClusterAssembly {
+  bytes: Uint8Array
+  fragmentCount: number
+  /** Sequence numbers whose CLUSTR was unusable (≤0 or beyond the cell) and
+   *  fell back to the full cell — VSP Join semantics; callers should treat a
+   *  non-empty list as a signal the payload tail may carry padding. */
+  lengthFallbackFragments: number[]
+}
+
+/**
+ * Reassemble the fragments of one cluster key into the decoder's byte input.
+ * Semantics mirror the VSP oracle (pkg/datacluster fragments.go Join): sort by
+ * SRTF2, reject duplicates and gaps (sequences must run 0..n-1), trim each
+ * row to the CLUSTR byte count it declares. Hex handling mirrors DecodeHex:
+ * upper/lower case accepted, whitespace stripped, anything else rejected.
+ * The assembly is fail-closed: gaps, duplicates, non-hex cells and over-budget
+ * totals are errors, never silently truncated payloads.
+ */
+export function assembleEufuncV5ClusterFragments(input: EufuncClusterFragment[]): EufuncClusterAssembly {
+  if (!Array.isArray(input) || input.length === 0) throw new Error('no fragments')
+  const sorted = [...input].sort((a, b) => a.srtf2 - b.srtf2)
+  const parts: Buffer[] = []
+  let total = 0
+  const lengthFallbackFragments: number[] = []
+  for (let i = 0; i < sorted.length; i += 1) {
+    const f = sorted[i]!
+    if (!Number.isInteger(f.srtf2) || f.srtf2 < 0) throw new Error(`fragment sequence ${f.srtf2} is not a non-negative integer`)
+    if (i > 0 && f.srtf2 === sorted[i - 1]!.srtf2) throw new Error(`fragment ${f.srtf2} appears twice`)
+    if (f.srtf2 !== i) throw new Error(`fragment ${i} is missing`)
+    const hex = f.clustdHex.replace(/[\s]/g, '')
+    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) throw new Error(`fragment ${f.srtf2} CLUSTD is not hex`)
+    const cellBytes = hex.length / 2
+    let n = f.clustrBytes
+    if (!Number.isInteger(n) || n <= 0 || n > cellBytes) {
+      // VSP Join fallback: an unusable length keeps the full cell; surfaced to
+      // the caller instead of being silently absorbed.
+      lengthFallbackFragments.push(f.srtf2)
+      n = cellBytes
+    }
+    const bytes = Buffer.from(hex.slice(0, n * 2), 'hex')
+    total += bytes.length
+    if (total > MAX_CLUSTER_BYTES) throw new Error('assembled cluster exceeds byte limit')
+    // Buffer 分段收集：spread 展开大数组会触发栈溢出，禁用
+    parts.push(bytes)
+  }
+  if (total === 0) throw new Error('assembled cluster is empty')
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const part of parts) { merged.set(part, offset); offset += part.length }
+  return { bytes: merged, fragmentCount: sorted.length, lengthFallbackFragments }
+}
+
+
 const HEADER_SIZE = 16
 const MAX_CLUSTER_BYTES = 1024 * 1024
 const MAX_OBJECTS = 64
