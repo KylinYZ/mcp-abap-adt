@@ -170,3 +170,112 @@ describe('transport member and outgoing-load boundary composition', () => {
     expect(f.run).not.toHaveBeenCalled();
   });
 });
+
+describe('transport crossref structural boundary composition (WBCROSSGT/CROSS)', () => {
+  // 扩展 fixture：按 SQL 路由 WBCROSSGT/CROSS 表（每成员各一次查询）
+  function crossFixture(
+    members: Record<string, unknown>[],
+    wbcrossgt: Record<string, unknown>[] | Error = [],
+    cross: Record<string, unknown>[] | Error = []
+  ) {
+    const run = jest.fn(async (sql: string, limit: number) => {
+      if (sql.includes('FROM e070 WHERE trkorr IN')) return { values: [{ TRKORR: tr, STRKORR: '' }] };
+      if (sql.includes('FROM e070 WHERE strkorr IN')) return { values: [] };
+      if (sql.includes('FROM e071')) return { values: members };
+      expect(sql.includes('FROM WBCROSSGT') || sql.includes('FROM CROSS')).toBe(true);
+      expect(limit).toBe(2000);
+      const source = sql.includes('FROM WBCROSSGT') ? wbcrossgt : cross;
+      if (source instanceof Error) throw source;
+      return { values: source };
+    });
+    return { run };
+  }
+  const wbRow = (include: string, name: string, direct = 'X') => ({ INCLUDE: include, OTYPE: 'ME', NAME: name, DIRECT: direct });
+  const crossRow = (include: string, name: string, prog = '') => ({ INCLUDE: include, TYPE: 'PERFORM', NAME: name, PROG: prog });
+
+  it('collects WBCROSSGT REFERENCES and CROSS CALLS with component merge, direct/noise and sibling filters', async () => {
+    const f = crossFixture(
+      [member('ZA'), member('ZB')],
+      [
+        wbRow('ZA===CP', 'ZB\\ME:DO_STUFF'),       // 组件段剥离 → 对象级 REFERENCES ZA→ZB
+        wbRow('ZA===CP', 'ZOTHER', ' '),            // INDIRECT（DIRECT 非 X）→ 噪声丢弃
+        wbRow('ZAB====CP', 'ZB'),                   // 兄弟池（ZAB 不属于 ZA）→ 归属过滤
+        wbRow('ZA===CP', 'ZA')                      // 自引用 → 丢弃
+      ],
+      [crossRow('ZA===CP', 'DO_FORM', 'ZPROG_OUT')] // PERFORM 交换 → CALLS ZA→ZPROG_OUT
+    );
+    const result = await collectTransportLoadBoundaries(f.run, { ...input, includeLoadBoundaries: false, includeCrossRefBoundaries: true });
+    expect(result.scope).toBe('explicit-transport-outgoing-crossref');
+    expect(result.collection.status).toBe('complete-within-r3tr-crossref-reader-scope');
+    expect(result.collection.dependencyQueryCount).toBe(4);
+    const edges = result.graph.edges.filter(e => e.kind === 'REFERENCES' || e.kind === 'CALLS');
+    expect(edges).toEqual([
+      { from: 'CLAS:ZA', to: 'CLAS:ZB', kind: 'REFERENCES', source: 'WBCROSSGT' },
+      { from: 'CLAS:ZA', to: 'UNKNOWN:ZPROG_OUT', kind: 'CALLS', source: 'CROSS' }
+    ]);
+    // in-scope 精确命中（ZB 是成员）+ 未命中按 Z/Y 启发式分类
+    expect(result.analysis?.summary).toMatchObject({ inScope: 1, missingCustom: 1 });
+  });
+
+  it('combines loads and crossref sources in one structural pass', async () => {
+    const run = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM e070 WHERE trkorr IN')) return { values: [{ TRKORR: tr, STRKORR: '' }] };
+      if (sql.includes('FROM e070 WHERE strkorr IN')) return { values: [] };
+      if (sql.includes('FROM e071')) return { values: [member('ZA'), member('ZB')] };
+      if (sql.includes('FROM D010INC')) return { values: [load('ZA', 'ZB')] };
+      if (sql.includes('FROM WBCROSSGT')) return { values: [wbRow('ZB===CP', 'ZA')] };
+      if (sql.includes('FROM CROSS')) return { values: [] };
+      throw new Error(`unexpected sql: ${sql}`);
+    });
+    const result = await collectTransportLoadBoundaries(run, { ...input, includeLoadBoundaries: true, includeCrossRefBoundaries: true });
+    expect(result.scope).toBe('explicit-transport-outgoing-structural');
+    expect(result.collection.status).toBe('complete-within-r3tr-reader-scope');
+    expect(result.graph.edges.filter(e => e.kind === 'LOADS')).toHaveLength(1);
+    expect(result.graph.edges.filter(e => e.kind === 'REFERENCES')).toHaveLength(1);
+    expect(result.collection.dependencyQueryCount).toBe(6); // 每成员 3 次（1 loads + 2 crossref）× 2 成员
+  });
+
+  it('skips the loads read for a member whose crossref tables both fail, without hiding the failure', async () => {
+    // 失败仅限 ZA 的两表（按 SQL 内成员名路由）；ZB 两表正常
+    const run = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM e070 WHERE trkorr IN')) return { values: [{ TRKORR: tr, STRKORR: '' }] };
+      if (sql.includes('FROM e070 WHERE strkorr IN')) return { values: [] };
+      if (sql.includes('FROM e071')) return { values: [member('ZA'), member('ZB')] };
+      if (sql.includes('FROM D010INC')) return { values: [] };
+      if (sql.includes("'ZA%'")) throw new Error('secret');
+      if (sql.includes('FROM WBCROSSGT')) return { values: [wbRow('ZB===CP', 'ZA')] };
+      if (sql.includes('FROM CROSS')) return { values: [] };
+      throw new Error(`unexpected sql: ${sql}`);
+    });
+    const result = await collectTransportLoadBoundaries(run, { ...input, includeLoadBoundaries: true, includeCrossRefBoundaries: true, maxDependencyQueries: 6 });
+    expect(result.collection.issues).toContainEqual({ nodeId: 'CLAS:ZA', reason: 'crossref-unreadable' });
+    expect(result.collection.skipped).toContainEqual({ nodeId: 'CLAS:ZA', reason: 'crossref-read-failed' });
+    expect(result.collection.status).toBe('partial');
+    expect(JSON.stringify(result)).not.toContain('secret');
+    // ZB 成员仍获得完整两源读取（crossref 2 + loads 1，预算让给后续成员）
+    expect(result.collection.reads.filter(r => r.nodeId === 'CLAS:ZB')).toHaveLength(3);
+    expect(result.collection.reads.filter(r => r.nodeId === 'CLAS:ZA')).toHaveLength(2);
+  });
+
+  it('flags ambiguous same-name multi-type members instead of guessing target identity', async () => {
+    const f = crossFixture(
+      [member('ZA'), member('ZB'), member('ZB', 'PROG')],
+      [wbRow('ZA===CP', 'ZB')],
+      []
+    );
+    const result = await collectTransportLoadBoundaries(f.run, { ...input, includeLoadBoundaries: false, includeCrossRefBoundaries: true, maxDependencyQueries: 8 });
+    expect(result.collection.issues).toContainEqual({ nodeId: 'CLAS:ZA', reason: 'ambiguous-target-membership' });
+    expect(result.graph.edges.some(e => e.to === 'UNKNOWN:ZB' && e.kind === 'REFERENCES')).toBe(true);
+  });
+
+  it('rejects the both-switches-false combination at collector and handler layers', async () => {
+    await expect(collectTransportLoadBoundaries(fixture([member('ZA')]).run, { ...input, includeLoadBoundaries: false, includeCrossRefBoundaries: false }))
+      .rejects.toMatchObject({ message: expect.stringContaining('At least one of includeLoadBoundaries') });
+    const handler = new TransportScopeHandlers(async () => ({ values: [] }));
+    await expect(handler.handle('getTransportScope', { transports: [tr], includeLoadBoundaries: false, includeCrossRefBoundaries: false }))
+      .rejects.toMatchObject({ code: -32602 });
+    // 预算参数仍要求至少一个开关
+    await expect(handler.handle('getTransportScope', { transports: [tr], maxDependencyQueries: 5 }))
+      .rejects.toMatchObject({ code: -32602 });
+  });
+});

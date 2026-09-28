@@ -39,7 +39,7 @@ type KnowledgeToolDefinition = ToolDefinition & {
 };
 
 /** 本处理器认领的工具名。 */
-const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity']);
+const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets']);
 
 export class KnowledgeQueriesHandlers {
   /**
@@ -169,6 +169,25 @@ export class KnowledgeQueriesHandlers {
           required: ['activity']
         },
         ...readOnly
+      },
+      {
+        name: 'getFmTestDataSets',
+        description:
+          'List the saved Function Builder test data sets of a function module: EUFUNC directory entries (set numbers with author/date/time) without decoding payloads. Data source: EUFUNC (relid=FL) via read-only SQL. Payload contents (inputs/outputs) are EXPORT data clusters and require the S/2 cluster decoder, which is not implemented here. Read-only.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            function: {
+              type: 'string',
+              description: 'Function module name, e.g. Z_MCP_SM21_READ.',
+              minLength: 1,
+              maxLength: 30
+            }
+          },
+          required: ['function']
+        },
+        ...readOnly
       }
     ];
   }
@@ -228,6 +247,13 @@ export class KnowledgeQueriesHandlers {
         const language = this.language(toolName, argumentsValue);
         const maxRefs = this.boundedNumber(toolName, argumentsValue.maxRefs, 'maxRefs', 1, 20);
         return success(await this.knowledgeQueries.getImgActivity({ activity, language, ...(maxRefs !== undefined ? { maxRefs } : {}) }));
+      }
+      if (toolName === 'getFmTestDataSets') {
+        const fmName = typeof argumentsValue?.function === 'string' ? argumentsValue.function.trim().toUpperCase() : '';
+        if (!fmName || fmName.length > 30 || !/^[A-Z0-9_]+$/.test(fmName)) {
+          throw invalid(`${toolName} requires function: a function module name of at most 30 characters matching [A-Z0-9_].`);
+        }
+        return success(await this.knowledgeQueries.getFmTestDataSets({ function: fmName }));
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown knowledge-queries tool: ${toolName}`);
     } catch (error) {

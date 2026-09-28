@@ -124,9 +124,29 @@ describe('read-only explicit transport scope collector', () => {
     expect(result.requests).toEqual([]); expect(result.collection.status).toBe('partial');
   });
 
-  it('rejects unrelated headers, missing parent columns and invalid rows', async () => {
+  it('rejects unrelated headers, NULL rows and self-referencing headers; absent STRKORR reads as a request', async () => {
+    // { TRKORR: 'DEVK900001' } 缺 STRKORR 键 = 真机 NULL 语义 = 顶层请求本身，
+    // 被接受为请求而非异常；OTHER（不在请求列表）、null 行、自引用头仍被拒绝。
     const result = await collectTransportScope(reader([header('OTHER'), { TRKORR: 'DEVK900001' }, null, header('DEVK900001', 'DEVK900001')]), input);
-    expect(result.requests).toEqual([]); expect(result.collection.status).toBe('partial');
+    expect(result.requests).toEqual(['DEVK900001']);
+    expect(result.collection.status).toBe('partial');
+    expect(result.collection.issues).toContainEqual({ stage: 'requested-headers', reason: 'invalid-or-out-of-scope-header' });
+  });
+
+  it('treats an undefined STRKORR cell on the parent header as empty, not malformed (real-dev datapreview)', async () => {
+    // 真机实证（2026-09-25，sap-demo）：SAP datapreview 对 NULL 列不输出 <data>
+    // 元素，parseQueryResponse 按 columns 补键后值为 undefined（JSON 序列化时被
+    // 省略，表现为"缺键"假象）。undefined 值必须按空串语义接受，否则顶层请求
+    // 头被当异常数据拒绝，整条采集链空转。
+    const run = reader([header('DEVK900002', 'DEVK900001')],
+      [{ TRKORR: 'DEVK900001' }, { TRKORR: 'DEVK900001', STRKORR: undefined }],
+      [header('DEVK900002', 'DEVK900001')],
+      [member('DEVK900002'), member()]);
+    const result = await collectTransportScope(run, { transports: ['DEVK900002'] });
+    expect(result.requests).toEqual(['DEVK900001']);
+    expect(result.transports).toEqual(['DEVK900001', 'DEVK900002']);
+    expect(result.boundaryScope.objectIds).toEqual(['CLAS:ZCL_A']);
+    expect(result.collection.status).toBe('complete-within-r3tr-reader-scope');
   });
 
   it('preserves evidence from valid members while reporting invalid identities or scope', async () => {

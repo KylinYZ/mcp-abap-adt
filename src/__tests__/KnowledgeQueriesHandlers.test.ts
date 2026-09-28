@@ -18,15 +18,16 @@ function clientMock(): KnowledgeQueriesClient {
     })),
     getImgActivity: jest.fn(async () => ({
       activity: 'X1', language: 'EN', paths: [], notes: []
-    }))
+    })),
+    getFmTestDataSets: jest.fn()
   };
 }
 
 describe('KnowledgeQueriesHandlers tool catalog', () => {
-  it('publishes three uniquely named read-only tools', () => {
+  it('publishes four uniquely named read-only tools', () => {
     const handlers = new KnowledgeQueriesHandlers(clientMock());
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity']);
+    expect(tools.map(t => t.name)).toEqual(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets']);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true

@@ -450,3 +450,43 @@
 - 门禁全绿：Jest 163 suites / 1566 tests（+11）、build、coverage（28/0）、parity、git diff --check。profile 计数同步：development=183、workbench=150、diagnostic=140、legacy-full=203、operations=49。
 - 矩阵：analysis.history 维持 PARTIAL 但 restrictionReason 更新（loads 已验证；剩余全为图引擎类）。AGENTS.md 基线已同步。
 - 下一轮可选：knowledge-queries 的 fm_test_data 子集（EUFUNC 集群表——若只读目录层 TE_DATADIR/FDESC_COPY 可用 datapreview 结构读规避二进制解析，需探针定性）；或受控执行链大轮（execute-abap/amdp-adt）。
+
+## 2026-09-25 闲时轮：getTransportScope 组合链真机验证 SMOKE OK——抓到并修复 NULL 列 undefined 缺陷
+
+- 状态读取：拉取远程新提交 3225156（离线依赖图三工具：analyzeDependencyGraph/buildLoadDependencyGraph/getTransportScope，全部仅离线验证）。矩阵无 UNVERIFIED；按 nextMilestone=transport-structural-dependency-composition 选定本轮工作：为组合链补真机验证（离线三份证据共同声明的缺口）。
+- 本地门禁先行全绿（168 suites / 1765 tests 基线；顺手补跑被远程提交遗漏的矩阵 MD 再生成）。
+- 真机（sap-demo，只读）：`npm run test:transport-scope-real-dev`——S4HK900010 → 父请求 S4HK900009 归并、194 个 R3TR 成员、includeLoadBoundaries 组合分类（partial 三来源如实传播、summary 恒等关系成立、deploymentReadinessVerified/systemWideComplete 恒 false 断言）、负例（未知传输 partial+unresolved、非法 ID InvalidParams）。SMOKE OK。定向补证：buildLoadDependencyGraph 对真实类读回 26 条 LOADS 边（D010INC 真数据）。
+- **真机抓到并修复实质缺陷**：SAP datapreview 对 NULL 列不输出 <data> 元素，parseQueryResponse 按 columns 补键后单元格值为 undefined（JSON 序列化省略成"缺键"假象）——TransportScope 的 cell() 只认字符串，顶层请求头（STRKORR 本应为空）被判异常数据，整条采集链空转；离线 fixtures（空串形态）无法暴露。修复：undefined/null/缺键统一归一化为空串语义，歧义列仍拒绝。新增回归用例 + 修正旧用例过时假设。教训再确认：fixtures 全绿≠真机可用，datapreview 行形态（undefined 值）需真机取证。
+- 排障坑：tsbuildinfo 增量缓存跳过重写导致修复"未生效"假象（删缓存强制重建即解，二次踩坑确认）。
+- 门禁全绿：168 suites / 1766 tests、build、coverage、parity、git diff --check。
+- 矩阵：analysis.history 维持 PARTIAL，restrictionReason 增真机验证段，nextMilestone 更新为 transport-crossref-structural-edges（WBCROSSGT/CROSS 结构边采集）。证据：docs/evidence/transport-scope-real-dev-verified.md。
+- 本轮未做 git commit/push（遵守闲时任务边界，工作区留给所有者复查）。
+
+## 2026-09-25 闲时轮二：getTransportScope 补 WBCROSSGT/CROSS 结构边并真机验证——tr_boundaries 核心链路闭环
+
+- 沿上轮 nextMilestone（transport-crossref-structural-edges）推进：getTransportScope 新增 includeCrossRefBoundaries 开关（与 includeLoadBoundaries 并列、至少一个为 true），对传输范围代码承载成员（CLAS/INTF/PROG/FUGR）采集 WBCROSSGT/CROSS 出向结构边（REFERENCES/CALLS 口径），与 LOADS 源互补后统一进入边界分类器。行语义逐条对齐 getCallees（真机验证过的同表读取口径）：DIRECT='X' 过滤类型引用噪声、PERFORM 行 NAME/PROG 交换、组件段合并为对象级边、兄弟池归属过滤、目标身份按成员名称集精确匹配（同名多类型记歧义不猜）、未命中落 UNKNOWN 类型节点交 Z/Y 启发式分类。
+- 真机（sap-demo，只读）：决定性正例 S4HK900012——裸 SQL 取证 LZMCP_TOOLS 有 CROSS DIRECT 行（NAME=S_ADMI_FCD），组合链端到端产出 FUGR:ZMCP_TOOLS→UNKNOWN:S_ADMI_FCD（CALLS）并正确分类 standardCandidates，恒等关系成立、安全常量不放宽；getCallees 同源对照 21 条引用；双源组合真机可跑（partial 如实传播）；负例双 false → InvalidParams。SMOKE OK（npm run test:transport-crossref-real-dev）。
+- 环境取证与新教训：① WBCROSSGT 的 INCLUDE 池名存在无填充截断形态（名长截断直接拼段后缀），归属过滤规则正确处理；② S4HK900010 自有验证类在 WBCROSSGT 无 DIRECT 行（极简代码+部分 inactive），结构边 0 是真实结果；③ datapreview 按会话查询预算耗尽后 E070/E071 读取静默失败成空成员——多段重查询 smoke 必须按段拆独立 MCP 会话并对空成员显式断言；④ bash heredoc 写含反斜杠 mock 数据会被转义吃掉伪造失败假象（heredoc 转义地狱第三次）——mock 数据必须用 Write 工具写文件。
+- 实现修复：新入参 includeCrossRefBoundaries 同步 requestLimits.STRICT_TOOL_FIELDS（连续两轮在此翻车，已彻底记牢）；handler 补双 false 显式拒绝（防静默降级为纯成员模式）。
+- 门禁全绿：168 suites / 1771 tests（+5）、build、coverage、parity、git diff --check。
+- 矩阵：analysis.history 维持 PARTIAL，restrictionReason 增 crossref 真机段，nextMilestone 清空（tr_boundaries 核心链路真机闭环；剩余 E070A（服务器未配置）/动态调用/图引擎轮均超出纯 SQL 范围）。证据：docs/evidence/transport-crossref-real-dev-verified.md。
+- 下一轮建议：analysis.history 纯 SQL 可落地子集已尽；剩余 PARTIAL（execute-abap/amdp-adt/knowledge-queries 解析器轮）均需大轮立项。可考虑对三轮组合链工具（getTransportScope/buildLoadDependencyGraph/analyzeDependencyGraph）做一次使用指南文档补写（docs/使用指南.md 尚未收录本轮 crossref 开关）。
+
+## 2026-09-25 闲时轮三：getFmTestDataSets（EUFUNC 目录层）落地真机验证——fm_test_data 缺口收窄至集群解码器
+
+- 选型：knowledge-queries（P2）的 fm_test_data 拆层策略——目录层（key 与元数据列）纯 SQL 可落地，payload 内容层（CLUSTD EXPORT 集群）仍需 S/2 集群解析器（独立工程轮）。
+- 真机前置探针（datapreview 直查）：EUFUNC 表可读，列形态 RELID/GRUPPE/NAME/NUMMER/SEQID/SRTF2/LANGU/AUTOR/DATUM/ZEIT/VERSION/CLUSTR/CLUSTD 与 VSP fmtest.go key 取值完全对应；决定性正例 C162_SPEC_GET_BY_ID（标准 FM，999 目录行 + 数据行）。
+- 新增 getFmTestDataSets 只读工具（挂 KnowledgeQueries 家族第四工具；focused/workbench/legacy-full/diagnostic profile）：relid='FL' 按 FM 名精确匹配，列出已保存测试集（编号/作者/日期/时间，SRTF2 续块去重、999 目录行分离为 directory 元数据），notes 恒带"payload 未解码"声明；通道失败降级空目录 + notes（不重试不伪装）。
+- 真机 SMOKE OK：正例 C162_SPEC_GET_BY_ID 读回 999 目录（author=SAP）+ 1 个测试集；自有 FM 空目录为正常回答；非法名 InvalidParams。
+- 接线修复：KnowledgeQueries mock 与 client 绑定同步（python 批量编辑两处错位，逐处修正）；STRICT_TOOL_FIELDS 白名单、ToolProfiles/OperationPolicy 名单、ToolCatalogIntegrity 计数（dev=187/workbench=154/diag=144/full=207）全部同步。
+- 门禁全绿：169 suites / 1776 tests（+5 API 用例）、build、coverage、parity、git diff --check。
+- 矩阵：diagnostics.knowledge-queries 维持 PARTIAL，taskPath 增 getFmTestDataSets，restrictionReason 更新（目录层子集真机验证；剩余 fm_test_data 内容层与 cluster_read 均为集群解析器工程轮）。证据：docs/evidence/fm-test-data-real-dev-verified.md。
+- 下一轮建议：knowledge-queries 剩余缺口（fm_test_data 内容层 + cluster_read）与 analysis.history 剩余（impact/health/graph_stats）均需集群解析器/图引擎工程轮立项，纯 SQL 子集已尽；PARTIAL 剩余的 execute-abap/amdp-adt 为受控链大轮。若不做大轮，可做文档收尾轮（三组合链工具 + getFmTestDataSets 补写进 docs/使用指南.md）。
+
+## 2026-09-25 闲时轮四：文档收尾轮——组合链三工具与 getFmTestDataSets 补写进使用指南
+
+- 选型：PARTIAL 剩余全部是大轮/工程轮/定论不做（execute-abap、amdp-adt=受控链大轮；knowledge-queries、analysis.history=解析器/图引擎工程轮；abapgit=定论 RESTRICTION），无 UNVERIFIED。执行上上轮明确建议的文档收尾轮：近三轮落地的 5 个只读工具补写进 docs/使用指南.md（面向外部读者的权威指南此前缺失，工作区此前已含 27 个文件的未提交成果一并保留）。
+- 使用指南更新：① 6.2/6.3 过时标注修正（"尚未真机验证"→ 6.2/6.4/6.5 真机验证完成，引用 transport-scope/transport-crossref 两份真机证据）；② 新增 6.4 传输结构边界组合链（getTransportScope 双开关语义、crossref 决定性正例、恒等关系与安全常量、预算与 partial 语义）；③ 新增 6.5 函数模块测试数据目录（getFmTestDataSets 目录层语义、payload 不解析声明、空目录为正常回答）；④ 基线行 169/1776（2026-09-25）。
+- 版本适用性标注：6.4/6.5 注明"随下一 npm 版本发布（源码运行已可用）"，6.1 保留"尚未发布"（npm 0.8.4 确不含），避免误导 npm 安装用户。
+- 门禁：169 suites / 1776 tests 全绿、parity、git diff --check（纯文档轮，无代码/矩阵变化）。
+- 遗留与下一轮：PARTIAL 5 行全部进入"大轮/工程轮/定论"状态，纯 SQL 与轻量子集已尽。后续路径三选一：① 集群解析器工程轮（fm_test_data 内容层 + cluster_read，VSP pkg/datacluster 移植）；② 受控执行/调试链大轮（execute-abap、amdp-adt）；③ 发版轮（工作区已有大量未提交成果，可提请所有者审查后发布 0.8.5）。均需所有者输入，闲时轮不再自行开新工程。

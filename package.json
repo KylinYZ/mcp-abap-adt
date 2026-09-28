@@ -56,7 +56,10 @@
     "test:message-text-real-dev": "node ./scripts/message-text-real-dev-smoke.mjs",
     "test:recover-real-dev": "node ./scripts/recover-failed-create-real-dev-smoke.mjs",
     "test:load-graph-real-dev": "node ./scripts/load-graph-real-dev-smoke.mjs",
-    "test:dependency-graph:offline": "node ./scripts/dependency-graph-offline-smoke.mjs"
+    "test:dependency-graph:offline": "node ./scripts/dependency-graph-offline-smoke.mjs",
+    "test:transport-scope-real-dev": "node ./scripts/transport-scope-real-dev-smoke.mjs",
+    "test:transport-crossref-real-dev": "node ./scripts/transport-crossref-real-dev-smoke.mjs",
+    "test:fm-test-data-real-dev": "node ./scripts/fm-test-data-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",

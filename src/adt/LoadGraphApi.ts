@@ -226,8 +226,9 @@ function isGeneratedLoadName(name: string): boolean {
  * ZCL_ORDER 精确、SAPLZCL_ORDER（函数组池）、ZCL_ORDER= 开头（池填充）、
  * L<组> 开头且尾段是函数池段（TOP/UXX/U01…U99/F01…F99/I01/E01/O01）。
  * 其余以名字开头的一律是不同对象（ZCL_ORDER_ITEM 不属于 ZCL_ORDER）。
+ * 导出供交叉引用结构边采集（TransportLoadBoundaries）复用。
  */
-function includeBelongsToName(include: string, name: string): boolean {
+export function includeBelongsToName(include: string, name: string): boolean {
   const inc = include.toUpperCase()
   const target = name.toUpperCase()
   if (inc === target || inc === `SAPL${target}`) return true

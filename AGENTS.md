@@ -10,9 +10,9 @@
 
 - 当前版本：`0.8.4`；npm 包：`abap-ai-workbench-mcp@0.8.4`。
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
-- 当前源码 profile 目录（含尚未发布的图分析/加载图/传输成员采集工具）：`safe=7`、`development=186`、`diagnostic-readonly=143`、`legacy-full=206`、`development-workbench=153`、`business-readonly=18`、`operations-readonly=52`。
+- 当前源码 profile 目录：`safe=7`、`development=187`、`diagnostic-readonly=144`、`legacy-full=207`、`development-workbench=154`、`business-readonly=18`、`operations-readonly=49`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
-- 自动化基线：168 个 Jest suites、1765 个 tests（2026-09-24，离线全量及默认覆盖率通过）。VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；analysis.history 的单跳 loads 已有历史真机证据；新增快照 impact/stats/boundaries、有界加载图及显式传输成员采集仅完成离线验证，不能视为系统级对齐。当前进度见 `docs/evidence/transport-scope-offline-alignment.md`；采集链见 `docs/evidence/load-dependency-graph-offline-alignment.md`。
+- 自动化基线：169 个 Jest suites、1776 个 tests（2026-09-25）。VSP 能力对齐：54/71（MCP_SUPERSET=13）；analysis.history 的 loads 与 transport-crossref 结构边、knowledge-queries 的 fm_test_data 目录层均已真机验证；离线三工具（快照 impact/stats/boundaries、有界加载图、显式传输成员采集）已由组合链真机验证覆盖核心路径。当前进度见 `docs/evidence/transport-crossref-real-dev-verified.md` 与 `docs/evidence/fm-test-data-real-dev-verified.md`。
 - 真实 SAP smoke 默认使用 `sap-demo.env`（所有者 2026-09-22 指示；sap-dev 上 S4HK900009 已不可用）。
 - 运行时要求：Node.js >=22.14.0（`.nvmrc` 为 22；Node 18/20 已 EOL，自 0.7.0 起不再支持——为 RFC 基座 open-rfc 的支持合同对齐）。
 

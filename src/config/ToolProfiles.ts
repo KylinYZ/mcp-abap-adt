@@ -98,6 +98,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 知识查询只读三工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
   // 文档 + IMG 检索 + IMG 活动详情（路径递归）
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
+  'getFmTestDataSets',
   // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
   'getCrHistory', 'getCoChange',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）：编译期加载关系

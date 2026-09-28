@@ -1,4 +1,5 @@
 import { normalizeRepositoryName } from './CrossReferenceApi.js'
+import { createFmTestDataClient } from './FmTestDataApi.js'
 
 /**
  * ============================================================================
@@ -530,6 +531,7 @@ export interface KnowledgeQueriesClient {
   getAbapDocumentation(input: GetAbapDocumentationInput): Promise<GetAbapDocumentationResult>
   searchImgActivities(input: SearchImgActivitiesInput): Promise<SearchImgActivitiesResult>
   getImgActivity(input: GetImgActivityInput): Promise<GetImgActivityResult>
+  getFmTestDataSets(input: { function: string }): Promise<import('./FmTestDataApi.js').GetFmTestDataSetsResult>
 }
 
 /**
@@ -546,6 +548,7 @@ export function createKnowledgeQueriesClient(client: {
   return {
     getAbapDocumentation: input => getAbapDocumentation(runner, input),
     searchImgActivities: input => searchImgActivities(runner, input),
-    getImgActivity: input => getImgActivity(runner, input)
+    getImgActivity: input => getImgActivity(runner, input),
+    getFmTestDataSets: input => createFmTestDataClient(client).getFmTestDataSets(input)
   }
 }

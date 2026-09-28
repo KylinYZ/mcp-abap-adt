@@ -10,8 +10,16 @@ const objectPattern = /^[A-Z0-9_/=$%<>~.-]{1,80}$/;
 const list = (values: string[]) => values.map(value => `'${value}'`).join(', ');
 function cell(row: Record<string, unknown>, name: string): string | undefined {
   const keys = Object.keys(row).filter(key => key.toUpperCase() === name || key.toUpperCase().endsWith(`~${name}`) || key.toUpperCase().endsWith(`.${name}`));
-  if (keys.length !== 1 || typeof row[keys[0]] !== 'string') return undefined;
-  return (row[keys[0]] as string).trim().toUpperCase();
+  // 真机实证（2026-09-25，sap-demo）：SAP datapreview 对 NULL 列不输出 <data>
+  // 元素——parseQueryResponse 按 columns 补键后值为 undefined（JSON 序列化时
+  // 被省略，显示成"缺键"假象）。undefined/null/键缺失都是合法空值（空串语义），
+  // 唯多同名键（歧义）与非字符串非空值才是异常。
+  if (keys.length > 1) return undefined;
+  if (keys.length === 0) return '';
+  const value = row[keys[0]];
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') return undefined;
+  return value.trim().toUpperCase();
 }
 
 export async function collectTransportScope(runQuery: TransportHistoryQueryRunner, input: { transports: string[] }) {
