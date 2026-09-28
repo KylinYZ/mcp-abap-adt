@@ -32,3 +32,24 @@ membership and task-to-request collapse, using this project's existing E070/E071
 read-only query channel. Unlike silent skipping, non-R3TR entries, missing or
 conflicting headers and collection limits explicitly make acquisition partial.
 Explicit transport unions do not implement E070A CR discovery.
+
+## Offline EUFUNC v5 decoder prototype reference
+
+- Protocol/source reference checkout: `D:\Dev\sapMcp\vibing-steampunk`, commit
+  `9886d2727f47506368b0a3c2f1c1766f1200f747`.
+- Files reviewed as format references: `pkg/datacluster/legacy.go`,
+  `pkg/datacluster/cluster.go`, `pkg/datacluster/values.go`, and
+  `pkg/sapcompress/sapcompress.go`.
+- The source repository is MIT-licensed; this directory's `LICENSE` contains
+  its full terms. The prototype in
+  `src/adt/EufuncV5DecoderPrototype.ts` is an independently written, bounded
+  TypeScript parser informed by the documented source. It does not copy the Go
+  implementation, fixtures, or fixture values and is not a runtime dependency.
+- Its tests construct disposable synthetic bytes at test time; they are not
+  reproductions of the VSP EUFUNC fixtures and are not an oracle for real SAP
+  payload compatibility. The parser is intentionally not connected to ADT,
+  `getFmTestDataSets`, an MCP tool, or any SAP system. It is a prototype only.
+- Scope is currently version 5, code page 1100, plain and SAP LZH v1, plus a
+  small explicit type subset. Other versions, code pages, algorithms, markers,
+  and types fail closed. No production-use or real-data compatibility claim is
+  made.

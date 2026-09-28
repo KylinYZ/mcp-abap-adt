@@ -1,15 +1,16 @@
 # 当前进度
 
-更新时间：2026-09-24
+更新时间：2026-09-28
 
 ## 结论
 
-- 代码版本：`0.8.4`；本地新增图分析与只读采集接线尚未发布。
-- 自动化门禁：168 个 Jest suites、1765 个 tests（离线全量及默认覆盖率均通过）；构建、创建成熟度检查、矩阵检查和离线 MCP 进程 smoke 通过。
-- 当前推进：新增 `getTransportScope`，沿用 E070/E071 只读通道，把显式传输/任务展开为父请求与兄弟任务的 R3TR 成员并集；缺失、冲突、LIMU 未解析及截断均报告 partial。离线 stdio 已串联成员采集、加载图与 boundaries；零 SAP 调用，矩阵仍 PARTIAL、对齐仍 54/71。详见 [`传输成员离线对齐`](docs/evidence/transport-scope-offline-alignment.md)。
-- 下一步：将传输成员与有界结构依赖采集合成，保留采集缺口，避免仅凭成员边误报完整；E070A CR 分组及 LIMU 映射不猜身份。未知 ADT 协议先请求脱敏 Eclipse 抓包。新增链路待真实环境验证，用户 MCP 客户端部署未完成。
+- 代码版本：`0.8.4`；当前 `main` 已包含 2026-09-28 的组合链真机验证代码，是否发布为 npm 新版本及用户 MCP 部署状态需另行核实。
+- 自动化门禁：本轮 `npm test -- --runInBand` 通过，170 suites / 1794 tests；`npm run build`、`npm run check:repository-creation-coverage`（28 个 REAL_DEV_VERIFIED、无缺少必需证据）、VSP 矩阵校验与 `git diff --check` 通过。一个可选离线包 smoke 因本机缺少真实离线包而按脚本设计跳过；本轮未连接 SAP。
+- VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；`analysis.history` 仍为 PARTIAL。loads、有界加载图和传输成员/结构边界组合链已由专用 DEV 真机证据覆盖核心路径；CR 分组、动态图边及图引擎完整性仍有缺口，详见[后续缺口与验收规划](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)。
+- `getFmTestDataSets` 已真机验证 EUFUNC 测试集目录与元数据读取；CLUSTD payload 未解码，不提供 inputs/outputs 内容。是否投入 S/2 集群解码器应先做独立可行性评估，不应扩大当前能力声明。
+- 路线图与审计见 [`analysis.history / FM payload 路线图`](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)、[analysis.history 缺口审计](docs/evidence/analysis-history-gap-audit.md)及[FM API 集成计划](docs/evidence/fm-test-data-api-integration-plan.md)。用户提供的 VSP checkout 已确认精确匹配矩阵固定 SHA，MIT 许可与内部 decoder/compressor 依赖已核实；隔离离线 v5 parser 原型及合成测试已完成，不连 SAP、不接 MCP。现有 EUFUNC fixtures 的再分发/脱敏状态和本项目 datapreview 的 CLUSTD wire 表示仍待核实；不得将原型描述为真实 payload 已验证。CR/LIMU 身份不得猜测，未知 ADT 协议先请求脱敏 Eclipse 抓包。发布与 MCP 客户端部署状态未在本轮核实。
 - 仓库对象目录：31 类；`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`。
-- 真实 DEV 验证固定使用专用配置、现有未释放传输和一次原生确认；QAS/PRD 不写。
+- 真实 DEV 验证使用专用配置及只读或受控流程；QAS/PRD 不写。组合链证据使用 `sap-demo`，只读 SQL，无写操作。
 - 所有历史 `OUTCOME_UNKNOWN`、`COMPENSATED`、`COMPENSATION_FAILED` 计划均不可重放；新验证必须使用新身份和新 preview。
 
 ## 已达到 `REAL_DEV_VERIFIED`

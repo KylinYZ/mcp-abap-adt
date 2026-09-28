@@ -48,3 +48,10 @@ SMOKE OK
 - 结构依赖边仍是 **D010INC LOADS 单一口径**（非 CALLS/REFERENCES 全集）；
 - WBCROSSGT/CROSS 出边采集、E070A CR 分组、动态调用解析仍未实现；
 - 排障期间遗留对象：无（S4HK900009 为既有传输，仅只读访问）。
+
+## 后续证据更正（2026-09-28）
+
+上面的“剩余缺口”记录早于 cross-reference 结构边接线，现已过时。2026-09-25 的专门只读 DEV 证据
+[`transport-crossref-real-dev-verified.md`](transport-crossref-real-dev-verified.md) 验证了 WBCROSSGT/CROSS 出边采集及 LOADS + REFERENCES/CALLS 组合 TR 边界链；因此不能再将“WBCROSSGT/CROSS 出边采集未实现”当作当前结论。
+
+该后续证据只覆盖特定 DEV 样本和有界读取，不宣称 CR 分组、动态图解析、包归属完整、系统级图引擎等价或全系统完整性。`analysis.history` 仍为 `PARTIAL`（54/71）；逐项缺口见 [`analysis-history-gap-audit.md`](analysis-history-gap-audit.md)。本更正不改变原验证日期、样本或原始 smoke 结果。
