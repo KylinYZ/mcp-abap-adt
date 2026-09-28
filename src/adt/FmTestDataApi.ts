@@ -127,12 +127,16 @@ export interface FmTestDataClient {
   getFmTestDataSets(input: { function: string }): Promise<GetFmTestDataSetsResult>
 }
 
-/** 把 runQuery 通道绑定成处理器可注入的窄客户端（decode 固定 true；不重试）。 */
+/** 把 runQuery 通道绑定成处理器可注入的窄客户端（不重试）。
+ *  decode 固定 false：真机取证（2026-09-28，fm-test-data-clustd-real-dev-verified）
+ *  证实 datapreview 对 DATS 列（EUFUNC.DATUM，type='D'）在 decode=true 时转成
+ *  JS Date，date 元数据会退化成英文日期串；decode=false 下全部列原样字符串
+ *  （INT 列带尾随空格，cellText 的 trim 已吸收），与本 API 的 cellText 语义一致。 */
 export function createFmTestDataClient(client: {
   runQuery(sqlQuery: string, rowNumber?: number, decode?: boolean): Promise<{ values?: Record<string, unknown>[] }>
 }): FmTestDataClient {
   const runner: FmTestDataQueryRunner = async (sql, rowLimit) =>
-    (await client.runQuery(sql, rowLimit, true)) ?? { values: [] }
+    (await client.runQuery(sql, rowLimit, false)) ?? { values: [] }
   return {
     getFmTestDataSets: input => getFmTestDataSets(runner, input)
   }

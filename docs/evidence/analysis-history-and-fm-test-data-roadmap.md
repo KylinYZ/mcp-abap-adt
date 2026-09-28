@@ -8,7 +8,7 @@
 - `getTransportScope` 的 LOADS + WBCROSSGT/CROSS 组合链有专用 DEV 只读验证，包含决定性结构边正例、边界分类和部分状态传播。证据：[传输 cross-reference 真机验证](transport-crossref-real-dev-verified.md)。
 - 缺口审计已完成：[analysis.history 缺口审计](analysis-history-gap-audit.md)。各项仍须按子能力分别证明，不以整个 tool catalog 的存在推断等价。
 - FM 测试数据工具只读 EUFUNC 目录/元数据；`CLUSTD` EXPORT 集群 payload 不解析。证据：[FM 测试数据目录层真机验证](fm-test-data-real-dev-verified.md)。
-- Payload 源码审计有新进展：用户提供的 VSP checkout 精确匹配矩阵固定 SHA，MIT 许可和 decoder/compressor 内部依赖已核实；本地 EUFUNC V5 fixtures 可供审计，但脱敏/再分发资格未核实，不复制使用。隔离离线原型已完成，并以合成数据测试覆盖受限格式子集；全仓 Jest/build 通过。datapreview CLUSTD wire 契约的离线 mock contract 测试已完成（RAW 原样性/字节还原有利，NULL 错位/单行空串消失/带属性单元格三项 parser 现状需先加固）；主项目 MCP/API 接入仍 NO-GO，直到 datapreview `CLUSTD` wire 表示及完整性得到独立验证。详见 [payload 可行性审计](fm-test-data-payload-spike.md)、[FM API 集成计划](fm-test-data-api-integration-plan.md)与 [datapreview 契约离线锁定](fm-test-data-datapreview-contract-offline.md)。
+- Payload 源码审计有新进展：用户提供的 VSP checkout 精确匹配矩阵固定 SHA，MIT 许可和 decoder/compressor 内部依赖已核实；本地 EUFUNC V5 fixtures 可供审计，但脱敏/再分发资格未核实，不复制使用。隔离离线原型已完成，并以合成数据测试覆盖受限格式子集；全仓 Jest/build 通过。datapreview CLUSTD wire 契约已离线 mock 锁定并于 2026-09-28 获授权真机实证：CLUSTD=hex（type='X'，`<data>` 无属性）、CLUSTR=INT2 片段字节数、LRAW 固定宽度+全零 padding，无损重组规则确立；payload 可解码 partial（原型 fail-closed 于尾部形态，待按真机 bytes 扩展）；多片段完整性 partial（样本均单片段）。MCP/API 接入仍 NO-GO 直到 decoder 容错边界扩展+oracle 对照完成。详见 [payload 可行性审计](fm-test-data-payload-spike.md)、[FM API 集成计划](fm-test-data-api-integration-plan.md)、[datapreview 契约离线锁定](fm-test-data-datapreview-contract-offline.md)与 [CLUSTD 真机取证](fm-test-data-clustd-real-dev-verified.md)。
 - 包版本为 0.8.4。是否发布包含这些代码的新版、npm 状态及用户 MCP 客户端部署/重启验收，均需独立核实；离线或 DEV smoke 不等于已发布、已部署。
 
 ## 规划 A：analysis.history 缺口与验收

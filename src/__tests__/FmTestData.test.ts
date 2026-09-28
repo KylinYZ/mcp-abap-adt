@@ -3,7 +3,7 @@
  * fm_test_data 目录层子集）。SQL 通道全 mock，不连接 SAP。
  * 行形态对齐真机取证（2026-09-25，sap-demo EUFUNC 实查）。
  */
-import { getFmTestDataSets } from '../adt/FmTestDataApi';
+import { getFmTestDataSets, createFmTestDataClient } from '../adt/FmTestDataApi';
 
 const row = (overrides: Record<string, unknown>) => ({
   NAME: 'Z_MCP_SM21_READ', GRUPPE: 'ZMCP_TOOLS', NUMMER: '', AUTOR: '', DATUM: '', ZEIT: '',
@@ -59,5 +59,16 @@ describe('getFmTestDataSets（EUFUNC 目录层）', () => {
     await expect(getFmTestDataSets(run, { function: 'BAD NAME!' })).rejects.toThrow(/invalid/);
     await expect(getFmTestDataSets(run, { function: '' })).rejects.toThrow(/invalid/);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('wires the client channel with decode=false (真机取证：DATS 列 decode=true 会转 Date 损坏 date 元数据)', async () => {
+    // 2026-09-28 真机实证（fm-test-data-clustd-real-dev-verified）：EUFUNC.DATUM
+    // 在 datapreview 元数据中报 type='D'，decode=true 把它转成 JS Date，
+    // date 字段退化成英文日期串。接线必须固定 decode=false 保持原样字符串。
+    const runQuery = jest.fn(async (_sqlQuery: string, _rowNumber?: number, _decode?: boolean) => ({ values: [row({ NUMMER: '001', DATUM: '20260925' })] }));
+    const client = createFmTestDataClient({ runQuery });
+    const result = await client.getFmTestDataSets({ function: 'C162_SPEC_GET_BY_ID' });
+    expect(result.sets[0].date).toBe('20260925');
+    expect(runQuery.mock.calls[0][2]).toBe(false); // 第三参 decode 固定 false
   });
 });

@@ -5,10 +5,10 @@
 ## 结论
 
 - 代码版本：`0.8.4`；当前 `main` 已包含 2026-09-28 的组合链真机验证代码，是否发布为 npm 新版本及用户 MCP 部署状态需另行核实。
-- 自动化门禁：本轮 `npm test -- --runInBand` 通过，171 suites / 1807 tests；`npm run build`、`npm run check:repository-creation-coverage`（28 个 REAL_DEV_VERIFIED、无缺少必需证据）、VSP 矩阵校验与 `git diff --check` 通过。一个可选离线包 smoke 因本机缺少真实离线包而按脚本设计跳过；本轮未连接 SAP。
+- 自动化门禁：本轮 `npm test -- --runInBand` 通过，171 suites / 1811 tests；`npm run build`、`npm run check:repository-creation-coverage`（28 个 REAL_DEV_VERIFIED、无缺少必需证据）、VSP 矩阵校验与 `git diff --check` 通过。一个可选离线包 smoke 因本机缺少真实离线包而按脚本设计跳过。
 - VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；`analysis.history` 仍为 PARTIAL。loads、有界加载图和传输成员/结构边界组合链已由专用 DEV 真机证据覆盖核心路径；CR 分组、动态图边及图引擎完整性仍有缺口，详见[后续缺口与验收规划](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)。
 - `getFmTestDataSets` 已真机验证 EUFUNC 测试集目录与元数据读取；CLUSTD payload 未解码，不提供 inputs/outputs 内容。是否投入 S/2 集群解码器应先做独立可行性评估，不应扩大当前能力声明。
-- datapreview CLUSTD wire 契约已离线锁定（13 个 mock contract 用例）：RAW/XSTRING 列 decode 不转码、hex 可逐行字节还原是有利前提；但 NULL 缺格错位无告警、单行空串整行消失、带属性单元格对象化三项 parser 现状表明接入前必须先加固。证据：[datapreview 契约离线锁定](docs/evidence/fm-test-data-datapreview-contract-offline.md)。真机探针待授权。
+- datapreview CLUSTD wire 契约已离线锁定并经真机实证（2026-09-28，授权后只读探针）：CLUSTD=hex/type='X'/'<data>' 无属性、CLUSTR=INT2 片段字节数、LRAW 固定宽度+全零 padding，无损重组规则确立（每片段取前 CLUSTR×2 hex 字符按 SRTF2 拼接）；payload 可解码 partial（原型 fail-closed 于尾部形态）；多片段完整性仍 partial（样本均单片段）。随附修复 createFmTestDataClient decode=false（DATS→Date 真机实锤的有损转换）。证据：[CLUSTD 真机取证](docs/evidence/fm-test-data-clustd-real-dev-verified.md) 与 [datapreview 契约离线锁定](docs/evidence/fm-test-data-datapreview-contract-offline.md)。decoder 接入维持 NO-GO，待原型按真机 bytes 扩展容错边界并建立 oracle。
 - 路线图与审计见 [`analysis.history / FM payload 路线图`](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)、[analysis.history 缺口审计](docs/evidence/analysis-history-gap-audit.md)及[FM API 集成计划](docs/evidence/fm-test-data-api-integration-plan.md)。用户提供的 VSP checkout 已确认精确匹配矩阵固定 SHA，MIT 许可与内部 decoder/compressor 依赖已核实；隔离离线 v5 parser 原型及合成测试已完成，不连 SAP、不接 MCP。现有 EUFUNC fixtures 的再分发/脱敏状态和本项目 datapreview 的 CLUSTD wire 表示仍待核实；不得将原型描述为真实 payload 已验证。CR/LIMU 身份不得猜测，未知 ADT 协议先请求脱敏 Eclipse 抓包。发布与 MCP 客户端部署状态未在本轮核实。
 - 仓库对象目录：31 类；`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`。
 - 真实 DEV 验证使用专用配置及只读或受控流程；QAS/PRD 不写。组合链证据使用 `sap-demo`，只读 SQL，无写操作。

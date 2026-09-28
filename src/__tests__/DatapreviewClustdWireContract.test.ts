@@ -267,3 +267,62 @@ describe('datapreview XML wire 契约：EUFUNC 完整行形态对照', () => {
     expect(Buffer.from(clustd, 'hex')).toHaveLength(64);
   });
 });
+
+describe('datapreview XML wire 契约：真机证实形态（2026-09-28 sap-demo，fm-test-data-clustd-real-dev-verified）', () => {
+  it('真机实证：CLUSTD 报 type=X、<data> 无属性、连续 mixed-case hex（3800 字节固定 LRAW 宽度）', () => {
+    // 真机 Q2/Q4：CLUSTD 列 metadata type='X'，dataWithAttributes=0，
+    // 单元格为 7600 hex 字符（=3800 字节固定宽度，含 padding）。
+    const hex = syntheticHex(3800);
+    const xml = tableDataXml([column('SRTF2', 'I', ['0 '], 4), column('CLUSTR', 's', ['422 '], 4), column('CLUSTD', 'X', [hex], 3800)]);
+    const raw = parseQueryResponse(xml);
+    expect(raw.columns.find(c => c.name === 'CLUSTD')?.type).toBe('X');
+    expect(raw.values[0].CLUSTD).toBe(hex); // decode=false 原样，长度不被裁剪
+  });
+
+  it('真机实证：CLUSTR 是 INT2（type=s）承载片段有效字节数；INT 列呈现带尾随空格', () => {
+    // 真机推翻合成假设「CLUSTR=RAW22」：实为 INT2（片段字节数），值形如 '422 '。
+    // 无损重组规则（padding 模型，真机 Q5 实证 paddingAllZeros=true）：
+    // 每片段取 CLUSTD 前 CLUSTR×2 个 hex 字符 → hex decode → 按 SRTF2 拼接。
+    const effective = 'CAFEBABE'; // 有效 4 字节的示意 hex（真机 422 字节，此处缩样）
+    const padding = '0'.repeat(64);   // 真机：剩余 6756 字符全 '0'
+    const xml = tableDataXml([
+      column('SRTF2', 'I', ['0 '], 4),
+      column('CLUSTR', 's', ['4 '], 4),
+      column('CLUSTD', 'X', [effective + padding], 36)
+    ]);
+    const raw = parseQueryResponse(xml);
+    const row = raw.values[0];
+    const clustrBytes = parseInt(String(row.CLUSTR).trim(), 10); // 尾随空格由 trim 吸收
+    const effectiveHex = String(row.CLUSTD).slice(0, clustrBytes * 2);
+    const paddingHex = String(row.CLUSTD).slice(clustrBytes * 2);
+    expect(clustrBytes).toBe(4);
+    expect(effectiveHex).toBe(effective);
+    expect(paddingHex).toMatch(/^0*$/); // padding 全 '0'——真机同规则
+    expect(Buffer.from(effectiveHex, 'hex')).toEqual(Buffer.from([0xca, 0xfe, 0xba, 0xbe]));
+  });
+
+  it('真机实证：NUMMER 可为 NULL（省略 <data>），nummer<>999 过滤后单元格 undefined（缺格形态再现）', () => {
+    // 真机 Q3/Q4：C162 的非 999 测试集行 NUMMER 为 NULL——列无任何 <data> 时
+    // （真机服务端生成紧凑 XML，无空白文本），该列单元格 undefined，与阶段 A
+    // 锁定的缺格契约一致；拼接/分组逻辑不得假设 NUMMER 恒有值。
+    // 手工拼紧凑 XML：column() 对全 undefined 列会生成带缩进空白的 <dataSet>，
+    // 在 trimValues:false 下空白文本会被 xmlArray 当作单元格值，非真机形态。
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<tableData xmlns="http://www.sap.com/adt/datapreview/tabledata">
+  <columns>
+    <metadata name="NUMMER" type="C" keyAttribute="false" length="3"/>
+    <dataSet></dataSet>
+  </columns>
+  <columns>
+    <metadata name="SRTF2" type="I" keyAttribute="false" length="4"/>
+    <dataSet>
+      <data>0 </data>
+    </dataSet>
+  </columns>
+</tableData>`;
+    const raw = parseQueryResponse(xml);
+    expect(raw.values).toHaveLength(1);
+    expect(raw.values[0].NUMMER).toBeUndefined();
+    expect(raw.values[0].SRTF2).toBe('0 ');
+  });
+});
