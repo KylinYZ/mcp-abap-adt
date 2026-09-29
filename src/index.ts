@@ -2,14 +2,12 @@
 
 import { config } from 'dotenv';
 import { randomUUID } from 'crypto';
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  McpError,
-  ErrorCode
-} from "@modelcontextprotocol/sdk/types.js";
+// 0.9.0：协议栈迁移到官方 v2 双栈包（2026-07-28 modern + 2025 legacy）。
+// 低层 Server 保留自管工具目录模式；stdio 传输生命周期由 serveStdio 拥有。
+import { Server, inputRequired } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { McpError, ErrorCode } from "./lib/McpErrorCompat.js";
+import { createMrtrElicitPort, ConfirmationRequiredError } from "./lib/MrtrElicitation.js";
 import { ADTClient, session_types } from "./adt/index.js";
 import path from 'path';
 import { AuthHandlers } from './handlers/AuthHandlers.js';
@@ -44,6 +42,7 @@ import { SafeDebugHandlers } from './handlers/SafeDebugHandlers.js';
 import { SafeAdvancedHandlers } from './handlers/SafeAdvancedHandlers.js';
 import { SafeQualityHandlers } from './handlers/SafeQualityHandlers.js';
 import { SafeActivationHandlers } from './handlers/SafeActivationHandlers.js';
+import { SafeTransportCreationHandlers } from './handlers/SafeTransportCreationHandlers.js';
 import {
   RepositoryObjectCreationHandlers
 } from './handlers/RepositoryObjectCreationHandlers.js';
@@ -67,6 +66,8 @@ import { QualityCheckPlanStore } from './safe/QualityCheckPlanStore.js';
 import { QualityCheckWorkflow } from './safe/QualityCheckWorkflow.js';
 import { ObjectActivationPlanStore } from './safe/ObjectActivationPlanStore.js';
 import { ObjectActivationWorkflow } from './safe/ObjectActivationWorkflow.js';
+import { TransportCreationPlanStore } from './safe/TransportCreationPlanStore.js';
+import { TransportCreationWorkflow } from './safe/TransportCreationWorkflow.js';
 import { RepositoryObjectCreationRegistry } from './safe/RepositoryObjectCreationRegistry.js';
 import { RepositoryObjectCreationPlanStore } from './safe/RepositoryObjectCreationPlanStore.js';
 import { RepositoryObjectCreationWorkflow } from './safe/RepositoryObjectCreationWorkflow.js';
@@ -108,6 +109,8 @@ import { createCdsAnalysisClient } from './adt/CdsDependencyApi.js';
 import {
   createSourceGrepClient
 } from './adt/SourceGrepApi.js';
+import { WhereUsedConfigHandlers } from './handlers/WhereUsedConfigHandlers.js';
+import { createWhereUsedConfigClient } from './adt/WhereUsedConfigApi.js';
 import {
   createUnitCoverageClient
 } from './adt/UnitCoverageApi.js';
@@ -194,6 +197,7 @@ export class AbapAdtServer extends Server {
   private safeAdvancedHandlers: SafeAdvancedHandlers;
   private safeQualityHandlers: SafeQualityHandlers;
   private safeActivationHandlers: SafeActivationHandlers;
+  private safeTransportCreationHandlers: SafeTransportCreationHandlers;
   private repositoryObjectCreationHandlers: RepositoryObjectCreationHandlers;
   private highLevelReadHandlers: HighLevelReadHandlers;
   private cdsAnalysisHandlers: CdsAnalysisHandlers;
@@ -219,6 +223,7 @@ export class AbapAdtServer extends Server {
   private transportHistoryHandlers: TransportHistoryHandlers;
   private transportScopeHandlers: TransportScopeHandlers;
   private loadGraphHandlers: LoadGraphHandlers;
+  private whereUsedConfigHandlers: WhereUsedConfigHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -250,12 +255,26 @@ export class AbapAdtServer extends Server {
     private revisionHandlers: RevisionHandlers;
     private rapGeneratorHandlers: RapGeneratorHandlers;
     private sm21Handlers?: Sm21Handlers;
+    /**
+     * 当前正在执行的 tools/call 请求的 MRTR 确认 port。
+     * v2 把确认流移到 input_required 多轮模型：port 在无响应轮抛
+     * ConfirmationRequiredError（由 handler 转 inputRequired 结果），
+     * 在重试轮从 inputResponses 恢复确认结果；legacy 连接经 v2 官方
+     * shim 自动转 elicitation/create，行为与 0.8.x 一致。
+     * 单并发执行模型下以实例字段传递。
+     */
+    private activeElicitPort?: (params: import("@modelcontextprotocol/server").ElicitRequestFormParams | import("@modelcontextprotocol/server").ElicitRequestURLParams, timeoutMs: number) => Promise<import("@modelcontextprotocol/server").ElicitResult>;
+    /**
+     * 当前请求 envelope 携带的客户端能力（modern era：2026-07-28 每请求
+     * _meta envelope；legacy era 为 null，回落 initialize 握手填充的实例能力）。
+     */
+    private activeEnvelopeCapabilities?: { elicitation?: { form?: unknown } } | null;
 
   constructor(passwordOverride?: string) {
     super(
       {
         name: "abap-ai-workbench-mcp",
-        version: "0.8.3",
+        version: "0.9.0",
       },
       {
         capabilities: {
@@ -428,6 +447,15 @@ export class AbapAdtServer extends Server {
     // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：编译期加载
     // 关系（INCLUDE 拆分依赖），datapreview SQL 通道同款只读。
     this.loadGraphHandlers = new LoadGraphHandlers(createLoadGraphClient(readClient));
+    // where-used-config 只读工具（analysis.history 的 where_used_config 子操作）：
+    // TVARVC 配置引用分析 = 交叉表 SQL + grepObjects 源码确认两通道组合。
+    this.whereUsedConfigHandlers = new WhereUsedConfigHandlers(createWhereUsedConfigClient({
+      runSql: async (sql, rowLimit) => {
+        const result = await readClient.runQuery(sql, rowLimit, true);
+        return { values: result?.values ?? [] };
+      },
+      grepObjects: input => createSourceGrepClient(readClient.httpClient).grepObjects(input)
+    }));
     // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：open-rfc 直连
     // SAP 网关（node:net，无 SDK），连接参数由既有 ADT 环境推导（主机/
     // client/凭据同源，实例号经 RFC_SYSNR 覆盖，缺省 '01' 与专用 DEV
@@ -464,8 +492,8 @@ export class AbapAdtServer extends Server {
       audit: auditLogger
     } as never);
     this.descriptionChangeHandlers = new DescriptionChangeHandlers(descriptionWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     // 受控消息类文本写入（i18n.write 的 write_message_texts）：与描述链同面的
     // 受控写工作流（plan + 原生确认 + stateful 锁链单次执行 + readback）。
@@ -476,8 +504,8 @@ export class AbapAdtServer extends Server {
       audit: auditLogger
     } as never);
     this.messageTextHandlers = new MessageTextHandlers(messageTextWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
 
     const changeWorkflow = new AbapChangeWorkflow(
@@ -549,8 +577,8 @@ export class AbapAdtServer extends Server {
     const repositoryConfirmationProvider = createRepositoryCreationConfirmationProvider({
       environment: process.env,
       platform: process.platform,
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     const repositoryCleanupWorkflow = new RepositoryObjectCleanupWorkflow(
       this.adtClient,
@@ -625,8 +653,8 @@ export class AbapAdtServer extends Server {
       audit: auditLogger
     } as never);
     this.cloneObjectHandlers = new CloneObjectHandlers(cloneWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     // 受控对象重命名（refactor.rename 一站式）：preview 只读快照+改名冻结，
     // apply 单确认两步——①复用克隆工作流落地新对象（受控创建链保证）；
@@ -640,18 +668,18 @@ export class AbapAdtServer extends Server {
       audit: auditLogger
     } as never);
     this.renameControlledHandlers = new RenameControlledHandlers(renameWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs })
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => changeWorkflow.apply(input))
     }, creationWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => creationWorkflow.apply(input))
     });
     const debugWorkflow = new DebugControlWorkflow(
@@ -672,8 +700,8 @@ export class AbapAdtServer extends Server {
       auditLogger
     );
     this.safeDebugHandlers = new SafeDebugHandlers(debugWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => debugWorkflow.applyOperation(input)),
       authorizeConfirmed: (targetUser, debuggeeId) => this.executionGate.run(
         () => debugWorkflow.authorizeConfirmed(targetUser, debuggeeId)
@@ -700,8 +728,8 @@ export class AbapAdtServer extends Server {
       previewPackageChange: args => packageWorkflow.preview(args),
       previewRapOperation: args => rapWorkflow.preview(args)
     }, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: operationPlanId => this.executionGate.run(async () => {
         const plan = advancedPlans.get(operationPlanId);
         if (plan.operationKind === 'CHANGE_PACKAGE') return packageWorkflow.apply(operationPlanId);
@@ -724,8 +752,8 @@ export class AbapAdtServer extends Server {
       auditLogger
     );
     this.safeQualityHandlers = new SafeQualityHandlers(qualityWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
     });
 
@@ -744,9 +772,30 @@ export class AbapAdtServer extends Server {
       auditLogger
     );
     this.safeActivationHandlers = new SafeActivationHandlers(activationWorkflow, {
-      supportsFormElicitation: () => Boolean(this.getClientCapabilities()?.elicitation?.form),
-      elicitInput: (params, timeoutMs) => this.elicitInput(params, { timeout: timeoutMs }),
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: activationPlanId => this.executionGate.run(() => activationWorkflow.apply(activationPlanId))
+    });
+
+    // 受控传输请求创建工作流（cts.create-request 专属动作，仅创建）：
+    // preview 只读 CTS 预检并冻结 plan；apply 经原生确认后在执行门内单次创建
+    // 并读回验证；释放/删除/改属主不在本链路面。
+    const transportCreationPlans = new TransportCreationPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
+    const transportCreationWorkflow = new TransportCreationWorkflow(
+      this.adtClient,
+      this.safetyPolicy,
+      transportCreationPlans,
+      auditLogger
+    );
+    this.safeTransportCreationHandlers = new SafeTransportCreationHandlers(transportCreationWorkflow, {
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
+      applyConfirmed: planId => this.executionGate.run(() => transportCreationWorkflow.apply(planId))
     });
 
     this.focusedTaskHandlers = new FocusedTaskHandlers(
@@ -787,6 +836,9 @@ export class AbapAdtServer extends Server {
   }
 
   private handleError(error: unknown) {
+    // MRTR 确认请求必须穿透守卫链（不能降级为 isError 文本），
+    // 由 tools/call handler 捕获并转为 input_required 结果
+    if (error instanceof ConfirmationRequiredError) throw error;
     if (!(error instanceof Error)) {
       error = new Error(String(error));
     }
@@ -825,27 +877,80 @@ export class AbapAdtServer extends Server {
     };
   }
 
+  /**
+   * 确认能力感知：modern（2026-07-28）连接的客户端能力在每请求 envelope 中
+   * （实例 getClientCapabilities 不填充）；legacy 连接由 initialize 握手填充。
+   * 合并读取保证两个 era 的 supportsFormElicitation 判定一致。
+   */
+  private currentClientCapabilities(): { elicitation?: { form?: unknown } } | undefined {
+    return this.activeEnvelopeCapabilities ?? this.getClientCapabilities() ?? undefined;
+  }
+
+  /**
+   * MRTR 确认桥：把构造期注入的 elicitInput port 转发到当前
+   * tools/call 调用的 MRTR 引擎（无响应轮抛确认请求、重试轮恢复结果）。
+   */
+  private elicitViaActiveRequest(
+    params: Parameters<NonNullable<AbapAdtServer['activeElicitPort']>>[0],
+    timeoutMs: number
+  ) {
+    if (!this.activeElicitPort) {
+      throw new McpError(ErrorCode.InternalError, 'No active request context for confirmation.');
+    }
+    return this.activeElicitPort(params, timeoutMs);
+  }
+
   private setupToolHandlers() {
-    this.setRequestHandler(ListToolsRequestSchema, async () => {
-      return { tools: this.toolCatalog };
+    // v2 低层 API：setRequestHandler 按方法字符串注册（不再传 zod schema）。
+    // tools/list 返回静态目录；tools/call 进入统一的守卫执行链。
+    this.setRequestHandler('tools/list', async () => {
+      // ToolDefinition 是本项目自管的 JSON Schema 子集；wire 合法性由
+      // v2 era 校验层在运行时把关（0.8.x 起该目录即按 JSON Schema 输出）。
+      return { tools: this.toolCatalog } as unknown as import("@modelcontextprotocol/server").ListToolsResult;
     });
 
-    this.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      return executeGuardedToolCall(
+    this.setRequestHandler('tools/call', async (request, ctx) => {
+      // 单并发执行模型下，为本次调用创建 MRTR 确认 port：
+      // - 无 inputResponses（首轮）→ 确认点抛 ConfirmationRequiredError；
+      // - 客户端带 inputResponses 重试（legacy 经 shim 自动驱动）→ port 恢复确认结果。
+      const callArguments = (request.params.arguments || {}) as Record<string, unknown>;
+      this.activeElicitPort = createMrtrElicitPort(
         request.params.name,
-        (request.params.arguments || {}) as Record<string, unknown>,
-        this.guardrails,
-        this.executionGate,
-        usesSapExecutionGate(request.params.name),
-        limitedArguments => this.sessionSupervisor
-          ? this.sessionSupervisor.execute(
-            request.params.name,
-            () => this.dispatchTool(request.params.name, limitedArguments, extra.signal)
-          )
-          : this.dispatchTool(request.params.name, limitedArguments, extra.signal),
-        result => this.serializeResult(result),
-        error => this.handleError(error)
+        callArguments,
+        ctx.mcpReq.inputResponses,
+        ctx.mcpReq.requestState()
       );
+      this.activeEnvelopeCapabilities =
+        ((ctx.mcpReq.envelope as Record<string, unknown> | undefined)?.['io.modelcontextprotocol/clientCapabilities'] as { elicitation?: { form?: unknown } } | undefined) ?? null;
+      try {
+        return await executeGuardedToolCall(
+          request.params.name,
+          callArguments,
+          this.guardrails,
+          this.executionGate,
+          usesSapExecutionGate(request.params.name),
+          limitedArguments => {
+            // 限额参数可能与原始参数不同：port 绑定用原始调用参数（重试请求逐字节一致）
+            const dispatchArgs = limitedArguments;
+            return this.sessionSupervisor
+              ? this.sessionSupervisor.execute(
+                request.params.name,
+                () => this.dispatchTool(request.params.name, dispatchArgs, ctx.mcpReq.signal)
+              )
+              : this.dispatchTool(request.params.name, dispatchArgs, ctx.mcpReq.signal);
+          },
+          result => this.serializeResult(result) as import("@modelcontextprotocol/server").CallToolResult,
+          error => this.handleError(error) as import("@modelcontextprotocol/server").CallToolResult
+        );
+      } catch (error) {
+        // 确认请求穿透守卫链（handleError 原样 rethrow），转 MRTR input_required 结果
+        if (error instanceof ConfirmationRequiredError) {
+          return inputRequired({ inputRequests: error.inputRequests, requestState: error.requestState });
+        }
+        throw error;
+      } finally {
+        this.activeElicitPort = undefined;
+      }
     });
   }
 
@@ -864,6 +969,8 @@ export class AbapAdtServer extends Server {
     const qualityTools = this.safeQualityHandlers.getTools();
     // 受控激活三工具：进入 development 分支与 workbench 显式名单的专属集合
     const activationTools = this.safeActivationHandlers.getTools();
+    // 受控传输创建三工具：进入 development 分支与 workbench 显式名单的专属集合
+    const transportCreationTools = this.safeTransportCreationHandlers.getTools();
     // CDS 依赖分析三工具：只读，进入 development/diagnostic-readonly/legacy-full
     // 分支与 workbench 显式名单（business/operations/safe 不收录）
     const cdsTools = this.cdsAnalysisHandlers.getTools();
@@ -895,6 +1002,7 @@ export class AbapAdtServer extends Server {
       ...this.transportHistoryHandlers.getTools(),
       ...this.transportScopeHandlers.getTools(),
       ...this.loadGraphHandlers.getTools(),
+      ...this.whereUsedConfigHandlers.getTools(),
       ...this.dependencyGraphHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools()
     ];
@@ -935,7 +1043,7 @@ export class AbapAdtServer extends Server {
           name: 'healthcheck',
           description: 'Check local MCP process health and configured target identity without contacting SAP',
           inputSchema: {
-            type: 'object',
+            type: 'object' as const,
             properties: {}
           }
         }
@@ -946,6 +1054,7 @@ export class AbapAdtServer extends Server {
       ...controlledAdvancedTools,
       ...qualityTools,
       ...activationTools,
+      ...transportCreationTools,
       ...cdsTools,
       ...coverageTools,
       ...runtimeTools,
@@ -964,6 +1073,7 @@ export class AbapAdtServer extends Server {
       qualityTools,
       focusedTools,
       activationTools,
+      transportCreationTools,
       cdsTools,
       coverageTools
     ).map(withCanonicalToolMetadata);
@@ -1010,6 +1120,11 @@ export class AbapAdtServer extends Server {
         // catalog 成员检查保证非 development/development-workbench profile 不可见。
         if (this.safeActivationHandlers.supports(toolName)) {
           return this.safeActivationHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控传输创建链（仅创建）：门控语义同上；释放/删除等动作无对应工具，
+        // 不会进入本分发路径。
+        if (this.safeTransportCreationHandlers.supports(toolName)) {
+          return this.safeTransportCreationHandlers.handle(toolName, limitedArguments);
         }
         // Wave 3 只读分析三工具（grep/callees/applog）：与 CDS 分析同型，
         // safe 之外的全部 profile 分派；runUnitCoverage 是执行类工具，catalog
@@ -1077,6 +1192,10 @@ export class AbapAdtServer extends Server {
         // D010INC 加载图只读工具（analysis.history 的 loads 子操作）：同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.loadGraphHandlers.supports(toolName)) {
           return this.loadGraphHandlers.handle(toolName, limitedArguments);
+        }
+        // where-used-config 只读工具（analysis.history 的 where_used_config 子操作）：同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.whereUsedConfigHandlers.supports(toolName)) {
+          return this.whereUsedConfigHandlers.handle(toolName, limitedArguments);
         }
         if (this.dependencyGraphHandlers.supports(toolName)) {
           return this.dependencyGraphHandlers.handle(toolName, limitedArguments);
@@ -1371,24 +1490,24 @@ export class AbapAdtServer extends Server {
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.connect(transport);
-    console.error('MCP ABAP ADT API server running on stdio');
+    // v2 双栈：传输生命周期由 serveStdio 拥有（main() 中装配），
+    // 这里只负责进程级关闭钩子与错误上报。
+    console.error('MCP ABAP ADT API server running on stdio (dual-era: 2026-07-28 + 2025 legacy)');
     if (this.safetyPolicy.toolProfile === 'legacy-full') {
       console.error('WARNING: SAP_MCP_TOOL_PROFILE=legacy-full exposes raw mutating and destructive ADT tools.');
     }
-    
+
     // Handle shutdown
     process.on('SIGINT', async () => {
       await this.close();
       process.exit(0);
     });
-    
+
     process.on('SIGTERM', async () => {
       await this.close();
       process.exit(0);
     });
-    
+
     // Handle errors
     this.onerror = (error) => {
       console.error('[MCP Error]', error);
@@ -1421,8 +1540,17 @@ function withCanonicalToolMetadata(tool: ToolDefinition): ToolDefinition {
 
 export async function main(): Promise<void> {
   const password = await resolveSapPassword();
-  const server = new AbapAdtServer(password);
-  await server.run();
+  // v2 双栈入口：同一工厂服务两个协议 era——
+  // - modern（2026-07-28）客户端走 server/discover 探测后按新协议服务；
+  // - legacy（2025）客户端走 initialize 握手，行为与 0.8.x 完全一致。
+  // serveStdio 默认 legacy:'serve'，每个连接 pin 一个工厂实例。
+  serveStdio(() => {
+    const server = new AbapAdtServer(password);
+    void server.run();
+    return server;
+  }, {
+    onerror: (error) => console.error('[serveStdio error]', error instanceof Error ? error.message : error)
+  });
 }
 
 if (require.main === module) {

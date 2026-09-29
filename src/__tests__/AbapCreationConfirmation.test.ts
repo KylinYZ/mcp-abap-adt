@@ -1,4 +1,4 @@
-import { ErrorCode, McpError, type ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError, type ElicitResult } from '../lib/McpErrorCompat.js';
 import { AbapCreationConfirmation, type AbapCreationConfirmationOptions } from '../safe/AbapCreationConfirmation';
 import { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkflow';
 import { SafeAbapError } from '../safe/errors';

@@ -3,11 +3,11 @@
  * PARTIAL_RENAME 防御语义/未知终结）、handler 工具面。
  * HTTP、克隆工作流与清理工作流全部 mock，不连接 SAP。
  */
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode } from '../lib/McpErrorCompat.js';
 import { RenameControlledWorkflow } from '../safe/RenameControlledWorkflow';
 import { RenameControlledHandlers } from '../handlers/RenameControlledHandlers';
 import { SafeAbapError } from '../safe/errors';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const PROGRAM_SOURCE = (name: string) => `REPORT ${name.toLowerCase()}.\nWRITE / 'demo'.`;
 

@@ -1,4 +1,4 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '../lib/McpErrorCompat.js';
 import type { Sm21Client, Sm21LogEntry, Sm21ReadRequest, Sm21ReadResult } from './types.js';
 
 // Custom SICF handlers cannot live below the ADT framework resource router.

@@ -2,7 +2,7 @@
  * DumpAnalysisHandlers 测试：聚合纯函数 + handler 工具面两层。
  * 数据源（RuntimeDumpReader.read）全部 mock，不连接 SAP。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { DumpAnalysisHandlers } from '../handlers/DumpAnalysisHandlers';
 import { extractDumpFacets, findSimilarDumps, groupRuntimeDumps } from '../read/DumpAnalytics';
 import type { RuntimeDumpSummary } from '../read/RuntimeDumpReader';

@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { TransportHistoryQueryRunner } from '../adt/TransportHistoryApi.js';
 import { collectTransportScope, TransportScopeInputError } from '../adt/TransportScope.js';

@@ -2,13 +2,13 @@
  * 受控描述修改三件套测试：ADT 协议函数、工作流（plan/确认/执行/readback）、
  * handler 工具面。HTTP 与锁全部 mock，不连接 SAP。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import {
   descriptionObjectURL, descriptionOf, replaceDescriptionAttribute, setDescription
 } from '../adt/DescriptionApi';
 import { DescriptionChangeWorkflow } from '../safe/DescriptionChangeWorkflow';
 import { DescriptionChangeHandlers } from '../handlers/DescriptionChangeHandlers';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const METADATA = (description: string) =>
   `<?xml version="1.0"?><prog:abapProg adtcore:description="${description}" adtcore:descriptionTextLimit="120" adtcore:name="ZTEST">`;

@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { ApplicationLogHandlers } from '../handlers/ApplicationLogHandlers';
 import type { ApplicationLogClient, ApplicationLogResult } from '../adt/ApplicationLogApi.js';
 

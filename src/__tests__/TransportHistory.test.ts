@@ -6,7 +6,7 @@ import {
 } from '../adt/TransportHistoryApi.js';
 import type { TransportHistoryQueryRunner } from '../adt/TransportHistoryApi.js';
 import type { TransportHistoryClient } from '../adt/TransportHistoryApi.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode } from '../lib/McpErrorCompat.js';
 
 /**
  * 传输历史只读契约测试（mock SQL 通道，零 SAP 往返）。

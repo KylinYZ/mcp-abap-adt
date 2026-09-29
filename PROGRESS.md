@@ -1,11 +1,11 @@
 # 当前进度
 
-更新时间：2026-09-28
+更新时间：2026-09-29
 
 ## 结论
 
-- 代码版本：`0.8.4`；当前 `main` 已包含 2026-09-28 的组合链真机验证代码，是否发布为 npm 新版本及用户 MCP 部署状态需另行核实。
-- 自动化门禁：本轮 `npm test -- --runInBand` 通过，171 suites / 1819 tests；`npm run build`、`npm run check:repository-creation-coverage`（28 个 REAL_DEV_VERIFIED、无缺少必需证据）、VSP 矩阵校验与 `git diff --check` 通过。一个可选离线包 smoke 因本机缺少真实离线包而按脚本设计跳过。
+- 代码版本：`0.9.0`（分支 `feat/mcp-v2-dual-era`）：协议栈迁移 MCP 官方 v2 双栈——原生 2026-07-28（`server/discover` 应答，根除 ZCode 0.16.9+ auto 协商超时）+ 2025 legacy 兼容；受控确认流 MRTR 化（legacy 经官方 shim 保持 elicitation/create，v1 宿主零感知）。证据：[v2 双栈迁移实证](docs/evidence/mcp-v2-dual-era-verified.md)、[步骤 0 API 定型](docs/evidence/mcp-v2-migration-api-probe.md)。生产依赖 `@modelcontextprotocol/server@2.2.0`（v1 SDK 移 devDeps 作 2025 回归资产）。是否发布 npm 及用户部署状态待定；ZCode 0.16.9 真机终验待做。
+- 自动化门禁：2026-09-29 起 `npm test -- --runInBand` 通过，174 suites / 1860 tests（连续两轮全绿）；`npm run build` 通过。受控传输请求创建链（仅创建）已落地：`previewTransportCreation`/`applyTransportCreation`/`getTransportCreationStatus`，DEV + development/development-workbench 专属，原生确认 + create/readback 双步验证，释放/删除/改属主/直改 E071·E071K 维持禁止；离线自动化已验证，真机 smoke 尚未运行（属待环境确认项）。
 - VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；`analysis.history` 仍为 PARTIAL。loads、有界加载图和传输成员/结构边界组合链已由专用 DEV 真机证据覆盖核心路径；CR 分组、动态图边及图引擎完整性仍有缺口，详见[后续缺口与验收规划](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)。
 - `getFmTestDataSets` 已真机验证 EUFUNC 测试集目录与元数据读取；CLUSTD payload 未解码，不提供 inputs/outputs 内容。是否投入 S/2 集群解码器应先做独立可行性评估，不应扩大当前能力声明。
 - datapreview CLUSTD wire 契约已离线锁定并经真机实证（2026-09-28，授权后只读探针）：CLUSTD=hex/type='X'/'<data>' 无属性、CLUSTR=INT2 片段字节数、LRAW 固定宽度+全零 padding，无损重组规则确立。oracle 解码轮：999 目录集群核心两对象 TE_DATADIR/FDESC_COPY 对象级可解码实锤；**多片段完整性真机实证**（RSZ_X_COMPONENT_GET 6 片 SRTF2 0..5 连续、组装器精确重组 19407 字节，VSP Join 语义离线组装器 +6 回归）。全量解码边界如实记录：V6 集群（原型白名单只收 V5，VSP 上游支持 V6）与 deep 嵌套 0xAD（上游同拒）。随附修复 createFmTestDataClient decode=false（DATS→Date 真机实锤的有损转换）。证据：[CLUSTD 真机取证](docs/evidence/fm-test-data-clustd-real-dev-verified.md)。decoder 接入维持 NO-GO：V6 路径与 %_I/%_V 输入输出对象解码为独立工程轮。
@@ -492,3 +492,20 @@
 - 版本适用性标注：6.4/6.5 注明"随下一 npm 版本发布（源码运行已可用）"，6.1 保留"尚未发布"（npm 0.8.4 确不含），避免误导 npm 安装用户。
 - 门禁：169 suites / 1776 tests 全绿、parity、git diff --check（纯文档轮，无代码/矩阵变化）。
 - 遗留与下一轮：PARTIAL 5 行全部进入"大轮/工程轮/定论"状态，纯 SQL 与轻量子集已尽。后续路径三选一：① 集群解析器工程轮（fm_test_data 内容层 + cluster_read，VSP pkg/datacluster 移植）；② 受控执行/调试链大轮（execute-abap、amdp-adt）；③ 发版轮（工作区已有大量未提交成果，可提请所有者审查后发布 0.8.5）。均需所有者输入，闲时轮不再自行开新工程。
+
+## 2026-09-28 闲时轮：getWhereUsedConfig（TVARVC 配置引用分析）落地真机验证——analysis.history 再收一子操作
+
+- 选型：CLUSTD 解码器接入维持 NO-GO（上轮 V6 边界），analysis.history 剩余子操作中 where_used_config 经 VSP 本地源码（D:\MyDev\SAP\vibing-steampunk handlers_graph.go）评估为纯 SQL+源码 grep 可落地——本轮落地。
+- 实现：WhereUsedConfigApi + getWhereUsedConfig 只读工具（analysis 家族同型接线）。两段式：候选采集（WBCROSSGT OTYPE='TY' + CROSS TYPE='S' 按 NAME='TVARVC' 配对，单源失败可生存、双源失败硬错误非空答案）→ 源码 grep 确认（复用 grepObjects 通道，大小写不敏感；confirmed=true 仅当命中，失败/跳过/预算外一律 unsearched 不借义）。grep 预算默认 10 上限 30（与 VSP 无界的有意差异，notes 声明）；候选身份用 normalizeLoadName 归一化；不做包回填。
+- 真机（sap-demo）：该系统 TVARVC 零候选（无激活引用代码）——采用直连 ADT 写链自造数据（授权范围：自有 Z* 验证对象的源码写与激活）：创建 ZWUXREF4790 → stateful 加锁写引用 TVARVC 源码 → 激活 → 组合链 readers=1 confirmed=1（决定性正例）→ 直连删除 + 缺席复核零残留。SMOKE OK。
+- 环境取证：① 受控创建链的 REAL_DEV validation 模式（sap-demo.env 现 VALIDATION=true + PREFIX=ZV）会拒绝非 ZV 前缀创建且 REAL_DEV_VERIFIED 类型禁止 validation 计划写——smoke 进程 env 覆盖 false 无法绕过（validation 拒绝来自创建链内部语义，非 env 解析）；② 直连写链三坑：setObjectSource 必须用 /source/main 源端点、lock/activate 必须 stateful 会话；③ dist 是 ESM——插桩用 require 会崩（ESM 顶部 import）。
+- 门禁全绿：172 suites / 1827 tests（+8）、build、coverage、parity、git diff --check。profile 计数（dev=188/workbench=155/diag=145/full=208）与 STRICT_TOOL_FIELDS 同步。
+- 矩阵：analysis.history 维持 PARTIAL，taskPath 增 getWhereUsedConfig，restrictionReason 更新。证据：docs/evidence/where-used-config-real-dev-verified.md。
+- 下一轮建议：analysis.history 剩余 usage_examples（callers 源码片段呈现层，可基于 getCallees+getObjectSource 收编）仍可纯 SQL 落地，可作下轮候选；其余同前（集群解析器/图引擎/受控执行链大轮）。
+
+## 2026-09-29 轮：受控传输请求创建链落地——"仅创建"动作对 AI 放开
+
+- 需求与边界（所有者指示）：放开"由 AI 创建传输请求"一个动作，触发条件=用户明确要求建请求（落点=原生确认）；释放、删除、改属主、加用户与直改 E071/E071K 维持禁止。
+- 实现（与受控激活链同构的三工具受控链）：safe 层新增 TransportCreationTypes/PlanStore/Workflow/Confirmation；handlers 层新增 SafeTransportCreationHandlers（previewTransportCreation=只读 CTS 预检（transportInfo）+冻结 plan，锚点 URI 由 server 从包名推导 `/sap/bc/adt/packages/<devclass>`、applyTransportCreation=form elicitation 原生确认后经 executionGate 单次创建+transportDetails 读回验证、getTransportCreationStatus=本地查询）。拒绝本地 `$` 包与非法包名/超长描述（AS4TEXT≤60）；创建异常/空请求号/读回不一致→UNKNOWN_OUTCOME 终结不重试不删除。策略层：CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES（preview=read-only、apply=advanced-mutation、status=local）+ DEV-only 角色门控 + development/development-workbench profile 门控（不进 legacy-full，专家继续用原子 createTransport）；serverGuardrails 豁免 apply/status 外层 gate（防 concurrency=1 自我死锁，同激活链教训）。profile 计数：development 188→191、development-workbench 155→158（focused 同步）。
+- 门禁：`npm run build` 通过；`npm test -- --runInBand` 连续两轮全绿 174 suites / 1860 tests（首轮 4 个 suite 因瞬态编译问题失败，未定位到代码原因，复跑两轮稳定全绿）；新测试 26 例覆盖工作流/确认/profile 门控/仅创建边界（transportRelease 等四工具在受控 profile catalog 断言不存在）。真机 smoke 未运行——预检→确认→创建→读回全链待所有者授权后按 AGENTS.md 专用 DEV 配置补跑。
+- 文档：AGENTS.md（安全边界改为"仅创建放开+其余禁止"、profile 计数、基线 174/1860）、docs/使用指南.md 4.1 增传输创建链段落、PROGRESS.md 本节。

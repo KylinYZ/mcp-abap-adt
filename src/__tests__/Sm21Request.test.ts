@@ -1,4 +1,4 @@
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '../lib/McpErrorCompat.js';
 import { sm21ConfigFromEnvironment } from '../sm21/config';
 import { parseSm21Request } from '../sm21/request';
 

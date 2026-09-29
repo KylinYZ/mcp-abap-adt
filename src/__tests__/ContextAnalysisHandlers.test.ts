@@ -1,6 +1,6 @@
 import { ContextAnalysisHandlers } from '../handlers/ContextAnalysisHandlers.js';
 import type { ContextAnalysisClient } from '../adt/ContextCompressionApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * ContextAnalysisHandlers 目录与分派契约测试（mock 四能力客户端，零 SAP 往返）。

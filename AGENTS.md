@@ -8,11 +8,11 @@
 新用户入口与能力分层见 `docs/产品定位.md`；不要把兼容 profile 名称重新写成产品入口。
 ## 当前发布与事实基线
 
-- 当前版本：`0.8.4`；npm 包：`abap-ai-workbench-mcp@0.8.4`。
+- 当前版本：`0.9.0`（MCP v2 双栈：原生 2026-07-28 + 2025 兼容，证据见 docs/evidence/mcp-v2-dual-era-verified.md）；npm 包：`abap-ai-workbench-mcp@0.9.0`。
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
-- 当前源码 profile 目录：`safe=7`、`development=187`、`diagnostic-readonly=144`、`legacy-full=207`、`development-workbench=154`、`business-readonly=18`、`operations-readonly=49`。
+- 当前源码 profile 目录：`safe=7`、`development=191`、`diagnostic-readonly=145`、`legacy-full=208`、`development-workbench=158`、`business-readonly=18`、`operations-readonly=49`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
-- 自动化基线：169 个 Jest suites、1776 个 tests（2026-09-25）。VSP 能力对齐：54/71（MCP_SUPERSET=13）；analysis.history 的 loads 与 transport-crossref 结构边、knowledge-queries 的 fm_test_data 目录层均已真机验证；离线三工具（快照 impact/stats/boundaries、有界加载图、显式传输成员采集）已由组合链真机验证覆盖核心路径。当前进度见 `docs/evidence/transport-crossref-real-dev-verified.md` 与 `docs/evidence/fm-test-data-real-dev-verified.md`。
+- 自动化基线：174 个 Jest suites、1860 个 tests（2026-09-29）。VSP 能力对齐：54/71（MCP_SUPERSET=13）；analysis.history 的 loads、transport-crossref 结构边、where_used_config 与 knowledge-queries 的 fm_test_data 目录层均已真机验证；离线三工具已由组合链真机验证覆盖核心路径。当前进度见 `docs/evidence/transport-crossref-real-dev-verified.md`、`docs/evidence/where-used-config-real-dev-verified.md` 与 `docs/evidence/fm-test-data-real-dev-verified.md`。
 - 真实 SAP smoke 默认使用 `sap-demo.env`（所有者 2026-09-22 指示；sap-dev 上 S4HK900009 已不可用）。
 - 运行时要求：Node.js >=22.14.0（`.nvmrc` 为 22；Node 18/20 已 EOL，自 0.7.0 起不再支持——为 RFC 基座 open-rfc 的支持合同对齐）。
 
@@ -53,7 +53,7 @@ npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-a
 - QAS、PRD、缺失或未知系统角色只允许本地/只读工具；隐藏和 dispatch 拒绝必须同时保留。
 - 所有受控写入必须经过 server 生成的 preview plan、一次原生确认和 apply；不得接受调用方确认布尔值、任意 URL、XML、JSON、媒体类型或 lock handle。
 - `REAL_DEV_VERIFIED` 只能由完整 create/readback/transport/cleanup/absence 证据启用；未知结果不得重放或自动删除。
-- 不连接生产，不创建或释放传输，不修改 E071/E071K，不执行数据库写操作。
+- 传输请求：**仅创建**一个动作对 AI 放开——必须走受控创建链（`previewTransportCreation` → 原生确认 → `applyTransportCreation`，仅 DEV + development/development-workbench，创建后必须读回验证）；释放、删除、改属主、加用户与直改 E071/E071K 一律禁止。不连接生产，不执行数据库写操作。
 - 报告时明确区分自动化、真实 SAP 已验证、部署状态和仍待环境确认的内容。
 
 ## 证据与历史

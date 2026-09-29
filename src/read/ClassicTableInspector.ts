@@ -1,5 +1,5 @@
 import type { ADTClient, QueryResultColumn } from '../adt/index.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 const CLASSIC_TABLE_NAME = /^(?:\/[A-Z0-9_]{1,10}\/)?[A-Z][A-Z0-9_]*$/;
 

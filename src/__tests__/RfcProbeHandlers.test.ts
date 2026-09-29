@@ -1,6 +1,6 @@
 import { RfcProbeHandlers } from '../handlers/RfcProbeHandlers.js';
 import type { TransportAdapter } from '../rfc/transport.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode } from '../lib/McpErrorCompat.js';
 
 /**
  * RfcProbeHandlers 目录与分派契约测试（mock 传输适配器，零真实网络）。

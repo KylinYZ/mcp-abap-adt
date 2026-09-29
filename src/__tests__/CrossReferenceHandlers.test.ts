@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { CrossReferenceHandlers } from '../handlers/CrossReferenceHandlers';
 import type { CrossReferenceClient, GetCalleesResult } from '../adt/CrossReferenceApi.js';
 

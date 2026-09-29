@@ -1,4 +1,5 @@
 import { SafeAbapError } from './errors.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import { RepositoryCreationConfirmationChallengeStore } from './RepositoryCreationConfirmationChallengeStore.js';
 import type { RepositoryCreationConfirmationProvider } from './RepositoryCreationConfirmationProvider.js';
 import type { RepositoryCreationPlanView } from './repositoryCreationTypes.js';
@@ -68,8 +69,11 @@ export class RepositoryObjectCreationConfirmation {
         expiresAt: new Date(expiresAt).toISOString()
       }, { timeoutMs, signal });
     } catch (error) {
+      // 先作废本轮 challenge 再放行 MRTR 穿透：重入轮会重新签发 challenge，
+      // 避免同 plan 残留 PENDING 触发 "already pending" 拒绝
       this.options.challengeStore.cancel(challenge.challengeId);
       await this.audit(plan, 'cancel', 'CANCELLED');
+      if (error instanceof ConfirmationRequiredError) throw error;
       if (error instanceof SafeAbapError && error.code === 'CONFIRMATION_UNSUPPORTED') throw error;
       throw cancelledError();
     }

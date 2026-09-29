@@ -55,6 +55,9 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'previewRepositoryObjectCreation', 'applyRepositoryObjectCreation', 'getRepositoryObjectCreationStatus',
   // 受控对象激活链（devtools.activate 缺口）：workbench 面显式收录三工具
   'previewObjectActivation', 'applyObjectActivation', 'getObjectActivationStatus',
+  // 受控传输请求创建链（cts.create-request 专属动作，仅创建）：workbench 面
+  // 显式收录三工具；释放/删除/改属主不收录（仍停留在 legacy-full 原子面）
+  'previewTransportCreation', 'applyTransportCreation', 'getTransportCreationStatus',
   // CDS 依赖分析三工具（read.cds-analysis）：只读诊断能力，workbench 面显式收录
   'getCdsDependencies', 'getCdsImpactAnalysis', 'getCdsElementInfo',
   // Wave 3 分析五工具：源码 grep/交叉引用/应用日志（只读）+ 覆盖率执行（other-mutation）
@@ -99,6 +102,7 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 文档 + IMG 检索 + IMG 活动详情（路径递归）
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   'getFmTestDataSets',
+  'getWhereUsedConfig',
   // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
   'getCrHistory', 'getCoChange',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）：编译期加载关系
@@ -140,6 +144,8 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   'compareRevisions',
   // 传输历史与共同变更只读（analysis.history 行：E071/E070 运维诊断）
   'getCrHistory', 'getCoChange',
+  // TVARVC 变量读者定位只读（analysis.history 行：where_used_config，与矩阵声明同步）
+  'getWhereUsedConfig',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）
   'getLoadGraph', 'buildLoadDependencyGraph', 'analyzeDependencyGraph', 'getTransportScope'
 ]);
@@ -155,6 +161,7 @@ export function selectProfileTools(
   qualityTools: ToolDefinition[] = [],
   focusedTools: ToolDefinition[] = [],
   activationTools: ToolDefinition[] = [],
+  transportCreationTools: ToolDefinition[] = [],
   cdsTools: ToolDefinition[] = [],
   coverageTools: ToolDefinition[] = []
 ): ToolDefinition[] {
@@ -166,6 +173,7 @@ export function selectProfileTools(
     ...runtimeTools,
     ...controlledAdvancedTools,
     ...activationTools,
+    ...transportCreationTools,
     ...cdsTools,
     ...readOnlyLegacyTools(legacyTools)
   ];
@@ -191,6 +199,7 @@ export function selectProfileTools(
       ...qualityTools,
       ...focusedTools,
       ...activationTools,
+      ...transportCreationTools,
       ...cdsTools,
       ...coverageTools,
       ...runtimeTools,

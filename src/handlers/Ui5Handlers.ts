@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { Ui5FilestoreClient } from '../adt/Ui5FilestoreApi.js';
 

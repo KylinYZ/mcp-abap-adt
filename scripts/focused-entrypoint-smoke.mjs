@@ -35,7 +35,8 @@ try {
   const text = helpResponse.content?.find(item => item.type === 'text')?.text || '';
   const payload = JSON.parse(text);
   const actions = payload?.result?.actions || [];
-  const passed = names.length === 93
+  // focused=development-workbench 基线 158（0.8.4 基线 154 + getWhereUsedConfig + TransportCreation 三工具）；与 ToolCatalogIntegrity.test.ts 对齐
+  const passed = names.length === 158
     && names.includes('sap')
     && names.includes('sapDoctor')
     && actions.some(action => action.action === 'read')

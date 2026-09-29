@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { CdsAnalysisHandlers } from '../handlers/CdsAnalysisHandlers';
 import type { CdsAnalysisClient } from '../adt/CdsDependencyApi.js';
 

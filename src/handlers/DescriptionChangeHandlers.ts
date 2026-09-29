@@ -10,11 +10,12 @@
  * 仅 DEV + development/development-workbench（ToolOperationPolicy 控制）；
  * 确认仅走 MCP form elicitation（decision=apply），不支持调用方布尔确认。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { SafeAbapError } from '../safe/errors.js';
 import type { DescriptionChangeWorkflow } from '../safe/DescriptionChangeWorkflow.js';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const DESCRIPTION_TOOL_NAMES = new Set([
   'previewDescriptionChange', 'applyDescriptionChange', 'getDescriptionChangeStatus'
@@ -101,7 +102,7 @@ export class DescriptionChangeHandlers {
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown description change tool: ${toolName}`);
     } catch (error) {
-      if (error instanceof McpError || error instanceof SafeAbapError) throw error;
+      if (error instanceof McpError || error instanceof SafeAbapError || error instanceof ConfirmationRequiredError) throw error;
       // 底层异常脱敏（可能含目标系统细节）
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);
     }

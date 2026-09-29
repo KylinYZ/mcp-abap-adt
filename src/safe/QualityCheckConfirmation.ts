@@ -3,7 +3,8 @@ import {
   McpError,
   type ElicitRequestFormParams,
   type ElicitResult
-} from '@modelcontextprotocol/sdk/types.js';
+} from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import { SafeAbapError } from './errors.js';
 import type { QualityCheckPlanView } from './qualityTypes.js';
 
@@ -50,6 +51,7 @@ export class QualityCheckConfirmation {
     try {
       return await this.options.elicitInput(params, timeoutMs);
     } catch (error) {
+      if (error instanceof ConfirmationRequiredError) throw error;
       if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) return { action: 'cancel' };
       throw new SafeAbapError('POLICY_DENIED', 'confirmation', 'The client confirmation dialog failed.');
     }

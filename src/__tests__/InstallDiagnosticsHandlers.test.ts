@@ -1,6 +1,6 @@
 import { InstallDiagnosticsHandlers } from '../handlers/InstallDiagnosticsHandlers.js';
 import type { InstallDiagnosticsClient } from '../adt/InstallDiagnosticsApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * InstallDiagnosticsHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

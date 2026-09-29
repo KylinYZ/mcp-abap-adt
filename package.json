@@ -1,6 +1,6 @@
 {
   "name": "abap-ai-workbench-mcp",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "mcpName": "io.github.kylinyz/abap-ai-workbench-mcp",
   "main": "dist/index.js",
   "bin": {
@@ -36,6 +36,7 @@
     "test:repository-verified-domain-preview": "node ./scripts/repository-verified-domain-preview.mjs",
     "test:adt-timeout": "node ./scripts/adt-timeout-smoke.mjs",
     "test:focused-entrypoint": "node ./scripts/focused-entrypoint-smoke.mjs",
+    "test:mcp-dual-era": "node ./scripts/mcp-v2-dual-era-smoke.mjs",
     "test:focused-real-dev:readonly": "node ./scripts/focused-real-dev-readonly-smoke.mjs",
     "test:focused-real-dev:preview": "node ./scripts/focused-real-dev-preview-smoke.mjs",
     "check:adt-imports": "node ./scripts/check-adt-imports.mjs",
@@ -59,7 +60,8 @@
     "test:dependency-graph:offline": "node ./scripts/dependency-graph-offline-smoke.mjs",
     "test:transport-scope-real-dev": "node ./scripts/transport-scope-real-dev-smoke.mjs",
     "test:transport-crossref-real-dev": "node ./scripts/transport-crossref-real-dev-smoke.mjs",
-    "test:fm-test-data-real-dev": "node ./scripts/fm-test-data-real-dev-smoke.mjs"
+    "test:fm-test-data-real-dev": "node ./scripts/fm-test-data-real-dev-smoke.mjs",
+    "test:where-used-config-real-dev": "node ./scripts/where-used-config-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",
@@ -90,7 +92,8 @@
     "node": ">=22.14.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.4.1",
+    "@kylinyz/open-rfc": "^0.2.4-kylin.2",
+    "@modelcontextprotocol/server": "2.2.0",
     "axios": "^1.15.2",
     "dotenv": "^16.4.7",
     "fast-xml-parser": "^5.7.2",
@@ -98,10 +101,11 @@
     "html-entities": "^2.5.2",
     "io-ts": "^2.2.21",
     "io-ts-reporters": "^2.0.1",
-    "sprintf-js": "^1.1.3",
-    "@kylinyz/open-rfc": "^0.2.4-kylin.2"
+    "sprintf-js": "^1.1.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.2.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.10",
     "@types/sprintf-js": "^1.1.4",

@@ -48,7 +48,7 @@ describe('SafeAbapHandlers', () => {
             minItems: 1,
             maxItems: 2,
             items: {
-              type: 'object',
+              type: 'object' as const,
               required: ['objectType', 'objectName', 'description'],
               properties: expect.objectContaining({
                 objectType: expect.any(Object),
@@ -257,7 +257,7 @@ describe('SafeAbapHandlers', () => {
     const legacyTools = [{
       name: 'deleteObject',
       description: 'legacy',
-      inputSchema: { type: 'object', properties: {} }
+      inputSchema: { type: 'object' as const, properties: {} }
     }];
 
     expect(selectProfileTools('safe', safeTools, legacyTools)).toEqual(safeTools);
@@ -268,10 +268,10 @@ describe('SafeAbapHandlers', () => {
   it('keeps development and diagnostic profiles limited to approved read-only tools', () => {
     const safeTools = new SafeAbapHandlers({} as never).getTools();
     const legacyTools = [
-      { name: 'dumps', description: 'read', inputSchema: { type: 'object', properties: {} } },
-      { name: 'setObjectSource', description: 'write', inputSchema: { type: 'object', properties: {} } }
+      { name: 'dumps', description: 'read', inputSchema: { type: 'object' as const, properties: {} } },
+      { name: 'setObjectSource', description: 'write', inputSchema: { type: 'object' as const, properties: {} } }
     ];
-    const safeDebugTools = [{ name: 'applyDebugOperation', description: 'safe debug', inputSchema: { type: 'object', properties: {} } }];
+    const safeDebugTools = [{ name: 'applyDebugOperation', description: 'safe debug', inputSchema: { type: 'object' as const, properties: {} } }];
     expect(selectProfileTools('development', [], legacyTools, [], safeDebugTools).map(tool => tool.name))
       .toEqual(['applyDebugOperation', 'dumps']);
     expect(selectProfileTools('diagnostic-readonly', safeTools, legacyTools).map(tool => tool.name))
@@ -287,17 +287,17 @@ describe('SafeAbapHandlers', () => {
     const safeTools = Array.from({ length: 7 }, (_, index) => ({
       name: index === 0 ? 'inspectAbapObject' : `safe-${index}`,
       description: 'safe',
-      inputSchema: { type: 'object', properties: {} }
+      inputSchema: { type: 'object' as const, properties: {} }
     }));
     const safeDebugTools = Array.from({ length: 8 }, (_, index) => ({
       name: `debug-${index}`,
       description: 'debug',
-      inputSchema: { type: 'object', properties: {} }
+      inputSchema: { type: 'object' as const, properties: {} }
     }));
     const runtimeTools = Array.from({ length: 2 }, (_, index) => ({
       name: `runtime-${index}`,
       description: 'runtime',
-      inputSchema: { type: 'object', properties: {} }
+      inputSchema: { type: 'object' as const, properties: {} }
     }));
     const readOnlyNames = [
       'transportInfo', 'hasTransportConfig', 'transportConfigurations', 'getTransportConfiguration',
@@ -323,7 +323,7 @@ describe('SafeAbapHandlers', () => {
     const legacyTools = readOnlyNames.map(name => ({
       name,
       description: 'read-only',
-      inputSchema: { type: 'object', properties: {} }
+      inputSchema: { type: 'object' as const, properties: {} }
     }));
 
     expect(selectProfileTools('development', safeTools, legacyTools, runtimeTools, safeDebugTools)).toHaveLength(109);

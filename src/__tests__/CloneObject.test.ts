@@ -3,14 +3,14 @@
  * （plan 冻结/确认/委托创建链/未知终结）、handler 工具面。
  * HTTP 与受控创建链全部 mock，不连接 SAP。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import {
   cloneSourceUrl, readCloneSource, renameCloneDeclarations
 } from '../adt/CloneObjectApi';
 import { CloneObjectWorkflow } from '../safe/CloneObjectWorkflow';
 import { SafeAbapError } from '../safe/errors';
 import { CloneObjectHandlers } from '../handlers/CloneObjectHandlers';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const PROGRAM_SOURCE = (name: string) => `REPORT ${name.toLowerCase()}.\nWRITE / 'demo'.`;
 const CLASS_SOURCE = (name: string) =>

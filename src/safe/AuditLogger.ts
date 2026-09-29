@@ -67,6 +67,9 @@ export interface AuditEvent {
   clonePlanId?: string;
   // 受控对象重命名工作流（RenameControlled）专用字段：planId 关联审计链。
   renamePlanId?: string;
+  // 受控传输请求创建工作流（TransportCreation）专用字段：planId 关联审计链；
+  // 创建成功的请求号复用既有 transportRequest 字段承载。
+  transportCreationPlanId?: string;
 }
 
 export class AuditLogger {

@@ -7,7 +7,7 @@ import type { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkf
 import type { ApplyCreationInput, CreationPlanView } from '../safe/creationTypes';
 import { SafeAbapError } from '../safe/errors';
 import type { ChangePlanView } from '../safe/types';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '../lib/McpErrorCompat.js';
 
 const guardrails = RuntimeGuardrails.fromEnvironment({});
 const errorResult = (error: unknown) => {
@@ -339,6 +339,12 @@ describe('server guardrail integration helpers', () => {
     // executionGate），同样豁免外层 gate；status 纯本地读取同豁免
     ['applyControlledRename', false],
     ['getControlledRenameStatus', false],
+    // 受控传输创建 apply 在确认层内部再次经过 executionGate，必须豁免外层 gate
+    //（防 maxConcurrentTools=1 自我死锁）；status 是纯本地 plan 读取同豁免；
+    // preview 走只读 CTS 预检，与 previewObjectActivation 同样占用外层 SAP 槽
+    ['applyTransportCreation', false],
+    ['getTransportCreationStatus', false],
+    ['previewTransportCreation', true],
     ['previewObjectActivation', true],
     ['healthcheck', false],
     ['sap', false],

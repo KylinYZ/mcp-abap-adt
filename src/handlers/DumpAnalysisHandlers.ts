@@ -16,7 +16,7 @@
  *   - 错误脱敏对齐 HighLevelReadHandlers：底层异常一律 InternalError，
  *     绝不外泄 ADT 响应内容。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { RuntimeDumpReader, type RuntimeDumpInput } from '../read/RuntimeDumpReader.js';
 import { findSimilarDumps, groupRuntimeDumps } from '../read/DumpAnalytics.js';

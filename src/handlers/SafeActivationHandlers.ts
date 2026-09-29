@@ -12,7 +12,7 @@
  * - profile/role 门控由 ToolOperationPolicy 与 ToolProfiles 承担：
  *   三工具仅 DEV + development/development-workbench 可见可用。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import {
   ObjectActivationConfirmation,
   type ObjectActivationConfirmationOptions,

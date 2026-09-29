@@ -1,4 +1,4 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { AbapChangeWorkflow } from '../safe/AbapChangeWorkflow.js';
 import { AbapChangeConfirmation, type AbapChangeConfirmationOptions } from '../safe/AbapChangeConfirmation.js';

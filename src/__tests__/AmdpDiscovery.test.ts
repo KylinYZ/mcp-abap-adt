@@ -2,7 +2,7 @@
  * AMDP discovery 三件套测试：状态码分类、注入绑定、handler 工具面。
  * HTTP 层全部 mock，不连接 SAP。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { checkAmdpDebugger, createAmdpDiscoveryClient } from '../adt/AmdpDiscoveryApi';
 import { AmdpDiscoveryHandlers } from '../handlers/AmdpDiscoveryHandlers';
 import type { AdtHTTP } from '../adt/AdtHTTP';

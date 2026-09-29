@@ -1,6 +1,6 @@
 import { TransactionReadHandlers } from '../handlers/TransactionReadHandlers.js';
 import type { TransactionReadClient } from '../adt/TransactionReadApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * TransactionReadHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

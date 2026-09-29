@@ -9,7 +9,7 @@
  * 满足"；AMDP 调试会话（start/breakpoint/await/stop）本身为后续受控工作流，
  * 不在本工具承诺范围（工具描述与矩阵 restrictionReason 均如实声明）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { AmdpDiscoveryClient } from '../adt/AmdpDiscoveryApi.js';
 

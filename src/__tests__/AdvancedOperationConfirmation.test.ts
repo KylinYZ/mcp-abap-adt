@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { AdvancedOperationConfirmation } from '../safe/AdvancedOperationConfirmation';
 import type { AdvancedOperationKind, AdvancedOperationPlanView } from '../safe/advancedTypes';
 

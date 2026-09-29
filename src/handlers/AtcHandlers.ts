@@ -3,7 +3,7 @@ import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { AtcProposal } from '../adt/index.js';
 import { readOnlyRawTool } from './rawToolMetadata.js';
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { McpError, ErrorCode } from "../lib/McpErrorCompat.js";
 
 export class AtcHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {

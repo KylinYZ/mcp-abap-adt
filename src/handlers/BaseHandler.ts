@@ -2,7 +2,7 @@ import type { ToolDefinition } from "../types/tools";
 import type { ADTClient } from "../adt/index.js";
 import { performance } from 'perf_hooks';
 import { createLogger } from '../lib/logger';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 export abstract class BaseHandler {
   protected readonly adtclient: ADTClient;

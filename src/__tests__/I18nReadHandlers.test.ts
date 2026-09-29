@@ -1,6 +1,6 @@
 import { I18nReadHandlers } from '../handlers/I18nReadHandlers.js';
 import type { I18nReadClient } from '../adt/I18nReadApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * I18nReadHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

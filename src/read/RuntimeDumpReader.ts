@@ -1,5 +1,5 @@
 import type { ADTClient, Dump } from '../adt/index.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;

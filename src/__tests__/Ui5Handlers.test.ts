@@ -1,6 +1,6 @@
 import { Ui5Handlers } from '../handlers/Ui5Handlers.js';
 import type { Ui5FilestoreClient } from '../adt/Ui5FilestoreApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * Ui5Handlers 目录与分派契约测试（mock filestore 客户端，零 SAP 往返）。

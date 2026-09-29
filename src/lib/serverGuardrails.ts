@@ -44,6 +44,11 @@ export function usesSapExecutionGate(toolName: string): boolean {
     // getControlledRenameStatus 是纯本地 plan 读取，同豁免。
     && toolName !== 'applyControlledRename'
     && toolName !== 'getControlledRenameStatus'
+    // 受控传输创建：apply 在确认层内部会再次经过 executionGate（applyConfirmed），
+    // 外层 dispatch 若先占唯一槽位同样会自我死锁，与受控激活/克隆同豁免；
+    // getTransportCreationStatus 是纯本地 plan 读取，同豁免。
+    && toolName !== 'applyTransportCreation'
+    && toolName !== 'getTransportCreationStatus'
     && toolName !== 'healthcheck';
 }
 

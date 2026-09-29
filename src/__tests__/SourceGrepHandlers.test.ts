@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { SourceGrepHandlers } from '../handlers/SourceGrepHandlers';
 import type { SourceGrepClient } from '../adt/SourceGrepApi.js';
 

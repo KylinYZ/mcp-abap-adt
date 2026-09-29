@@ -3,7 +3,8 @@ import {
   McpError,
   type ElicitRequestFormParams,
   type ElicitResult
-} from '@modelcontextprotocol/sdk/types.js';
+} from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import { DebugControlWorkflow, type ApplyDebugOperationInput } from './DebugControlWorkflow.js';
 import { SafeAbapError, errorMessage } from './errors.js';
 import type { DebugOperationPlanView } from './debugTypes.js';
@@ -71,6 +72,7 @@ export class DebugConfirmation {
     try {
       return await this.options.elicitInput(params, timeoutMs);
     } catch (error) {
+      if (error instanceof ConfirmationRequiredError) throw error;
       if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
         return { action: 'cancel' };
       }

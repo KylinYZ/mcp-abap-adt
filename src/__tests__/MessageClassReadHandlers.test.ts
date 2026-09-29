@@ -1,6 +1,6 @@
 import { MessageClassReadHandlers } from '../handlers/MessageClassReadHandlers.js';
 import type { MessageClassReadClient } from '../adt/MessageClassReadApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * MessageClassReadHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

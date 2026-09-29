@@ -4,7 +4,7 @@ import net from 'net';
 import { randomUUID } from 'crypto';
 import os from 'os';
 import path from 'path';
-import { type ElicitRequestFormParams, type ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import { type ElicitRequestFormParams, type ElicitResult } from '../lib/McpErrorCompat.js';
 import { SafeAbapError } from './errors.js';
 import type { RepositoryCreationConfirmationProviderMode } from './RepositoryCreationConfirmationChallengeStore.js';
 

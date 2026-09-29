@@ -1,4 +1,4 @@
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from './McpErrorCompat.js';
 
 interface QueuedOperation<T> {
   operation: () => Promise<T>;

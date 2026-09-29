@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition, ToolSchemaProperty } from '../types/tools.js';
 import { BaseHandler } from './BaseHandler.js';
 import { mutatingRawTool, readOnlyRawTool } from './rawToolMetadata.js';

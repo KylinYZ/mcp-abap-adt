@@ -1,6 +1,6 @@
 import { KnowledgeQueriesHandlers } from '../handlers/KnowledgeQueriesHandlers.js';
 import type { KnowledgeQueriesClient } from '../adt/KnowledgeQueriesApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * KnowledgeQueriesHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { HighLevelReadHandlers } from '../handlers/HighLevelReadHandlers';
 
 describe('HighLevelReadHandlers', () => {

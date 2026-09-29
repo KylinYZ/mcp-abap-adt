@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { DebugConfirmation, type DebugConfirmationOptions } from '../safe/DebugConfirmation.js';
 import { DebugControlWorkflow } from '../safe/DebugControlWorkflow.js';
 import type { SafeDebugCommand } from '../safe/debugTypes.js';

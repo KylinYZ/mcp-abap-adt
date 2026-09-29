@@ -12,11 +12,12 @@
  * 一次确认覆盖"创建新对象+删除旧对象"两步（删除旧对象是重命名语义的
  * 固有组成，确认消息显式标注两步副作用）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { SafeAbapError } from '../safe/errors.js';
 import type { RenameControlledWorkflow } from '../safe/RenameControlledWorkflow.js';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const RENAME_TOOL_NAMES = new Set([
   'previewControlledRename', 'applyControlledRename', 'getControlledRenameStatus'
@@ -105,7 +106,7 @@ export class RenameControlledHandlers {
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown controlled rename tool: ${toolName}`);
     } catch (error) {
-      if (error instanceof McpError || error instanceof SafeAbapError) throw error;
+      if (error instanceof McpError || error instanceof SafeAbapError || error instanceof ConfirmationRequiredError) throw error;
       // 底层异常脱敏（可能含目标系统细节）
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);
     }

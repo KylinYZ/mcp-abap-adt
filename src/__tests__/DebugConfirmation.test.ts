@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import { DebugConfirmation } from '../safe/DebugConfirmation';
 
 describe('DebugConfirmation', () => {

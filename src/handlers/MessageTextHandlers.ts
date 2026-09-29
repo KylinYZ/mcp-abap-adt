@@ -6,11 +6,12 @@
  *   2. applyMessageTextChange     —— 原生确认后单次执行（锁 → PUT → 解锁 → readback）
  *   3. getMessageTextChangeStatus —— 本地 plan 状态查询
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { SafeAbapError } from '../safe/errors.js';
 import type { MessageTextWorkflow } from '../safe/MessageTextWorkflow.js';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const MESSAGE_TEXT_TOOL_NAMES = new Set([
   'previewMessageTextChange', 'applyMessageTextChange', 'getMessageTextChangeStatus'
@@ -108,7 +109,7 @@ export class MessageTextHandlers {
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown message text tool: ${toolName}`);
     } catch (error) {
-      if (error instanceof McpError || error instanceof SafeAbapError) throw error;
+      if (error instanceof McpError || error instanceof SafeAbapError || error instanceof ConfirmationRequiredError) throw error;
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);
     }
   }

@@ -1,6 +1,6 @@
 import { SpoolJobHandlers } from '../handlers/SpoolJobHandlers.js';
 import type { SpoolJobClient } from '../adt/SpoolJobApi.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 /**
  * SpoolJobHandlers 目录与分派契约测试（mock 客户端，零 SAP 往返）。

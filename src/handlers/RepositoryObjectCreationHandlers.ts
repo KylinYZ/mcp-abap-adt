@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { RepositoryObjectCreationRegistry } from '../safe/RepositoryObjectCreationRegistry.js';
 import {
   RepositoryObjectCreationConfirmation,

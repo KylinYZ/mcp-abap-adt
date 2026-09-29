@@ -1,4 +1,4 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 
 type ToolCall = (toolName: string, argumentsValue: Record<string, unknown>) => Promise<unknown>;

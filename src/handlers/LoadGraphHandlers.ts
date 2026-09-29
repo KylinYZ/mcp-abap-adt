@@ -6,7 +6,7 @@
  *   - 与 getCrHistory/getCoChange 同一 datapreview SQL 通道（只读、decode、不重试）；
  *   - 对象名处理器层 token 预检，API 层引号转义（纵深防御）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { LoadGraphClient } from '../adt/LoadGraphApi.js';
 import { buildLoadDependencyGraph, LoadDependencyInputError, type LoadDependencyInput } from '../adt/LoadDependencyGraph.js';

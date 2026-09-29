@@ -1,4 +1,4 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '../lib/McpErrorCompat.js';
 import type { Sm21ReadRequest, Sm21RuntimeConfig, Sm21Severity } from './types.js';
 
 const MAX_FILTER_VALUES = 20;

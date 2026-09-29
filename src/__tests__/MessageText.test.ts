@@ -2,13 +2,13 @@
  * 受控消息文本写入三件套测试：ADT 协议（XML 构造/解析）、工作流（plan/同值短路/
  * 锁链/readback）、handler 工具面。HTTP 与锁全部 mock，不连接 SAP。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import {
   buildMessageClassXml, parseMessageClassTexts, messageClassURL
 } from '../adt/MessageClassApi';
 import { MessageTextWorkflow, normalizeMessageTexts } from '../safe/MessageTextWorkflow';
 import { MessageTextHandlers } from '../handlers/MessageTextHandlers';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 
 const XML = '<?xml version="1.0"?><messageClass><messages msgno="001" msgtext="Hello"/><messages msgno="002" msgtext="World"/></messageClass>';
 const policy = {

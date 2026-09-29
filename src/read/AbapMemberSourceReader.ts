@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { AbapObjectStructure, ObjectVersion, StructureElement } from '../adt/index.js';
 import type { AbapObjectResolver } from '../safe/AbapObjectResolver.js';
 import type { ResolvedAbapObject } from '../safe/types.js';

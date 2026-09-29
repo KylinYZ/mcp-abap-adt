@@ -1,4 +1,4 @@
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { FmAllowlist, createDefaultFmAllowlist } from '../rfc/allowlist.js';
 import { invokeFmCall } from '../rfc/call.js';

@@ -4,7 +4,8 @@ import {
   McpError,
   type ElicitRequestFormParams,
   type ElicitResult
-} from '@modelcontextprotocol/sdk/types.js';
+} from '../lib/McpErrorCompat.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import { AbapObjectCreationWorkflow } from './AbapObjectCreationWorkflow.js';
 import type { ApplyCreationInput, CreationPlanView } from './creationTypes.js';
 import { SafeAbapError, errorMessage } from './errors.js';
@@ -58,6 +59,7 @@ export class AbapCreationConfirmation {
     try {
       result = await this.options.elicitInput(this.formRequest(plan), confirmationTimeoutMs(plan));
     } catch (error) {
+      if (error instanceof ConfirmationRequiredError) throw error;
       if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
         return {
           status: 'confirmation_declined',

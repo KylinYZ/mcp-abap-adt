@@ -20,7 +20,8 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: {
-    type: string;
+    // MCP 工具输入 schema 恒为 JSON Schema object 根；v2 SDK 按字面量 'object' 校验
+    type: 'object';
     properties: Record<string, ToolSchemaProperty>;
     required?: string[];
     additionalProperties?: boolean;

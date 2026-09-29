@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { SafeAbapError } from './errors.js';
+import { ConfirmationRequiredError } from '../lib/MrtrElicitation.js';
 import type { RepositoryCreationConfirmationProvider } from './RepositoryCreationConfirmationProvider.js';
 import type { RepositoryCleanupPlanView } from './repositoryCleanupTypes.js';
 
@@ -97,10 +98,12 @@ export class RepositoryObjectCleanupConfirmation {
       await this.audit(plan, 'apply', 'CONSUMED');
       return this.options.applyConfirmed(cleanupPlanId);
     } catch (error) {
+      // 先作废本轮 challenge 再放行 MRTR 穿透（与创建确认同规则）
       if (challenge.status === 'PENDING') {
         challenge.status = 'CANCELLED';
         await this.audit(plan, 'cancel', 'CANCELLED');
       }
+      if (error instanceof ConfirmationRequiredError) throw error;
       if (error instanceof SafeAbapError) throw error;
       throw cancelledError();
     }
