@@ -4,7 +4,7 @@
 
 ## 结论
 
-- 代码版本：`0.9.0`（分支 `feat/mcp-v2-dual-era`）：协议栈迁移 MCP 官方 v2 双栈——原生 2026-07-28（`server/discover` 应答，根除 ZCode 0.16.9+ auto 协商超时）+ 2025 legacy 兼容；受控确认流 MRTR 化（legacy 经官方 shim 保持 elicitation/create，v1 宿主零感知）。证据：[v2 双栈迁移实证](docs/evidence/mcp-v2-dual-era-verified.md)、[步骤 0 API 定型](docs/evidence/mcp-v2-migration-api-probe.md)。生产依赖 `@modelcontextprotocol/server@2.2.0`（v1 SDK 移 devDeps 作 2025 回归资产）。是否发布 npm 及用户部署状态待定；ZCode 0.16.9 真机终验待做。
+- 代码版本：`0.9.0`（分支 `feat/mcp-v2-dual-era`）：协议栈迁移 MCP 官方 v2 双栈——原生 2026-07-28（`server/discover` 应答，根除 ZCode 0.16.9+ auto 协商超时）+ 2025 legacy 兼容；受控确认流 MRTR 化（legacy 经官方 shim 保持 elicitation/create，v1 宿主零感知）。证据：[v2 双栈迁移实证](docs/evidence/mcp-v2-dual-era-verified.md)、[步骤 0 API 定型](docs/evidence/mcp-v2-migration-api-probe.md)。生产依赖 `@modelcontextprotocol/server@2.2.0`（v1 SDK 移 devDeps 作 2025 回归资产）。是否发布 npm 及用户部署状态待定；ZCode 0.16.9 真机终验待做；真实 DEV 确认链与关键链路已于 2026-09-29 用 sap-demo 复跑全绿（message-text/recover/where-used/transport-crossref/rename-controlled 双确认链，证据见 mcp-v2-dual-era-verified.md）。
 - 自动化门禁：2026-09-29 起 `npm test -- --runInBand` 通过，174 suites / 1860 tests（连续两轮全绿）；`npm run build` 通过。受控传输请求创建链（仅创建）已落地：`previewTransportCreation`/`applyTransportCreation`/`getTransportCreationStatus`，DEV + development/development-workbench 专属，原生确认 + create/readback 双步验证，释放/删除/改属主/直改 E071·E071K 维持禁止；离线自动化已验证，真机 smoke 尚未运行（属待环境确认项）。
 - VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；`analysis.history` 仍为 PARTIAL。loads、有界加载图和传输成员/结构边界组合链已由专用 DEV 真机证据覆盖核心路径；CR 分组、动态图边及图引擎完整性仍有缺口，详见[后续缺口与验收规划](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)。
 - `getFmTestDataSets` 已真机验证 EUFUNC 测试集目录与元数据读取；CLUSTD payload 未解码，不提供 inputs/outputs 内容。是否投入 S/2 集群解码器应先做独立可行性评估，不应扩大当前能力声明。

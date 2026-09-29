@@ -46,8 +46,23 @@ PASS dual-era smoke: discover=510ms, modern(tools=158, wire2026=true, health=tru
 | v1 SDK 宿主（Claude Desktop / Cursor 等未跟进 2026 的） | initialize | 照常服务（v1 client 冒烟锁定） |
 | v2 SDK 宿主（modern 协商） | discover + envelope | 原生 2026-07-28 |
 
+## 真实 DEV 确认链与关键链路复跑（2026-09-29，sap-demo.env，授权后执行）
+
+0.9.0 迁移后的真机回归（legacy era，v1 SDK client + shim 驱动的 MRTR 确认）：
+
+| 冒烟 | 结果 |
+|---|---|
+| 只读基线（sap-dev-readonly：限制/缓存/队列/真实 ADT 读取） | PASS 9/9，无 FAIL |
+| `message-text-real-dev`（SE91 受控写：创建消息类 → MRTR 表单确认 → 写 2 条文本 → 同值短路 → 清理 → absence 零残留） | SMOKE OK |
+| `recover-failed-create-real-dev`（FAILED 计划恢复清理 + APPLIED 拒绝绑定 + PLAN_NOT_FOUND 负例） | SMOKE OK |
+| `where-used-config-real-dev`（直连自造 TVARVC 读者 → 决定性正例 → 靶对象清理） | SMOKE OK |
+| `transport-crossref-real-dev`（LOADS 与 REFERENCES/CALLS 双源组合 + 负例） | SMOKE OK |
+| `rename-controlled-real-dev`（受控重命名一站式：创建 → **双确认点**（克隆确认 + 删旧确认）→ readback → 双向 absence 零残留） | SMOKE OK |
+
+结论：MRTR 确认引擎在真实 SAP 环境下经 v1 宿主（shim 路径）完整工作，多轮与嵌套确认（重命名双确认）稳定，受控写入的清理与缺席复核语义不变。
+
 ## 遗留与后续
 
 - ZCode 0.16.9 真机端到端验收：需在装有 0.16.9 agent 的机子上以 auto 模式连接确认（本机 agent 0.13.3 无法复现其探测策略；协议面已由裸探测帧 + v2 client modern 会话双覆盖）
-- 真实 DEV 确认链 smoke（message-text 等 11 个 `test:*-real-dev`）：待按惯例授权后用 `sap-demo.env` 复跑
+- npm 发布：待用户决定
 - HTTP/Streamable 传输、tasks 官方扩展、subscriptions/listen：明确出界，未纳入
