@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Add the deployment-level confirmation-mode switch `SAP_MCP_CONFIRMATION_MODE` (`native` default | `auto`): with `auto`, every controlled apply chain (source change, object creation, clone/rename, transport create/cleanup, activation, DDIC/package/RAP, quality check, debug, repository creation/cleanup) skips the manual native confirmation and executes in a single apply call. `auto` is honored only with `SAP_MCP_SYSTEM_ROLE=DEV` and fails closed at startup otherwise; it is driven exclusively by the deployment environment variable — callers cannot trigger it via any tool argument. Audit entries honestly record `confirmationMode=auto-config`; the plan state machine, drift/hash checks, and the audit chain are unchanged, and healthcheck echoes the active mode.
 
 ## [0.8.4] - 2026-09-24
 - VSP capability alignment advances from 51/71 to 54/71 (`MCP_SUPERSET=13`, `EQUIVALENT=41`, `PARTIAL=5`, `GAP=2`, `INTENTIONAL_RESTRICTION=10`, `UNVERIFIED=0`).

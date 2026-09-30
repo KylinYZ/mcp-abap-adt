@@ -248,6 +248,14 @@ const parseRequest = (r: any) => {
     ...parseTask(r),
     tasks: xmlArray(r, "tm:task").map(parseTask)
   }
+  // 真机实证（2026-09-30 sap-demo）：请求级对象条目在 <tm:all_objects> 包装元素
+  // 之下（属性形态 tm:pgmid/tm:type/tm:name，无 tm:obj_func），直接子级
+  // tm:abap_object 不存在——此前 objects 恒为空数组，导致清理链的传输证据
+  // 核验"看不到"任何登记条目而必然 VERIFICATION_FAILED。此处兼容两种形态。
+  const allObjects = xmlArray(r, "tm:all_objects", "tm:abap_object").map(xmlNodeAttr)
+  if (allObjects.length > 0) {
+    request.objects = [...request.objects, ...allObjects]
+  }
   return request
 }
 const parseTargets = (s: any) => ({

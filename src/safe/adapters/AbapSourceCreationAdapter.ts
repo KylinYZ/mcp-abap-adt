@@ -121,7 +121,9 @@ export function preparedFromLegacy(
     })),
     sources: preview.sources || [],
     deferredObjectValidation: preview.deferredObjectValidation || [],
-    transportRequest: status.transportRequest
+    transportRequest: status.transportRequest,
+    // 7.51 兼容：把 legacy 链的传输门禁摘要（软检查结论/双通道/降级标注）透传给上层预览。
+    ...(preview.transportValidation ? { transportValidation: preview.transportValidation } : {})
   }
   return {
     target: {

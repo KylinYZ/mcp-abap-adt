@@ -1,5 +1,5 @@
 import { SafeAbapError } from '../safe/errors';
-import { SafetyPolicy, parseToolProfile } from '../safe/SafetyPolicy';
+import { SafetyPolicy, parseToolProfile, parseConfirmationMode } from '../safe/SafetyPolicy';
 
 describe('SafetyPolicy', () => {
   const validOptions = {
@@ -163,5 +163,35 @@ describe('SafetyPolicy', () => {
     expect(new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '60' }).debugAuthTtlMs).toBe(60_000);
     expect(() => new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '59' })).toThrow('SAP_MCP_DEBUG_AUTH_TTL_SECONDS');
     expect(() => new SafetyPolicy({ ...validOptions, debugAuthTtlSeconds: '3601' })).toThrow('SAP_MCP_DEBUG_AUTH_TTL_SECONDS');
+  });
+
+  describe('confirmation mode (SAP_MCP_CONFIRMATION_MODE)', () => {
+    it('defaults to native confirmation and never auto-approves', () => {
+      const policy = new SafetyPolicy(validOptions);
+      expect(policy.confirmationMode).toBe('native');
+      expect(policy.confirmationAutoApprove).toBe(false);
+      expect(parseConfirmationMode()).toBe('native');
+      expect(parseConfirmationMode('native')).toBe('native');
+    });
+
+    it('accepts auto mode on a DEV system', () => {
+      const policy = new SafetyPolicy({ ...validOptions, confirmationMode: 'auto' });
+      expect(policy.confirmationMode).toBe('auto');
+      expect(policy.confirmationAutoApprove).toBe(true);
+    });
+
+    it.each(['AUTO', ' Auto '])('normalizes %s to auto', raw => {
+      expect(parseConfirmationMode(raw)).toBe('auto');
+    });
+
+    it('rejects unknown mode values with the variable name', () => {
+      expect(() => parseConfirmationMode('yes')).toThrow('Unsupported SAP_MCP_CONFIRMATION_MODE');
+      expect(() => new SafetyPolicy({ ...validOptions, confirmationMode: 'skip' })).toThrow('SAP_MCP_CONFIRMATION_MODE');
+    });
+
+    it.each(['QAS', 'PRD', ''])('fails closed when auto mode is combined with non-DEV role %s', systemRole => {
+      expect(() => new SafetyPolicy({ ...validOptions, systemRole, confirmationMode: 'auto' }))
+        .toThrow('SAP_MCP_CONFIRMATION_MODE=auto requires SAP_MCP_SYSTEM_ROLE=DEV');
+    });
   });
 });

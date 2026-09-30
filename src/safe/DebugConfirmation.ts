@@ -12,6 +12,12 @@ import type { DebugOperationPlanView } from './debugTypes.js';
 export interface DebugConfirmationOptions {
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
+   * 返回 true 时跳过人工表单确认直接执行，事件记为 auto-config。
+   * 工具调用方永远无法通过参数触发此路径。
+   */
+  autoApprove?: () => boolean;
   applyConfirmed?: (input: ApplyDebugOperationInput) => Promise<Record<string, unknown>>;
   authorizeConfirmed?: (targetUser: string, debuggeeId: string) => Promise<Record<string, unknown>>;
 }
@@ -40,6 +46,12 @@ export class DebugConfirmation {
       );
     }
 
+    // 部署配置预授权：plan 状态与 kind 校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    if (this.options.autoApprove?.()) {
+      const input = { debugOperationPlanId, confirmedByUser: true, confirmationMode: 'auto-config' as const };
+      return this.options.applyConfirmed ? this.options.applyConfirmed(input) : this.workflow.applyOperation(input);
+    }
+
     const result = await this.elicit(this.operationForm(plan), confirmationTimeoutMs(plan));
     if (result.action !== 'accept' || result.content?.decision !== 'apply') {
       return {
@@ -55,6 +67,12 @@ export class DebugConfirmation {
   async confirmAndAuthorize(targetUser: string, debuggeeId: string): Promise<Record<string, unknown>> {
     this.assertFormSupported();
     const attach = this.workflow.currentAttach(targetUser, debuggeeId);
+    // 部署配置预授权：attach 校验通过后跳过人工表单确认
+    if (this.options.autoApprove?.()) {
+      return this.options.authorizeConfirmed
+        ? this.options.authorizeConfirmed(targetUser, debuggeeId)
+        : this.workflow.authorizeConfirmed(targetUser, debuggeeId);
+    }
     const result = await this.elicit({
       mode: 'form',
       message: `授权 DEV 调试控制 · 用户 ${targetUser} · debuggee ${debuggeeId} · 进程 ${attach.processId}`,

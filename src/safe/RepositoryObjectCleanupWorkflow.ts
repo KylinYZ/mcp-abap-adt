@@ -385,7 +385,7 @@ export class RepositoryObjectCleanupWorkflow {
   ): Promise<NonNullable<RepositoryCleanupResource['transportCompanionKeys']>> {
     const details = await this.client.transportDetails(String(this.context.realDevValidationTransport || ''));
     assertTransportOpen(details);
-    const entries = [...(details.objects || []), ...(details.tasks || []).flatMap(task => task.objects || [])];
+    const entries = dedupeTransportEntries([...(details.objects || []), ...(details.tasks || []).flatMap(task => task.objects || [])]);
     const normalizedTypes = new Set(allowedTypes.map(item => item.toUpperCase()));
     const matches = entries.filter(entry => (
       String(entry['tm:name'] || '').toUpperCase() === resource.objectName
@@ -445,7 +445,7 @@ export class RepositoryObjectCleanupWorkflow {
   ): Promise<CleanupTransportDisposition> {
     const details = await this.client.transportDetails(transportRequest);
     assertTransportOpen(details);
-    const entries = [...(details.objects || []), ...(details.tasks || []).flatMap(task => task.objects || [])];
+    const entries = dedupeTransportEntries([...(details.objects || []), ...(details.tasks || []).flatMap(task => task.objects || [])]);
     const keyGroups = buildCleanupTransportKeyGroups(resource, [{
       programId: resource.transportProgramId || 'R3TR',
       objectType: resource.transportObjectType || resource.adtType.split('/')[0],
@@ -545,6 +545,12 @@ function expandCleanupTransportKeyAliases(
       aliases.push({ programId: 'R3TR', objectType: 'FUGR', objectName: normalized.objectName.startsWith('SAPL') ? aliasName : normalized.objectName });
     }
   }
+  // 真机实证（2026-09-30 sap-demo）：PROGRAM 的 transportInfo 锁键是 LIMU/REPS
+  //（include 源码级），而传输登记条目（E071 与 tm:all_objects）是 R3TR/PROG
+  //（主对象级）——缺这个别名时匹配集为空，清理核验必然 VERIFICATION_FAILED。
+  if (resource.objectKind === 'PROGRAM' && normalized.objectType === 'REPS') {
+    aliases.push({ programId: 'R3TR', objectType: 'PROG', objectName: normalized.objectName });
+  }
   if (resource.objectKind === 'FUNCTION_MODULE' && resource.parentName) {
     aliases.push(...(resource.transportIdentityAliases || []));
   }
@@ -611,6 +617,27 @@ function transportKeyMatches(
   return String(entry['tm:pgmid'] || 'R3TR').toUpperCase() === key.programId.toUpperCase()
     && String(entry['tm:type'] || '').toUpperCase() === key.objectType.toUpperCase()
     && String(entry['tm:name'] || '').toUpperCase() === key.objectName.toUpperCase();
+}
+
+/**
+ * 按 pgmid|type|name 三元组去重传输对象条目。真机实证（2026-09-30 sap-demo）：
+ * ADT transportDetails 的 tm:all_objects 会把请求级与任务级视图合并输出，同一
+ * 对象出现两条逐字节相同的条目——这是合法形态而非登记腐坏，必须先按身份折叠，
+ * 否则误报 duplicate matching entries。折叠后每身份保留首条，混合操作标记
+ * （创建条目+删除条目并存）沿用"任一删除条目即判删除"的既有语义。
+ */
+function dedupeTransportEntries(entries: TransportObject[]): TransportObject[] {
+  const seen = new Set<string>();
+  const deduped: TransportObject[] = [];
+  for (const entry of entries) {
+    const identity = [entry['tm:pgmid'] || 'R3TR', entry['tm:type'], entry['tm:name']]
+      .map(value => String(value || '').toUpperCase())
+      .join('|');
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    deduped.push(entry);
+  }
+  return deduped;
 }
 
 function stableJson(value: unknown): string {

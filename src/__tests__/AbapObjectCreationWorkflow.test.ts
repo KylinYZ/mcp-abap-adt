@@ -4,6 +4,7 @@ import { SafetyPolicy } from '../safe/SafetyPolicy';
 import type { AbapCreationResolver } from '../safe/AbapCreationResolver';
 import type { CreationAdtClient, ResolvedCreationObject } from '../safe/creationTypes';
 import { SafeAbapError } from '../safe/errors';
+import type { TransportValidationSummary } from '../safe/TransportRegistration';
 
 const object: ResolvedCreationObject = {
   objectType: 'PROGRAM',
@@ -28,11 +29,26 @@ function harness(options: {
   activeAfterActivationError?: boolean;
   inactiveAfterActivationError?: boolean;
   activationReturnsInactive?: boolean;
+  /** transportchecks（软检查）抛出的错误文本，模拟 7.51 的 URI 映射缺失。 */
+  transportCheckThrows?: string;
+  /** transportchecks 成功时返回的候选请求（缺省含 DEVK900001）。 */
+  transportCheckTransports?: Array<{ TRKORR: string }>;
+  /** transportDetails（ADT 请求详情）抛出的错误文本，模拟 7.51 资源不可映射。 */
+  transportDetailsThrows?: string;
+  /** transportDetails 返回的请求状态（缺省 modifiable）。 */
+  transportStatus?: string;
+  /** 第 N 次 transportDetails 调用起抛错（模拟门禁可用而归属证明通道失效）。 */
+  transportDetailsFailsAfter?: number;
+  /** transportDetails 返回的登记条目（缺省为 ZNEW 的 R3TR PROG）。 */
+  transportObjects?: Array<Record<string, string>>;
+  /** E070/E071 SQL 通道行为：缺省无 runQuery（通道不可用）。 */
+  sqlRows?: (sql: string) => Record<string, unknown>[];
 } = {}) {
   const calls: string[] = [];
   let exists = false;
   let source = '';
   let activationAttempted = false;
+  let transportDetailsCalls = 0;
   const resolver = {
     resolve: jest.fn(async () => [{ ...object }]),
     assertTargetsAbsent: jest.fn(async () => {
@@ -56,10 +72,30 @@ function harness(options: {
     searchObject: jest.fn(),
     objectStructure: jest.fn(),
     mainPrograms: jest.fn(),
-    transportInfo: jest.fn(async () => ({
-      DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
-    })),
-    transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+    transportInfo: jest.fn(async () => {
+      if (options.transportCheckThrows) throw new Error(options.transportCheckThrows);
+      return {
+        DEVCLASS: 'Z001',
+        TRANSPORTS: options.transportCheckTransports ?? [{ TRKORR: 'DEVK900001' }],
+        LOCKS: { TASKS: [] }
+      };
+    }),
+    transportDetails: jest.fn(async () => {
+      transportDetailsCalls += 1;
+      if (options.transportDetailsThrows) throw new Error(options.transportDetailsThrows);
+      if (options.transportDetailsFailsAfter !== undefined && transportDetailsCalls > options.transportDetailsFailsAfter) {
+        throw new Error('No URI-Mapping defined for URI /sap/bc/adt/cts/transportrequests/DEVK900001');
+      }
+      // 归属证明的 ADT 备选通道读取对象清单：默认返回 ZNEW 的 R3TR PROG 登记。
+      return {
+        'tm:status': options.transportStatus ?? 'modifiable',
+        objects: options.transportObjects ?? [{ 'tm:pgmid': 'R3TR', 'tm:type': 'PROG', 'tm:name': 'ZNEW' }],
+        tasks: []
+      };
+    }),
+    ...(options.sqlRows ? {
+      runQuery: jest.fn(async (sql: string) => ({ values: options.sqlRows!(sql) }))
+    } : {}),
     getObjectSource: jest.fn(async () => { calls.push('getSource'); return source; }),
     setObjectSource: jest.fn(async (_url, value) => { calls.push('write'); source = value; }),
     syntaxCheck: jest.fn(async () => {
@@ -303,7 +339,11 @@ describe('AbapObjectCreationWorkflow', () => {
       transportInfo: jest.fn(async () => ({
         DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
       })),
-      transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+      transportDetails: jest.fn(async () => ({
+        'tm:status': 'modifiable',
+        objects: [{ 'tm:pgmid': 'LIMU', 'tm:type': 'INC', 'tm:name': 'LZVFG1001' }],
+        tasks: []
+      })),
       validateNewObject: jest.fn(async (options: { objname?: string }) => {
         calls.push(`validate:${options.objname}`);
         return { success: true };
@@ -430,7 +470,14 @@ describe('AbapObjectCreationWorkflow', () => {
       transportInfo: jest.fn(async () => ({
         DEVCLASS: 'Z001', TRANSPORTS: [{ TRKORR: 'DEVK900001' }], LOCKS: { TASKS: [] }
       })),
-      transportDetails: jest.fn(async () => ({ 'tm:status': 'modifiable' })),
+      transportDetails: jest.fn(async () => ({
+        'tm:status': 'modifiable',
+        objects: [
+          { 'tm:pgmid': 'R3TR', 'tm:type': 'FUGR', 'tm:name': 'ZNEW_FG' },
+          { 'tm:pgmid': 'LIMU', 'tm:type': 'FUNC', 'tm:name': 'ZNEW_FM' }
+        ],
+        tasks: []
+      })),
       validateNewObject: jest.fn(async (options: { objname?: string }) => {
         calls.push(`validate:${options.objname}`);
         if (options.objname === 'ZNEW_FM' && !existing.has('ZNEW_FG')) {
@@ -563,5 +610,181 @@ describe('AbapObjectCreationWorkflow', () => {
       'ZNEW_FM:active',
       'ZNEW_FG:active'
     ]);
+  });
+
+  it('degrades the transport preflight when the check resource cannot map URIs (7.51 behavior)', async () => {
+    const test = harness({ transportCheckThrows: 'No URI-Mapping defined for URI /sap/bc/adt/packages/z001' });
+    const preview = await test.workflow.preview(previewInput);
+
+    // 软检查失败不再拒绝预览：兼容性标注为未确认，诊断带端点/URI/分类。
+    const transportValidation = preview.transportValidation as TransportValidationSummary;
+    expect(transportValidation).toMatchObject({
+      packageCompatibility: 'CHECK_UNAVAILABLE',
+      requestCheck: { channel: 'ADT_TRANSPORT_DETAILS', modifiable: true }
+    });
+    expect(transportValidation.attempts).toEqual([expect.objectContaining({
+      endpoint: '/sap/bc/adt/cts/transportchecks',
+      uri: '/sap/bc/adt/packages/z001',
+      classification: 'URI_MAPPING_UNAVAILABLE'
+    })]);
+    expect(transportValidation.notes.join(' ')).toContain('has not been confirmed by SAP');
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+    expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'activate', 'getSource']);
+  });
+
+  it('falls back to the E070 SQL gate and SQL proof when the ADT transport-details resource is unavailable', async () => {
+    const test = harness({
+      transportDetailsThrows: 'No URI-Mapping defined for URI /sap/bc/adt/cts/transportrequests/DEVK900001',
+      sqlRows: (sql: string) => {
+        if (sql.includes('trstatus')) return [{ TRKORR: 'DEVK900001', TRSTATUS: 'D' }];
+        if (sql.includes('strkorr')) return [];
+        if (sql.includes('e071')) return [{ TRKORR: 'DEVK900001', PGMID: 'R3TR', OBJECT: 'PROG', OBJ_NAME: 'ZNEW' }];
+        throw new Error(`unexpected sql: ${sql}`);
+      }
+    });
+    const preview = await test.workflow.preview(previewInput);
+
+    expect(preview.transportValidation as TransportValidationSummary).toMatchObject({
+      requestCheck: { channel: 'E070_SQL', modifiable: true, status: 'D' },
+      packageCompatibility: 'SAP_CONFIRMED'
+    });
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({
+      status: 'success',
+      plan: { status: 'APPLIED', createdObjects: [{ transportRegistration: 'PROVEN' }] }
+    });
+  });
+
+  it('keeps both E070 SQL channels alive when runQuery is a prototype method of the client (this-binding regression)', async () => {
+    // 真机缺陷回归（2026-09-30 sap-demo 实证）：AdtClient.runQuery 是依赖 this.h 的
+    // 原型方法；工作流若以裸引用提取（const runner = client.runQuery）再调用，
+    // this 丢失直接抛 TypeError "reading 'h'"——门禁双通道恒判"两路皆败"，
+    // 归属证明静默退化到 ADT 回退通道。此测试把 runQuery 挂回 client 自己的
+    // 原型（等价生产形态），锁定 bind(this.client) 修复不被回退。
+    const test = harness({
+      transportDetailsThrows: 'No URI-Mapping defined for URI /sap/bc/adt/cts/transportrequests/DEVK900001',
+      sqlRows: (sql: string) => {
+        if (sql.includes('trstatus')) return [{ TRKORR: 'DEVK900001', TRSTATUS: 'D' }];
+        if (sql.includes('strkorr')) return [];
+        if (sql.includes('e071')) return [{ TRKORR: 'DEVK900001', PGMID: 'R3TR', OBJECT: 'PROG', OBJ_NAME: 'ZNEW' }];
+        throw new Error(`unexpected sql: ${sql}`);
+      }
+    });
+    class DatapreviewCapableClient {
+      session?: string;
+      runQuery(sql: string) {
+        if (!this.session) throw new TypeError("Cannot read properties of undefined (reading 'h')");
+        return { values: (test.client as unknown as { __sqlRows: (s: string) => Record<string, unknown>[] }).__sqlRows(sql) };
+      }
+    }
+    // bind(this.client) 后 this 即 client 本体：会话状态作为 client 自有字段存在，
+    // 等价生产 AdtClient 上 this.h 的可访问性
+    (test.client as unknown as { session?: string }).session = 'bound-session';
+    (test.client as unknown as { __sqlRows: (s: string) => Record<string, unknown>[] }).__sqlRows = (sql) => {
+      if (sql.includes('trstatus')) return [{ TRKORR: 'DEVK900001', TRSTATUS: 'D' }];
+      if (sql.includes('strkorr')) return [];
+      return [{ TRKORR: 'DEVK900001', PGMID: 'R3TR', OBJECT: 'PROG', OBJ_NAME: 'ZNEW' }];
+    };
+    Object.setPrototypeOf(test.client, DatapreviewCapableClient.prototype);
+
+    const preview = await test.workflow.preview(previewInput);
+    expect(preview.transportValidation as TransportValidationSummary).toMatchObject({
+      requestCheck: { channel: 'E070_SQL', modifiable: true, status: 'D' }
+    });
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({
+      status: 'success',
+      plan: { status: 'APPLIED', createdObjects: [{ transportRegistration: 'PROVEN' }] }
+    });
+  });
+
+  it('rejects the transport gate only after both the ADT resource and the E070 SQL channel fail', async () => {
+    const test = harness({
+      transportDetailsThrows: 'No URI-Mapping defined for URI /sap/bc/adt/cts/transportrequests/DEVK900001',
+      sqlRows: () => { throw new Error('datapreview channel unavailable'); }
+    });
+
+    await expect(test.workflow.preview(previewInput)).rejects.toMatchObject({
+      code: 'TRANSPORT_INVALID',
+      details: {
+        transportAttempts: [
+          expect.objectContaining({ endpoint: '/sap/bc/adt/cts/transportrequests/DEVK900001', classification: 'URI_MAPPING_UNAVAILABLE' }),
+          expect.objectContaining({ endpoint: 'E070 (datapreview SQL)', classification: 'OTHER' })
+        ]
+      }
+    });
+    expect(test.calls).toEqual([]);
+  });
+
+  it('treats a candidate mismatch as an advisory note instead of a hard gate', async () => {
+    const test = harness({ transportCheckTransports: [] });
+    const preview = await test.workflow.preview(previewInput);
+
+    const transportValidation = preview.transportValidation as TransportValidationSummary;
+    expect(transportValidation).toMatchObject({ packageCompatibility: 'NOT_CONFIRMED_BY_SAP' });
+    expect(transportValidation.notes.join(' ')).toContain('remains authoritative');
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).resolves.toMatchObject({ status: 'success', plan: { status: 'APPLIED' } });
+  });
+
+  it('still rejects released requests on both gate channels', async () => {
+    const adt = harness({ transportStatus: 'R' });
+    await expect(adt.workflow.preview(previewInput)).rejects.toMatchObject({
+      code: 'TRANSPORT_INVALID',
+      message: 'Transport DEVK900001 is already released.'
+    });
+
+    const sql = harness({
+      transportDetailsThrows: 'No URI-Mapping defined for URI /sap/bc/adt/cts/transportrequests/DEVK900001',
+      sqlRows: () => [{ TRKORR: 'DEVK900001', TRSTATUS: 'R' }]
+    });
+    await expect(sql.workflow.preview(previewInput)).rejects.toMatchObject({
+      code: 'TRANSPORT_INVALID',
+      message: 'Transport DEVK900001 is already released (E070 TRSTATUS=R).'
+    });
+  });
+
+  it('forbids compensation when the created object is not registered in the request', async () => {
+    const test = harness({ transportObjects: [] });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'TRANSPORT_REGISTRATION_UNPROVEN',
+      details: { transportRequest: 'DEVK900001', objectName: 'ZNEW', foundEntries: [] }
+    });
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.exists()).toBe(true);
+    expect(test.workflow.status('creation-1')).toMatchObject({
+      status: 'COMPENSATION_FAILED',
+      createdObjects: [{ objectName: 'ZNEW', ownershipProven: true, transportRegistration: 'UNPROVEN' }]
+    });
+  });
+
+  it('reports unknown transport registration when both proof channels fail after a successful gate', async () => {
+    const test = harness({
+      // 门禁两次 ADT 调用可用（preview + apply），归属证明的第三次调用失败；
+      // SQL 通道恒失败 → 证明通道全部不可用 → UNKNOWN。
+      transportDetailsFailsAfter: 2,
+      sqlRows: () => { throw new Error('datapreview channel unavailable'); }
+    });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({ code: 'TRANSPORT_REGISTRATION_UNKNOWN' });
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.exists()).toBe(true);
+    expect(test.workflow.status('creation-1')).toMatchObject({
+      status: 'COMPENSATION_FAILED',
+      createdObjects: [{ objectName: 'ZNEW', transportRegistration: 'UNKNOWN' }]
+    });
   });
 });

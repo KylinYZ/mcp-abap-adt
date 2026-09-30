@@ -14,6 +14,7 @@ const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
   getTransportScope: ['transports', 'includeLoadBoundaries', 'includeCrossRefBoundaries', 'maxDependencyQueries', 'maxEntries'],
   getFmTestDataSets: ['function'],
   getWhereUsedConfig: ['variable', 'grep', 'maxGrep'],
+  getUsageExamples: ['objectType', 'objectName', 'method', 'form', 'maxExamples'],
   buildLoadDependencyGraph: ['objectType', 'objectName', 'direction', 'maxDepth', 'maxQueries', 'maxNodes', 'maxEdges'],
   analyzeDependencyGraph: ['operation', 'graph', 'root', 'maxDepth', 'maxEntries', 'edgeKinds', 'boundaryScope'],
   sap: ['action', 'params'],

@@ -32,6 +32,11 @@ const TRANSPORT_CREATION_TOOL_NAMES = [
   'previewTransportCreation', 'applyTransportCreation', 'getTransportCreationStatus'
 ];
 
+/** 受控传输清理三工具名（空请求边界，同 handlers 类暴露）。 */
+const CLEANUP_TOOL_NAMES = [
+  'previewTransportCleanup', 'applyTransportCleanup', 'getTransportCleanupStatus'
+];
+
 /** 与 ToolCatalogIntegrity 相同的服务器配置模式（仅本地构造，不连接 SAP）。 */
 function configureServer(role: string, profile: string): AbapAdtServer {
   Object.assign(process.env, {
@@ -286,9 +291,10 @@ describe('TransportCreationWorkflow', () => {
 });
 
 describe('SafeTransportCreationHandlers', () => {
-  it('exposes exactly three bounded creation tools with correct hints', () => {
+  it('exposes the creation trio (plus the cleanup trio) with correct hints', () => {
     const { handlers } = setupHandlers();
-    expect(handlers.getTools().map(tool => tool.name)).toEqual(TRANSPORT_CREATION_TOOL_NAMES);
+    // 创建三件套在前（清理三件套的注解细节由 TransportCleanup.test.ts 断言）
+    expect(handlers.getTools().map(tool => tool.name).slice(0, 3)).toEqual(TRANSPORT_CREATION_TOOL_NAMES);
     expect(handlers.getTools()).toEqual([
       expect.objectContaining({ name: 'previewTransportCreation', annotations: expect.objectContaining({ readOnlyHint: true }) }),
       expect.objectContaining({
@@ -296,10 +302,13 @@ describe('SafeTransportCreationHandlers', () => {
         annotations: expect.objectContaining({ readOnlyHint: false }),
         _meta: expect.objectContaining({ approvalRequired: true })
       }),
-      expect.objectContaining({ name: 'getTransportCreationStatus', annotations: expect.objectContaining({ readOnlyHint: true }) })
+      expect.objectContaining({ name: 'getTransportCreationStatus', annotations: expect.objectContaining({ readOnlyHint: true }) }),
+      ...CLEANUP_TOOL_NAMES.map(name => expect.objectContaining({ name }))
     ]);
     expect(handlers.supports('previewTransportCreation')).toBe(true);
+    expect(handlers.supports('previewTransportCleanup')).toBe(true);
     expect(handlers.supports('createTransport')).toBe(false);
+    expect(handlers.supports('transportDelete')).toBe(false);
   });
 
   it('maps the trio to read-only / advanced-mutation / local operation classes', () => {

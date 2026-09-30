@@ -3,6 +3,13 @@ import type { ToolProfile } from './types.js';
 import { assertToolOperationAllowed as assertOperationAllowed } from '../config/ToolOperationPolicy.js';
 import { REPOSITORY_OBJECT_KINDS, type RepositoryObjectKind } from './repositoryCreationTypes.js';
 
+/**
+ * 受控工作流二次确认模式：
+ * - native（默认）：preview plan 后必须经一次原生人工确认才能 apply；
+ * - auto：跳过人工确认，apply 一次调用直接执行（由部署配置预授权，仅 DEV 允许）。
+ */
+export type ConfirmationPolicyMode = 'native' | 'auto';
+
 export interface SafetyPolicyOptions {
   sapUrl?: string;
   sapClient?: string;
@@ -15,6 +22,7 @@ export interface SafetyPolicyOptions {
   auditPath?: string;
   toolProfile?: string;
   allowTextConfirmation?: string;
+  confirmationMode?: string;
   allowedDebugUsers?: string;
   debugAuthTtlSeconds?: string;
   realDevValidation?: string;
@@ -36,6 +44,8 @@ export class SafetyPolicy {
   readonly auditPath?: string;
   readonly toolProfile: ToolProfile;
   readonly allowTextConfirmation: boolean;
+  readonly confirmationMode: ConfirmationPolicyMode;
+  readonly confirmationAutoApprove: boolean;
   readonly allowedDebugUsers: Set<string>;
   readonly debugAuthTtlMs: number;
   readonly realDevValidationEnabled: boolean;
@@ -57,6 +67,10 @@ export class SafetyPolicy {
     this.auditPath = options.auditPath?.trim() || undefined;
     this.toolProfile = parseToolProfile(options.toolProfile);
     this.allowTextConfirmation = parseBooleanFlag(options.allowTextConfirmation);
+    // 二次确认模式：auto 表示部署者显式授权 AI 全权执行受控写入（跳过人工确认），
+    // 属服务器部署级授权锚点；工具调用方永远无法通过参数自行跳过确认。
+    this.confirmationMode = parseConfirmationMode(options.confirmationMode);
+    this.confirmationAutoApprove = this.confirmationMode === 'auto';
     const configuredDebugUsers = csvSet(options.allowedDebugUsers, normalizeSapUser);
     this.allowedDebugUsers = configuredDebugUsers.size > 0
       ? configuredDebugUsers
@@ -69,6 +83,13 @@ export class SafetyPolicy {
     this.realDevValidationTransport = String(options.realDevValidationTransport || '').trim().toUpperCase();
     if (this.realDevValidationEnabled && (this.realDevValidationObjects.size === 0 || !this.realDevValidationPrefix || !this.realDevValidationPackage || !this.realDevValidationTransport)) {
       throw new Error('REAL_DEV validation requires an explicit object allow-list, name prefix, package, and transport.');
+    }
+    // fail-closed：跳过人工确认的授权只可能在 DEV 系统有效；
+    // QAS/PRD/未配置角色下配置 auto 属部署错误，启动即失败而非静默降级。
+    if (this.confirmationAutoApprove && this.systemRole !== 'DEV') {
+      throw new Error(
+        `SAP_MCP_CONFIRMATION_MODE=auto requires SAP_MCP_SYSTEM_ROLE=DEV (configured role: '${this.systemRole || 'unset'}').`
+      );
     }
   }
 
@@ -85,6 +106,7 @@ export class SafetyPolicy {
       auditPath: environment.SAP_MCP_AUDIT_PATH,
       toolProfile: environment.SAP_MCP_TOOL_PROFILE,
       allowTextConfirmation: environment.SAP_MCP_ALLOW_TEXT_CONFIRMATION,
+      confirmationMode: environment.SAP_MCP_CONFIRMATION_MODE,
       allowedDebugUsers: environment.SAP_MCP_ALLOWED_DEBUG_USERS,
       debugAuthTtlSeconds: environment.SAP_MCP_DEBUG_AUTH_TTL_SECONDS,
       realDevValidation: environment.SAP_MCP_REAL_DEV_VALIDATION,
@@ -216,6 +238,16 @@ export class SafetyPolicy {
   assertToolOperationAllowed(toolName: string): void {
     assertOperationAllowed(toolName, this.toolProfile, this.systemRole);
   }
+}
+
+/**
+ * 解析 SAP_MCP_CONFIRMATION_MODE（严格枚举，fail-closed）：
+ * 未配置默认 native 保持现状；非法值启动即抛错并点名变量。
+ */
+export function parseConfirmationMode(value?: string): ConfirmationPolicyMode {
+  const normalized = String(value || 'native').trim().toLowerCase();
+  if (normalized === 'native' || normalized === 'auto') return normalized;
+  throw new Error(`Unsupported SAP_MCP_CONFIRMATION_MODE '${normalized}'. Use native (default, requires manual confirmation) or auto (skip manual confirmation, DEV only).`);
 }
 
 export function parseToolProfile(value?: string): ToolProfile {

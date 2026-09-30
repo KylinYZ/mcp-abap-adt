@@ -83,6 +83,7 @@ export class CreationPlanStore {
       systemHost: plan.systemHost,
       client: plan.client,
       transportRequest: plan.transportRequest,
+      ...(plan.transportValidation ? { transportValidation: plan.transportValidation } : {}),
       objects: plan.objects.map(object => ({
         objectType: object.objectType,
         objectName: object.objectName,
@@ -98,6 +99,7 @@ export class CreationPlanStore {
         objectName: object.objectName,
         actualObjectUrl: object.actualObjectUrl,
         ownershipProven: object.ownershipProven,
+        transportRegistration: object.transportRegistration,
         unlockSucceeded: object.unlockSucceeded,
         verifiedSourceHash: object.verifiedSourceHash,
         sourceMatchType: object.sourceMatchType,

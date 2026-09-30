@@ -31,6 +31,12 @@ type RenameToolDefinition = ToolDefinition & {
 export interface RenameConfirmationOptions {
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
+   * 返回 true 时跳过人工表单确认，plan 状态校验仍由 workflow.applyConfirmed 执行。
+   * 工具调用方永远无法通过参数触发此路径。
+   */
+  autoApprove?: () => boolean;
 }
 
 export class RenameControlledHandlers {
@@ -114,6 +120,8 @@ export class RenameControlledHandlers {
 
   /** 原生表单确认：不支持 elicitation 直接拒绝（不降级文本确认）。 */
   private async confirm(planId: string): Promise<void> {
+    // 部署配置预授权：跳过人工表单确认，plan 状态校验由 workflow.applyConfirmed 兜底
+    if (this.confirmation.autoApprove?.()) return;
     if (!this.confirmation.supportsFormElicitation()) {
       throw new SafeAbapError('CONFIRMATION_UNSUPPORTED', 'confirmation', 'Controlled rename requires MCP form elicitation.');
     }

@@ -20,7 +20,13 @@ export type ToolProfile =
   | 'business-readonly'
   | 'operations-readonly';
 
-export type ConfirmationMode = 'elicitation' | 'text-fallback';
+/**
+ * 受控链确认来源：
+ * - elicitation：MCP 原生表单确认（人工点击）；
+ * - text-fallback：文本验证码回退确认；
+ * - auto-config：SAP_MCP_CONFIRMATION_MODE=auto 下由部署配置预授权，无人工介入。
+ */
+export type ConfirmationMode = 'elicitation' | 'text-fallback' | 'auto-config';
 
 export type SourceMatchType =
   | 'EXACT'

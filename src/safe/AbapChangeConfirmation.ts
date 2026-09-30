@@ -15,6 +15,12 @@ export interface AbapChangeConfirmationOptions {
   allowTextConfirmation: boolean;
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
+   * 返回 true 时跳过人工表单/文本确认，apply 携带 confirmationMode='auto-config' 直接执行。
+   * 工具调用方永远无法通过参数触发此路径。
+   */
+  autoApprove?: () => boolean;
   applyConfirmed?: (input: ApplyChangeInput) => Promise<Record<string, unknown>>;
   createTextCode?: () => string;
 }
@@ -37,6 +43,12 @@ export class AbapChangeConfirmation {
   async confirmAndApply(changePlanId: string, textConfirmation?: string): Promise<Record<string, unknown>> {
     this.cleanupExpiredChallenges();
     const plan = this.assertConfirmable(this.workflow.status(changePlanId));
+
+    // 部署配置预授权：plan 状态校验通过后跳过人工确认，审计如实记为 auto-config
+    if (this.options.autoApprove?.()) {
+      this.textChallenges.delete(changePlanId);
+      return this.applyConfirmed(changePlanId, 'auto-config');
+    }
 
     if (this.options.supportsFormElicitation()) {
       this.textChallenges.delete(changePlanId);

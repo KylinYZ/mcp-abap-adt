@@ -49,6 +49,10 @@ export function usesSapExecutionGate(toolName: string): boolean {
     // getTransportCreationStatus 是纯本地 plan 读取，同豁免。
     && toolName !== 'applyTransportCreation'
     && toolName !== 'getTransportCreationStatus'
+    // 受控传输清理（空请求边界）：豁免语义与创建链相同（确认层自持 executionGate）；
+    // getTransportCleanupStatus 是纯本地 plan 读取，同豁免。
+    && toolName !== 'applyTransportCleanup'
+    && toolName !== 'getTransportCleanupStatus'
     && toolName !== 'healthcheck';
 }
 

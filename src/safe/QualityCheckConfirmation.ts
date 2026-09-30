@@ -15,6 +15,11 @@ export interface QualityCheckStatusReader {
 export interface QualityCheckConfirmationOptions {
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
+   * 返回 true 时跳过人工表单确认直接执行。工具调用方永远无法通过参数触发此路径。
+   */
+  autoApprove?: () => boolean;
   runConfirmed: (qualityPlanId: string) => Promise<Record<string, unknown>>;
   now?: () => number;
 }
@@ -37,6 +42,10 @@ export class QualityCheckConfirmation {
     }
     const plan = this.statusReader.status(qualityPlanId);
     assertConfirmable(plan);
+    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    if (this.options.autoApprove?.()) {
+      return this.options.runConfirmed(qualityPlanId);
+    }
     const elicited = await this.elicit(
       confirmationForm(plan),
       confirmationTimeoutMs(plan, this.options.now?.() ?? Date.now())

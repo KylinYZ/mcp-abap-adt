@@ -14,6 +14,17 @@ import type {
 import { SafeAbapError, errorMessage } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
 import { compareFunctionModuleSources, compareSources, safeSourceMismatchSummary } from './sourceTools.js';
+import type { TransportAttempt, TransportObjectEntry, TransportRegistrationOutcome, TransportValidationSummary } from './TransportRegistration.js';
+import {
+  cellText,
+  classifyTransportError,
+  e070HeaderQuery,
+  e070TaskQuery,
+  e071EntriesQuery,
+  flattenAdtTransportObjects,
+  isReleasedStatus,
+  matchTransportRegistration
+} from './TransportRegistration.js';
 
 export interface CreationAuditSink {
   append(event: AuditEvent): Promise<void>;
@@ -31,7 +42,7 @@ export class AbapObjectCreationWorkflow {
   async preview(input: PreviewCreationInput): Promise<Record<string, unknown>> {
     const transportRequest = this.policy.assertTransportFormat(input.transportRequest);
     const objects = await this.resolver.resolve(input.objects);
-    await this.validateTransport(objects, transportRequest);
+    const transportValidation = await this.validateTransport(objects, transportRequest);
     const newFunctionGroup = objects.find(object => object.objectType === 'FUNCTION_GROUP');
     const deferredObjectValidation: string[] = [];
     for (const object of objects) {
@@ -47,7 +58,8 @@ export class AbapObjectCreationWorkflow {
       systemHost: this.policy.systemHost,
       client: this.policy.client,
       transportRequest,
-      objects
+      objects,
+      transportValidation
     });
     try {
       await this.recordStage(plan, 'CREATION_PREVIEW_CREATED', true);
@@ -59,6 +71,7 @@ export class AbapObjectCreationWorkflow {
     return {
       status: 'preview',
       plan: this.plans.view(plan.creationPlanId),
+      transportValidation,
       sources: objects
         .filter(object => object.source !== undefined)
         .map(object => ({
@@ -86,7 +99,7 @@ export class AbapObjectCreationWorkflow {
 
     try {
       for (const object of plan.objects) this.policy.assertMutationAllowed(mutationPolicyName(object));
-      await this.validateTransport(plan.objects, plan.transportRequest);
+      plan.transportValidation = await this.validateTransport(plan.objects, plan.transportRequest);
       await this.resolver.assertTargetsAbsent(plan.objects);
       await this.recordStage(plan, 'CREATION_PRECONDITIONS_REVALIDATED', true);
 
@@ -216,6 +229,9 @@ export class AbapObjectCreationWorkflow {
         await this.recordStage(plan, `OBJECT_VERIFIED:${created.objectName}`, true, undefined, true, created);
       }
 
+      // 创建后归属证明：对象存在且源码已核验，仍须证明其登记进指定请求；
+      // 证明不了按失败终止并禁止自动补偿（见 proveTransportRegistration）。
+      await this.proveTransportRegistration(plan);
       this.plans.setStatus(plan.creationPlanId, 'APPLIED');
       await this.recordStage(plan, 'CREATION_APPLIED', true, undefined, false);
       return { status: 'success', plan: this.plans.view(plan.creationPlanId) };
@@ -273,34 +289,211 @@ export class AbapObjectCreationWorkflow {
     }
   }
 
-  private async validateTransport(objects: ResolvedCreationObject[], transportRequest: string): Promise<void> {
-    try {
-      const packages = new Set(objects.map(object => this.policy.assertTransportablePackage(object.packageName)));
-      for (const packageName of packages) {
-        const representative = objects.find(object => object.packageName === packageName) as ResolvedCreationObject;
-        // New target URLs do not exist yet; validate transport against the existing package or parent group.
-        const info = await this.client.transportInfo(representative.parentPath, packageName, 'I');
+  /**
+   * 传输门禁（7.51 兼容改造，2026-09-29 排查定论）：
+   * - 包/父组的 transportchecks 降为软检查：成功时给出兼容性判定，失败只记录
+   *   诊断；候选清单不含请求也不再拒绝——创建 POST（corrNr）由 SAP 服务端做
+   *   权威传输登记，检查失败不是拒绝写入的理由（VSP 同语义）。
+   * - 请求门禁双通道：ADT transportDetails → E070 只读 SQL；"已释放"是权威
+   *   判定，任一通道给出即拒绝；两路都失败才整体拒绝。
+   * 返回摘要写入预览响应与计划（apply 重验后刷新），供读取方标注降级状态。
+   */
+  private async validateTransport(objects: ResolvedCreationObject[], transportRequest: string): Promise<TransportValidationSummary> {
+    const attempts: TransportAttempt[] = [];
+    const notes: string[] = [];
+    const packages = new Set(objects.map(object => this.policy.assertTransportablePackage(object.packageName)));
+    // 兼容性聚合取最差结论：CHECK_UNAVAILABLE > NOT_CONFIRMED_BY_SAP > SAP_CONFIRMED
+    let packageCompatibility: TransportValidationSummary['packageCompatibility'] = 'SAP_CONFIRMED';
+    const degrade = (level: TransportValidationSummary['packageCompatibility']) => {
+      if (level === 'CHECK_UNAVAILABLE' || packageCompatibility === 'SAP_CONFIRMED') packageCompatibility = level;
+    };
+    for (const packageName of packages) {
+      const representative = objects.find(object => object.packageName === packageName) as ResolvedCreationObject;
+      // 软检查 URI 优先用搜索返回的 parentUri（SAP 实际可映射形态），回退自拼 parentPath。
+      const checkUri = representative.parentUri || representative.parentPath;
+      let info: TransportInfo | undefined;
+      try {
+        info = await this.client.transportInfo(checkUri, packageName, 'I');
+      } catch (error) {
+        attempts.push({
+          endpoint: '/sap/bc/adt/cts/transportchecks',
+          uri: checkUri,
+          classification: classifyTransportError(error),
+          message: errorMessage(error)
+        });
+        degrade('CHECK_UNAVAILABLE');
+        notes.push(`Transport check for package ${packageName} is unavailable on this system (${classifyTransportError(error)}); package/request compatibility has not been confirmed by SAP.`);
+      }
+      if (info) {
         this.policy.assertTransportablePackage(info.DEVCLASS || packageName);
         if (!transportNumbers(info).has(transportRequest)) {
-          throw new SafeAbapError(
-            'TRANSPORT_INVALID',
-            'transport',
-            `Transport ${transportRequest} is not available for package ${packageName}.`
-          );
+          degrade('NOT_CONFIRMED_BY_SAP');
+          notes.push(`SAP transport check did not list ${transportRequest} among the open requests for ${packageName}; the creation POST with corrNr remains authoritative.`);
         }
       }
+    }
+    const requestCheck = await this.ensureModifiableRequest(transportRequest, attempts);
+    return { requestCheck, packageCompatibility, notes, attempts };
+  }
+
+  /**
+   * 请求门禁双通道。通道一 ADT transportDetails（7.52+ 主通道）；其"已释放"
+   * 判定是权威结论，直接拒绝；其余失败（含 7.51 的 URI 映射缺失）记录诊断后
+   * 降级通道二 E070 只读 SQL；SQL 通道缺失或也失败时才整体拒绝。
+   */
+  private async ensureModifiableRequest(
+    transportRequest: string,
+    attempts: TransportAttempt[]
+  ): Promise<TransportValidationSummary['requestCheck']> {
+    try {
       const details = await this.client.transportDetails(transportRequest);
-      const status = String(details['tm:status'] || '').trim().toUpperCase();
-      if (status === 'R' || status.includes('RELEASE')) {
+      const status = String(details['tm:status'] || '').trim();
+      if (isReleasedStatus(status)) {
         throw new SafeAbapError('TRANSPORT_INVALID', 'transport', `Transport ${transportRequest} is already released.`);
       }
+      return { transportRequest, channel: 'ADT_TRANSPORT_DETAILS', modifiable: true, status: status || undefined };
     } catch (error) {
       if (error instanceof SafeAbapError) throw error;
+      attempts.push({
+        endpoint: `/sap/bc/adt/cts/transportrequests/${transportRequest}`,
+        classification: classifyTransportError(error),
+        message: errorMessage(error)
+      });
+    }
+    // bind 必须显式：runQuery 是 AdtClient 原型方法（内部依赖 this.h），裸引用
+    // 提取会丢 this 并在调用时抛 TypeError（真机实证：reading 'h'）。
+    const runner = this.client.runQuery?.bind(this.client);
+    if (!runner) {
       throw new SafeAbapError(
         'TRANSPORT_INVALID',
         'transport',
-        `Failed to validate transport ${transportRequest}: ${errorMessage(error)}`
+        `Failed to validate transport ${transportRequest}: neither the ADT transport-details resource nor the E070 SQL channel is available.`,
+        { transportAttempts: [...attempts] }
       );
+    }
+    try {
+      const rows = (await runner(e070HeaderQuery(transportRequest), 5, true)).values ?? [];
+      if (rows.length === 0) {
+        throw new SafeAbapError('TRANSPORT_INVALID', 'transport', `Transport ${transportRequest} was not found in E070.`);
+      }
+      const status = cellText(rows[0], 'TRSTATUS');
+      if (status === 'R') {
+        throw new SafeAbapError('TRANSPORT_INVALID', 'transport', `Transport ${transportRequest} is already released (E070 TRSTATUS=R).`);
+      }
+      return { transportRequest, channel: 'E070_SQL', modifiable: true, status: status || undefined };
+    } catch (error) {
+      if (error instanceof SafeAbapError) throw error;
+      attempts.push({
+        endpoint: 'E070 (datapreview SQL)',
+        classification: classifyTransportError(error),
+        message: errorMessage(error)
+      });
+      throw new SafeAbapError(
+        'TRANSPORT_INVALID',
+        'transport',
+        `Failed to validate transport ${transportRequest}: both the ADT transport-details resource and the E070 SQL channel failed.`,
+        { transportAttempts: [...attempts] }
+      );
+    }
+  }
+
+  /**
+   * 创建后归属证明：对象存在且源码已核验，仍须在指定请求（含其全部任务）的
+   * 对象登记里找到证明条目，否则 apply 按失败终止。UNPROVEN（读取成功但无
+   * 该对象的登记）与 UNKNOWN（证明通道全部不可用）都禁止自动重试与补偿删除。
+   */
+  private async proveTransportRegistration(plan: CreationPlan): Promise<void> {
+    if (plan.createdObjects.length === 0) return;
+    const attempts: TransportAttempt[] = [];
+    const entries = await this.readTransportObjectEntries(plan.transportRequest, attempts);
+    for (const created of plan.createdObjects) {
+      const outcome: TransportRegistrationOutcome = entries
+        ? matchTransportRegistration(entries, created.objectType, created.objectName, created.parentFunctionGroup)
+        : 'UNKNOWN';
+      created.transportRegistration = outcome;
+      if (outcome === 'PROVEN' || outcome === 'PROVEN_VIA_GROUP') {
+        await this.recordStage(
+          plan,
+          `TRANSPORT_REGISTRATION_PROVEN:${created.objectName}`,
+          true,
+          outcome === 'PROVEN_VIA_GROUP'
+            ? `proven via parent function group ${created.parentFunctionGroup} registration`
+            : undefined,
+          false
+        );
+        continue;
+      }
+      throw new SafeAbapError(
+        outcome === 'UNPROVEN' ? 'TRANSPORT_REGISTRATION_UNPROVEN' : 'TRANSPORT_REGISTRATION_UNKNOWN',
+        'transport-registration',
+        outcome === 'UNPROVEN'
+          ? `Transport ${plan.transportRequest} does not contain a registration entry for created ${created.objectType} ${created.objectName}; the object exists but its transport ownership is unproven.`
+          : `Transport registration for created ${created.objectType} ${created.objectName} could not be verified; the object exists but its transport ownership is unknown.`,
+        {
+          transportRequest: plan.transportRequest,
+          objectName: created.objectName,
+          objectType: created.objectType,
+          foundEntries: entries ?? undefined,
+          transportAttempts: attempts
+        }
+      );
+    }
+  }
+
+  /**
+   * 读取指定请求（含任务）的对象登记条目。E071 只读 SQL 优先（与
+   * TransportHistoryApi 同通道）；SQL 通道缺失或失败时降级 ADT
+   * transportDetails 的对象清单。两路都失败返回 undefined（→ UNKNOWN），
+   * 与"读取成功但为空"（→ UNPROVEN）严格区分。
+   */
+  private async readTransportObjectEntries(
+    transportRequest: string,
+    attempts: TransportAttempt[]
+  ): Promise<TransportObjectEntry[] | undefined> {
+    // bind 必须显式：同 ensureModifiableRequest，裸引用提取会丢 this（reading 'h'），
+    // 使 E071 主通道静默失效并总是退化到 ADT 回退通道。
+    const runner = this.client.runQuery?.bind(this.client);
+    if (runner) {
+      try {
+        const request = transportRequest.toUpperCase();
+        const taskRows = (await runner(e070TaskQuery(request), 100, true)).values ?? [];
+        const trkorrList = [request];
+        for (const row of taskRows) {
+          const task = cellText(row, 'TRKORR').toUpperCase();
+          if (task && task !== request && !trkorrList.includes(task) && trkorrList.length < 50) {
+            trkorrList.push(task);
+          }
+        }
+        const rows = (await runner(e071EntriesQuery(trkorrList), 500, true)).values ?? [];
+        const entries: TransportObjectEntry[] = [];
+        for (const row of rows) {
+          const name = cellText(row, 'OBJ_NAME').toUpperCase();
+          if (!name) continue;
+          entries.push({
+            pgmid: cellText(row, 'PGMID').toUpperCase(),
+            object: cellText(row, 'OBJECT').toUpperCase(),
+            name
+          });
+        }
+        return entries;
+      } catch (error) {
+        attempts.push({
+          endpoint: 'E071 (datapreview SQL)',
+          classification: classifyTransportError(error),
+          message: errorMessage(error)
+        });
+      }
+    }
+    try {
+      const details = await this.client.transportDetails(transportRequest);
+      return flattenAdtTransportObjects(details);
+    } catch (error) {
+      attempts.push({
+        endpoint: `/sap/bc/adt/cts/transportrequests/${transportRequest}`,
+        classification: classifyTransportError(error),
+        message: errorMessage(error)
+      });
+      return undefined;
     }
   }
 
@@ -414,6 +607,21 @@ export class AbapObjectCreationWorkflow {
       if (!object.ownershipProven) {
         object.compensationSucceeded = false;
         failed = true;
+        continue;
+      }
+      // 归属证明未通过（UNPROVEN/UNKNOWN）的对象禁止自动删除：登记未知意味着
+      // 对象可能落在别的请求里，删除必须由人工在 SE10/ADT 确认归属后执行。
+      if (object.transportRegistration === 'UNPROVEN' || object.transportRegistration === 'UNKNOWN') {
+        object.compensationSucceeded = false;
+        failed = true;
+        await this.recordStage(
+          plan,
+          `OBJECT_COMPENSATION_SKIPPED:${object.objectName}`,
+          false,
+          'transport registration is unproven; automatic deletion is forbidden',
+          false,
+          object
+        );
         continue;
       }
 

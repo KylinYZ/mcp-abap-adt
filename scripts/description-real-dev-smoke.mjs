@@ -1,15 +1,29 @@
 // 受控描述修改真机闭环（写操作，自建对象）：
 // 受控创建 PROGRAM → previewDescriptionChange → 确认 apply → readback → 清理
+// 环境文件：默认 sap-demo.env（所有者 2026-09-22 指示），可显式传入覆盖；
+// 红线预检拒绝非 sap-demo 目标（历史版本硬编码 sap-dev.env 曾误连 ED1 7.51）。
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+const environmentFile = resolve(process.argv[2] || 'C:/Users/068157/.codex/sap-abap-adt/env/sap-demo.env');
+const envFileText = readFileSync(environmentFile, 'utf8');
+const envFileVars = {};
+for (const line of envFileText.split(/\r?\n/)) {
+  const m = line.match(/^([A-Z_]+)=(.*)$/);
+  if (m) envFileVars[m[1]] = m[2];
+}
+if (!String(envFileVars.SAP_URL || '').includes('10.30.254.48')) {
+  console.error('红线预检失败：SAP_URL 不是 sap-demo（10.30.254.48），本 smoke 只允许在 sap-demo 上执行。');
+  process.exit(1);
+}
 const SUFFIX = String(Date.now()).slice(-4);
 const OBJ = `ZDESCSMK${SUFFIX}`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string'));
 Object.assign(env, {
-  SAP_MCP_ENV_FILE: resolve('C:/Users/068157/.codex/sap-abap-adt/env/sap-dev.env'),
+  SAP_MCP_ENV_FILE: environmentFile,
   SAP_MCP_LOG_LEVEL: 'warn',
   SAP_MCP_REAL_DEV_VALIDATION: 'false'
 });

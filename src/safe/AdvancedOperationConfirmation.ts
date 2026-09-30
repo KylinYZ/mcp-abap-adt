@@ -17,6 +17,12 @@ export interface AdvancedOperationStatusReader {
 export interface AdvancedOperationConfirmationOptions {
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
+   * 返回 true 时跳过人工表单确认直接执行；确认事件由下游工作流自身审计记录。
+   * 工具调用方永远无法通过参数触发此路径。
+   */
+  autoApprove?: () => boolean;
   applyConfirmed: (operationPlanId: string) => Promise<Record<string, unknown>>;
   now?: () => number;
 }
@@ -41,6 +47,11 @@ export class AdvancedOperationConfirmation {
     assertConfirmable(plan);
     if (familyFor(plan.operationKind) !== expectedFamily) {
       throw new SafeAbapError('POLICY_DENIED', 'confirmation', `Use apply${familyToolName(plan.operationKind)} for this plan.`);
+    }
+
+    // 部署配置预授权：plan 状态与 family 校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    if (this.options.autoApprove?.()) {
+      return this.options.applyConfirmed(operationPlanId);
     }
 
     const result = await this.elicit(confirmationForm(plan), confirmationTimeoutMs(plan, this.options.now?.() ?? Date.now()));

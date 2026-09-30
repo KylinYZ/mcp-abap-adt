@@ -70,6 +70,9 @@ export interface AuditEvent {
   // 受控传输请求创建工作流（TransportCreation）专用字段：planId 关联审计链；
   // 创建成功的请求号复用既有 transportRequest 字段承载。
   transportCreationPlanId?: string;
+  // 受控传输请求清理工作流（TransportCleanup）专用字段：planId 关联审计链；
+  // 已删除的请求号复用既有 transportRequest 字段承载。
+  transportCleanupPlanId?: string;
 }
 
 export class AuditLogger {

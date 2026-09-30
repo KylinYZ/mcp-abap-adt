@@ -23,7 +23,8 @@ export type DebugOperationKind =
 
 export type DebugOperationStatus = 'PREVIEWED' | 'APPLYING' | 'APPLIED' | 'FAILED' | 'UNKNOWN' | 'EXPIRED';
 export type DebugAuthorizationStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
-export type DebugConfirmationMode = 'elicitation';
+/** 调试确认来源：elicitation=人工表单；auto-config=SAP_MCP_CONFIRMATION_MODE=auto 配置预授权 */
+export type DebugConfirmationMode = 'elicitation' | 'auto-config';
 
 export interface DebugListenerIdentity {
   debuggingMode: DebuggingMode;

@@ -221,6 +221,12 @@ export type WindowsConfirmationRunner = (
 export interface RepositoryCreationConfirmationProviderFactoryOptions {
   environment?: Record<string, string | undefined>;
   platform?: NodeJS.Platform;
+  /**
+   * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时为 true）：
+   * 为 true 时工厂返回 AutoConfig provider，确认直接放行（审计记 auto-config），
+   * 忽略 SAP_MCP_CONFIRMATION_PROVIDER 的人工确认通道选择。
+   */
+  confirmationAutoApprove?: boolean;
   supportsFormElicitation: () => boolean;
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
   windowsRunner?: WindowsConfirmationRunner;
@@ -326,9 +332,29 @@ class AutoRepositoryCreationConfirmationProvider implements RepositoryCreationCo
   }
 }
 
+/**
+ * 部署配置预授权 provider（SAP_MCP_CONFIRMATION_MODE=auto）：
+ * 不发起任何人工确认，直接返回 apply 决策；challenge 仍正常签发与消费，
+ * 保证 plan 状态机与审计链完整（providerMode 记为 auto-config）。
+ */
+class AutoConfigRepositoryCreationConfirmationProvider implements RepositoryCreationConfirmationProvider {
+  readonly mode = 'auto-config' as const;
+
+  async confirm(
+    request: RepositoryCreationConfirmationRequest,
+    _options: RepositoryCreationConfirmationProviderOptions
+  ): Promise<RepositoryCreationDecision> {
+    return { action: 'apply', challengeId: request.challengeId };
+  }
+}
+
 export function createRepositoryCreationConfirmationProvider(
   options: RepositoryCreationConfirmationProviderFactoryOptions
 ): RepositoryCreationConfirmationProvider {
+  // 部署配置预授权优先级最高：auto 模式下不再选择人工确认通道
+  if (options.confirmationAutoApprove) {
+    return new AutoConfigRepositoryCreationConfirmationProvider();
+  }
   const environment = options.environment || process.env;
   const platform = options.platform || process.platform;
   const configured = String(environment.SAP_MCP_CONFIRMATION_PROVIDER || 'auto').trim().toLowerCase();

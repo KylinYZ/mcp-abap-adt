@@ -30,12 +30,14 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 191],
-    ['diagnostic-readonly', 145],
-    ['legacy-full', 208],
-    ['development-workbench', 158],
+    ['development', 195],
+    ['diagnostic-readonly', 146],
+    ['legacy-full', 209],
+    ['development-workbench', 162],
     ['business-readonly', 18],
-    ['operations-readonly', 53]
+    // operations-readonly 54：53 + getUsageExamples（analysis.usage_examples，
+    // 与 vsp-capability-parity-matrix 的 operations-readonly 声明同步收录）
+    ['operations-readonly', 54]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;

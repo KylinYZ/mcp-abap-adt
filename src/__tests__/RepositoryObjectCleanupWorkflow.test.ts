@@ -148,24 +148,24 @@ describe('RepositoryObjectCleanupWorkflow', () => {
     expect(client.deleteObject).not.toHaveBeenCalled();
   });
 
-  it('fails when CTS loses or duplicates the exact deletion entry', async () => {
-    for (const entriesAfterDelete of [0, 2]) {
-      const client = cleanupClient([{ name: `ZVCTS${entriesAfterDelete}`, type: 'PROG/P', url: `/programs/zvcts${entriesAfterDelete}` }]);
-      const originalTransportDetails = client.transportDetails.getMockImplementation();
-      client.transportDetails.mockImplementation(async () => {
-        const details = await originalTransportDetails();
-        if (client.deleteObject.mock.calls.length === 0) return details;
-        const entry = details.objects[0];
-        return { ...details, objects: Array(entriesAfterDelete).fill(entry) };
-      });
-      const workflow = cleanupWorkflow(client, `cleanup-cts-${entriesAfterDelete}`);
-      await workflow.preview({ objectKind: 'PROGRAM', name: `ZVCTS${entriesAfterDelete}` });
+  it('fails when CTS loses the deletion entry after cleanup', async () => {
+    // 真机语义修正（2026-09-30 sap-demo）：transportDetails 的 tm:all_objects 会把
+    // 请求级与任务级视图合并输出（同身份条目逐字节重复），重复本身不再可判腐坏；
+    // 仍须拒绝的形态收敛为：删除后匹配条目数为 0（CTS 丢失登记）。
+    const client = cleanupClient([{ name: 'ZVCTS0', type: 'PROG/P', url: '/programs/zvcts0' }]);
+    const originalTransportDetails = client.transportDetails.getMockImplementation();
+    client.transportDetails.mockImplementation(async () => {
+      const details = await originalTransportDetails();
+      if (client.deleteObject.mock.calls.length === 0) return details;
+      return { ...details, objects: [] };
+    });
+    const workflow = cleanupWorkflow(client, 'cleanup-cts-lost');
+    await workflow.preview({ objectKind: 'PROGRAM', name: 'ZVCTS0' });
 
-      await expect(workflow.apply(`cleanup-cts-${entriesAfterDelete}`)).rejects.toMatchObject({
-        code: 'VERIFICATION_FAILED', stage: 'cleanup-transport'
-      });
-      expect(client.deleteObject).toHaveBeenCalledTimes(1);
-    }
+    await expect(workflow.apply('cleanup-cts-lost')).rejects.toMatchObject({
+      code: 'VERIFICATION_FAILED', stage: 'cleanup-transport'
+    });
+    expect(client.deleteObject).toHaveBeenCalledTimes(1);
   });
 
   it('ignores matching creation and technical-setting entries when one deletion entry remains', async () => {
@@ -208,7 +208,9 @@ describe('RepositoryObjectCleanupWorkflow', () => {
     });
   });
 
-  it('rejects duplicate neutral transport entries', async () => {
+  it('tolerates identical duplicate entries from the merged request/task transport view', async () => {
+    // 真机实证形态（2026-09-30 sap-demo）：同一 neutral 条目逐字节重复两条
+    //（请求级+任务级合并视图），去重后应判 NEUTRAL 而非误报 duplicate。
     const client = cleanupClient([{ name: 'ZVNEUTRAL2', type: 'PROG/P', url: '/programs/zvneutral2' }]);
     const originalTransportDetails = client.transportDetails.getMockImplementation()!;
     client.transportDetails.mockImplementation(async () => {
@@ -219,8 +221,12 @@ describe('RepositoryObjectCleanupWorkflow', () => {
     const workflow = cleanupWorkflow(client, 'cleanup-neutral-duplicate');
     await workflow.preview({ objectKind: 'PROGRAM', name: 'ZVNEUTRAL2' });
 
-    await expect(workflow.apply('cleanup-neutral-duplicate')).rejects.toMatchObject({
-      code: 'VERIFICATION_FAILED', stage: 'cleanup-transport'
+    await expect(workflow.apply('cleanup-neutral-duplicate')).resolves.toMatchObject({
+      status: 'success',
+      plan: expect.objectContaining({
+        status: 'COMPLETED_LOCAL_ABSENCE',
+        transportDisposition: 'NEUTRAL_ENTRIES_VERIFIED'
+      })
     });
   });
 

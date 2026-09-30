@@ -68,6 +68,8 @@ import { ObjectActivationPlanStore } from './safe/ObjectActivationPlanStore.js';
 import { ObjectActivationWorkflow } from './safe/ObjectActivationWorkflow.js';
 import { TransportCreationPlanStore } from './safe/TransportCreationPlanStore.js';
 import { TransportCreationWorkflow } from './safe/TransportCreationWorkflow.js';
+import { TransportCleanupPlanStore } from './safe/TransportCleanupPlanStore.js';
+import { TransportCleanupWorkflow } from './safe/TransportCleanupWorkflow.js';
 import { RepositoryObjectCreationRegistry } from './safe/RepositoryObjectCreationRegistry.js';
 import { RepositoryObjectCreationPlanStore } from './safe/RepositoryObjectCreationPlanStore.js';
 import { RepositoryObjectCreationWorkflow } from './safe/RepositoryObjectCreationWorkflow.js';
@@ -111,6 +113,8 @@ import {
 } from './adt/SourceGrepApi.js';
 import { WhereUsedConfigHandlers } from './handlers/WhereUsedConfigHandlers.js';
 import { createWhereUsedConfigClient } from './adt/WhereUsedConfigApi.js';
+import { UsageExamplesHandlers } from './handlers/UsageExamplesHandlers.js';
+import { createUsageExamplesClient } from './adt/UsageExamplesApi.js';
 import {
   createUnitCoverageClient
 } from './adt/UnitCoverageApi.js';
@@ -224,6 +228,7 @@ export class AbapAdtServer extends Server {
   private transportScopeHandlers: TransportScopeHandlers;
   private loadGraphHandlers: LoadGraphHandlers;
   private whereUsedConfigHandlers: WhereUsedConfigHandlers;
+  private usageExamplesHandlers: UsageExamplesHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -456,6 +461,29 @@ export class AbapAdtServer extends Server {
       },
       grepObjects: input => createSourceGrepClient(readClient.httpClient).grepObjects(input)
     }));
+    // usage-examples 只读工具（analysis.history 的 usage_examples 子操作）：
+    // 交叉表候选 + 逐候选源码读取（source/main GET）做形态匹配片段提取。
+    this.usageExamplesHandlers = new UsageExamplesHandlers(createUsageExamplesClient({
+      runSql: async (sql, rowLimit) => {
+        const result = await readClient.runQuery(sql, rowLimit, true);
+        return { values: result?.values ?? [] };
+      },
+      readSource: async input => {
+        // 候选只产 CLAS/INTF/PROG 三类（FUGR 已排除），URI 模板同 grepObjects
+        const uriByType: Record<string, string> = {
+          CLAS: `/sap/bc/adt/oo/classes/${input.objectName.toLowerCase()}`,
+          INTF: `/sap/bc/adt/oo/interfaces/${input.objectName.toLowerCase()}`,
+          PROG: `/sap/bc/adt/programs/programs/${input.objectName.toLowerCase()}`
+        };
+        const uri = uriByType[input.objectType];
+        if (!uri) throw new Error(`no source URL for ${input.objectType} ${input.objectName}`);
+        const response = await readClient.httpClient.request(`${uri}/source/main`, {
+          method: 'GET',
+          headers: { Accept: 'text/plain' }
+        });
+        return typeof response.body === 'string' ? response.body : '';
+      }
+    }));
     // RFC 探测只读工具（rfc.remote-enabled.discovery 直链）：open-rfc 直连
     // SAP 网关（node:net，无 SDK），连接参数由既有 ADT 环境推导（主机/
     // client/凭据同源，实例号经 RFC_SYSNR 覆盖，缺省 '01' 与专用 DEV
@@ -493,6 +521,8 @@ export class AbapAdtServer extends Server {
     } as never);
     this.descriptionChangeHandlers = new DescriptionChangeHandlers(descriptionWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     // 受控消息类文本写入（i18n.write 的 write_message_texts）：与描述链同面的
@@ -505,6 +535,8 @@ export class AbapAdtServer extends Server {
     } as never);
     this.messageTextHandlers = new MessageTextHandlers(messageTextWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
 
@@ -577,6 +609,8 @@ export class AbapAdtServer extends Server {
     const repositoryConfirmationProvider = createRepositoryCreationConfirmationProvider({
       environment: process.env,
       platform: process.platform,
+      // 部署级自动确认开关：auto 模式下工厂返回直接放行的 AutoConfig provider
+      confirmationAutoApprove: this.safetyPolicy.confirmationAutoApprove,
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
@@ -654,6 +688,8 @@ export class AbapAdtServer extends Server {
     } as never);
     this.cloneObjectHandlers = new CloneObjectHandlers(cloneWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     // 受控对象重命名（refactor.rename 一站式）：preview 只读快照+改名冻结，
@@ -669,16 +705,22 @@ export class AbapAdtServer extends Server {
     } as never);
     this.renameControlledHandlers = new RenameControlledHandlers(renameWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
     });
     this.safeAbapHandlers = new SafeAbapHandlers(changeWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => changeWorkflow.apply(input))
     }, creationWorkflow, {
       allowTextConfirmation: this.safetyPolicy.allowTextConfirmation,
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => creationWorkflow.apply(input))
     });
@@ -701,6 +743,8 @@ export class AbapAdtServer extends Server {
     );
     this.safeDebugHandlers = new SafeDebugHandlers(debugWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: input => this.executionGate.run(() => debugWorkflow.applyOperation(input)),
       authorizeConfirmed: (targetUser, debuggeeId) => this.executionGate.run(
@@ -729,6 +773,8 @@ export class AbapAdtServer extends Server {
       previewRapOperation: args => rapWorkflow.preview(args)
     }, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: operationPlanId => this.executionGate.run(async () => {
         const plan = advancedPlans.get(operationPlanId);
@@ -753,6 +799,8 @@ export class AbapAdtServer extends Server {
     );
     this.safeQualityHandlers = new SafeQualityHandlers(qualityWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
     });
@@ -773,6 +821,8 @@ export class AbapAdtServer extends Server {
     );
     this.safeActivationHandlers = new SafeActivationHandlers(activationWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: activationPlanId => this.executionGate.run(() => activationWorkflow.apply(activationPlanId))
     });
@@ -792,10 +842,33 @@ export class AbapAdtServer extends Server {
       transportCreationPlans,
       auditLogger
     );
+    // 受控传输请求清理工作流（空请求边界：未释放+零对象+本人属主才可删）：
+    // preview 只读核验三条红线并冻结 plan；apply 经原生确认后在执行门内单次
+    // 删除 + 缺席验证；非空/已释放/他人请求仍不可删。
+    const transportCleanupPlans = new TransportCleanupPlanStore(
+      this.safetyPolicy.planTtlMs,
+      () => Date.now(),
+      undefined,
+      this.guardrails.changePlanMaxEntries
+    );
+    const transportCleanupWorkflow = new TransportCleanupWorkflow(
+      this.adtClient,
+      this.safetyPolicy,
+      transportCleanupPlans,
+      auditLogger
+    );
     this.safeTransportCreationHandlers = new SafeTransportCreationHandlers(transportCreationWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
       applyConfirmed: planId => this.executionGate.run(() => transportCreationWorkflow.apply(planId))
+    }, transportCleanupWorkflow, {
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
+      applyConfirmed: planId => this.executionGate.run(() => transportCleanupWorkflow.apply(planId))
     });
 
     this.focusedTaskHandlers = new FocusedTaskHandlers(
@@ -1003,6 +1076,7 @@ export class AbapAdtServer extends Server {
       ...this.transportScopeHandlers.getTools(),
       ...this.loadGraphHandlers.getTools(),
       ...this.whereUsedConfigHandlers.getTools(),
+      ...this.usageExamplesHandlers.getTools(),
       ...this.dependencyGraphHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools()
     ];
@@ -1121,8 +1195,8 @@ export class AbapAdtServer extends Server {
         if (this.safeActivationHandlers.supports(toolName)) {
           return this.safeActivationHandlers.handle(toolName, limitedArguments);
         }
-        // 受控传输创建链（仅创建）：门控语义同上；释放/删除等动作无对应工具，
-        // 不会进入本分发路径。
+        // 受控传输创建与清理链（仅创建 + 仅删空请求）：门控语义同上；释放/
+        // 改属主等动作无对应工具，不会进入本分发路径。
         if (this.safeTransportCreationHandlers.supports(toolName)) {
           return this.safeTransportCreationHandlers.handle(toolName, limitedArguments);
         }
@@ -1196,6 +1270,10 @@ export class AbapAdtServer extends Server {
         // where-used-config 只读工具（analysis.history 的 where_used_config 子操作）：同型分派。
         if (this.safetyPolicy.toolProfile !== 'safe' && this.whereUsedConfigHandlers.supports(toolName)) {
           return this.whereUsedConfigHandlers.handle(toolName, limitedArguments);
+        }
+        // usage-examples 只读工具（analysis.history 的 usage_examples 子操作）：同型分派。
+        if (this.safetyPolicy.toolProfile !== 'safe' && this.usageExamplesHandlers.supports(toolName)) {
+          return this.usageExamplesHandlers.handle(toolName, limitedArguments);
         }
         if (this.dependencyGraphHandlers.supports(toolName)) {
           return this.dependencyGraphHandlers.handle(toolName, limitedArguments);
@@ -1485,6 +1563,8 @@ export class AbapAdtServer extends Server {
       session: this.sessionSupervisor?.snapshot(),
       sessionRecovery: this.sessionResilience.sessionRecovery,
       statelessReads: this.sessionResilience.statelessReads,
+      // 受控链二次确认模式回显：native=人工确认；auto=部署配置预授权（仅 DEV 可配置）
+      confirmationMode: this.safetyPolicy.confirmationMode,
       timestamp: new Date().toISOString()
     };
   }

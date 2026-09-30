@@ -35,8 +35,9 @@ try {
   const text = helpResponse.content?.find(item => item.type === 'text')?.text || '';
   const payload = JSON.parse(text);
   const actions = payload?.result?.actions || [];
-  // focused=development-workbench 基线 158（0.8.4 基线 154 + getWhereUsedConfig + TransportCreation 三工具）；与 ToolCatalogIntegrity.test.ts 对齐
-  const passed = names.length === 158
+  // focused=development-workbench 基线 162（0.8.4 基线 154 + getWhereUsedConfig
+  // + TransportCreation/Cleanup 各三工具 + getUsageExamples）；与 ToolCatalogIntegrity.test.ts 对齐
+  const passed = names.length === 162
     && names.includes('sap')
     && names.includes('sapDoctor')
     && actions.some(action => action.action === 'read')

@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import { SafeAbapError } from './errors.js';
 import type { RepositoryCreationPlanView } from './repositoryCreationTypes.js';
 
-export type RepositoryCreationConfirmationProviderMode = 'mcp-form' | 'mcp-app' | 'windows-native';
+/** 确认提供方模式：mcp-form/windows-native 为人工确认通道；auto-config 为部署配置预授权（SAP_MCP_CONFIRMATION_MODE=auto，仅 DEV） */
+export type RepositoryCreationConfirmationProviderMode = 'mcp-form' | 'mcp-app' | 'windows-native' | 'auto-config';
 export type RepositoryCreationConfirmationChallengeStatus = 'PENDING' | 'CONSUMED' | 'CANCELLED' | 'EXPIRED';
 
 export interface RepositoryCreationConfirmationChallenge {

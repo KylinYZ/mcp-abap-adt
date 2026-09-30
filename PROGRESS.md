@@ -5,7 +5,7 @@
 ## 结论
 
 - 代码版本：`0.9.0`（分支 `feat/mcp-v2-dual-era`）：协议栈迁移 MCP 官方 v2 双栈——原生 2026-07-28（`server/discover` 应答，根除 ZCode 0.16.9+ auto 协商超时）+ 2025 legacy 兼容；受控确认流 MRTR 化（legacy 经官方 shim 保持 elicitation/create，v1 宿主零感知）。证据：[v2 双栈迁移实证](docs/evidence/mcp-v2-dual-era-verified.md)、[步骤 0 API 定型](docs/evidence/mcp-v2-migration-api-probe.md)。生产依赖 `@modelcontextprotocol/server@2.2.0`（v1 SDK 移 devDeps 作 2025 回归资产）。是否发布 npm 及用户部署状态待定；ZCode 0.16.9 真机终验待做；真实 DEV 确认链与关键链路已于 2026-09-29 用 sap-demo 复跑全绿（message-text/recover/where-used/transport-crossref/rename-controlled 双确认链，证据见 mcp-v2-dual-era-verified.md）。
-- 自动化门禁：2026-09-29 起 `npm test -- --runInBand` 通过，174 suites / 1860 tests（连续两轮全绿）；`npm run build` 通过。受控传输请求创建链（仅创建）已落地：`previewTransportCreation`/`applyTransportCreation`/`getTransportCreationStatus`，DEV + development/development-workbench 专属，原生确认 + create/readback 双步验证，释放/删除/改属主/直改 E071·E071K 维持禁止；离线自动化已验证，真机 smoke 尚未运行（属待环境确认项）。
+- 自动化门禁：2026-09-29 起 `npm test -- --runInBand` 通过，174 suites / 1860 tests（连续两轮全绿）；`npm run build` 通过。受控传输请求创建链（仅创建）已落地：`previewTransportCreation`/`applyTransportCreation`/`getTransportCreationStatus`，DEV + development/development-workbench 专属，原生确认 + create/readback 双步验证，释放/删除/改属主/直改 E071·E071K 维持禁止；2026-09-29 当天完成 sap-demo 真机 smoke（SMOKE OK）；同日所有者边界调整"空请求允许删除"，落地受控清理三件套（preview 三条红线：未释放 D+零对象+本人属主 → 原生确认 → 删除+缺席验证），4 个残留空请求已经受控链删除并缺席复核，smoke 扩展自清理后零残留（SMOKE OK + CLEANUP OK），证据见 docs/evidence/transport-creation-real-dev-verified.md。
 - VSP 能力对齐仍为 54/71（MCP_SUPERSET=13）；`analysis.history` 仍为 PARTIAL。loads、有界加载图和传输成员/结构边界组合链已由专用 DEV 真机证据覆盖核心路径；CR 分组、动态图边及图引擎完整性仍有缺口，详见[后续缺口与验收规划](docs/evidence/analysis-history-and-fm-test-data-roadmap.md)。
 - `getFmTestDataSets` 已真机验证 EUFUNC 测试集目录与元数据读取；CLUSTD payload 未解码，不提供 inputs/outputs 内容。是否投入 S/2 集群解码器应先做独立可行性评估，不应扩大当前能力声明。
 - datapreview CLUSTD wire 契约已离线锁定并经真机实证（2026-09-28，授权后只读探针）：CLUSTD=hex/type='X'/'<data>' 无属性、CLUSTR=INT2 片段字节数、LRAW 固定宽度+全零 padding，无损重组规则确立。oracle 解码轮：999 目录集群核心两对象 TE_DATADIR/FDESC_COPY 对象级可解码实锤；**多片段完整性真机实证**（RSZ_X_COMPONENT_GET 6 片 SRTF2 0..5 连续、组装器精确重组 19407 字节，VSP Join 语义离线组装器 +6 回归）。全量解码边界如实记录：V6 集群（原型白名单只收 V5，VSP 上游支持 V6）与 deep 嵌套 0xAD（上游同拒）。随附修复 createFmTestDataClient decode=false（DATS→Date 真机实锤的有损转换）。证据：[CLUSTD 真机取证](docs/evidence/fm-test-data-clustd-real-dev-verified.md)。decoder 接入维持 NO-GO：V6 路径与 %_I/%_V 输入输出对象解码为独立工程轮。
@@ -509,3 +509,39 @@
 - 实现（与受控激活链同构的三工具受控链）：safe 层新增 TransportCreationTypes/PlanStore/Workflow/Confirmation；handlers 层新增 SafeTransportCreationHandlers（previewTransportCreation=只读 CTS 预检（transportInfo）+冻结 plan，锚点 URI 由 server 从包名推导 `/sap/bc/adt/packages/<devclass>`、applyTransportCreation=form elicitation 原生确认后经 executionGate 单次创建+transportDetails 读回验证、getTransportCreationStatus=本地查询）。拒绝本地 `$` 包与非法包名/超长描述（AS4TEXT≤60）；创建异常/空请求号/读回不一致→UNKNOWN_OUTCOME 终结不重试不删除。策略层：CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES（preview=read-only、apply=advanced-mutation、status=local）+ DEV-only 角色门控 + development/development-workbench profile 门控（不进 legacy-full，专家继续用原子 createTransport）；serverGuardrails 豁免 apply/status 外层 gate（防 concurrency=1 自我死锁，同激活链教训）。profile 计数：development 188→191、development-workbench 155→158（focused 同步）。
 - 门禁：`npm run build` 通过；`npm test -- --runInBand` 连续两轮全绿 174 suites / 1860 tests（首轮 4 个 suite 因瞬态编译问题失败，未定位到代码原因，复跑两轮稳定全绿）；新测试 26 例覆盖工作流/确认/profile 门控/仅创建边界（transportRelease 等四工具在受控 profile catalog 断言不存在）。真机 smoke 未运行——预检→确认→创建→读回全链待所有者授权后按 AGENTS.md 专用 DEV 配置补跑。
 - 文档：AGENTS.md（安全边界改为"仅创建放开+其余禁止"、profile 计数、基线 174/1860）、docs/使用指南.md 4.1 增传输创建链段落、PROGRESS.md 本节。
+- 真机 smoke（sap-demo，所有者当日授权）：`scripts/transport-creation-real-dev-smoke.mjs` 最终轮 29/29 全 PASS（S4HK900023）。全链验证：catalog 可见性与仅创建边界（4 个禁止工具不在目录）、$TMP 负向探针、包锚点预检（transportchecks 接受 packages URI，7.51 缺陷不复现）、确认拒绝/接受两分支、单次创建+读回、重复 apply 拒绝、直连 transportDetails 与 E070 双重独立佐证。
+- 真机新事实四条：① 创建动作锁包于会话（enqueue 层，TLOCK/E071 无行），进程被杀后滞留数分钟再被服务端回收——期间新会话对同包 preview 报"已由本人编辑"；② 创建自动生成 1 个子任务但 E071 零行（包不进请求）；③ 数字型用户名前导零被剥（068157→68157），属主比较须剥零；④ MCP runQuery 响应为 {status, result:{columns, values}} 包装形态。
+- 残留：4 个空请求 S4HK900017/019/021/023（TRSTATUS=D、属主 068157、E071 零对象，已逐一只读核实）——按"AI 不删除传输"边界不清理，属主可 SE09 手工删除。证据：docs/evidence/transport-creation-real-dev-verified.md。
+
+## 2026-09-29 轮（二）：空请求受控清理链——边界调整为"仅删空请求"
+
+- 所有者边界调整：空请求允许删除。落地受控清理三件套（与创建链同构，同一 handlers 类暴露）：`previewTransportCleanup`（只读 transportDetails 核验三条红线：未释放状态 D + 零对象（请求本体+全部子任务）+ 本人属主（数字型用户名剥前导零比较），任一不满足即 VALIDATION_FAILED 不建 plan）→ `applyTransportCleanup`（form elicitation 原生确认 decision=delete_transport → executionGate 单次 DELETE /cts/transportrequests/<number> → 只读读回验证缺席，仍可读即 UNKNOWN_OUTCOME 终结）→ `getTransportCleanupStatus`。非空/已释放/他人请求仍不可删；释放/改属主/加用户/直改 E071·E071K 维持禁止。策略层：CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES + DEV-only + development/development-workbench 门控；serverGuardrails 豁免 apply/status 外层 gate。profile 计数：development 191→194、workbench 158→161。
+- 真机（sap-demo）：4 个历史残留空请求（S4HK900017/019/021/023）经 `scripts/transport-cleanup-real-dev.mjs` 受控删除——逐个红线核验（status=D、objects=0、owner=68157）→ 原生确认 → 链内缺席验证 + 直连只读缺席复核双通过，SUMMARY 删除 4 跳过 0；smoke 脚本扩展自清理闭环（第 11–13 步），完整重跑 SMOKE OK（S4HK900025 创建→验证→清理→缺席），此后 smoke 零残留。
+- 门禁：`npm run build` 通过；`npm test -- --runInBand` 176 suites / 1895 tests 全绿（新增 TransportCleanup.test.ts 25 用例：三条红线逐条拒绝/剥零属主/缺席验证/UNKNOWN_OUTCOME 不重试/六工具 profile 门控/原子 transportDelete 仍不进受控目录）。
+- 文档：AGENTS.md 安全边界改写为"仅创建+仅删空请求"、docs/使用指南.md 清理句、证据文档追加清理章节、PROGRESS.md 本节。
+
+## 2026-09-29 轮（二）：受控创建链传输门禁 7.51 兼容改造——软检查 + 双通道门禁 + 归属证明
+
+- 背景：ED1（7.51）反馈两条受控创建链创建程序均卡 `TRANSPORT_INVALID: No URI-Mapping defined for URI`。修正前一轮误诊：预检从首版就传**自拼包 URI**（非不存在对象 URI），且 transportchecks 与 transportDetails 同在一个 try 无法按错误码归因；7.51/7.52 分界由用户断言 + sap-demo 行为探针侧证（SVERS=816 但文本池资源在=7.52+ 行为侧）。
+- 实现（保持安全门控、不新增绕过受控链的写入口）：① transportchecks 降为软检查（失败只记诊断，候选不含请求降为提示，创建 POST corrNr 由 SAP 权威登记，VSP 同语义）；② 请求门禁双通道（ADT transportDetails → E070 只读 SQL 兜底，"已释放"任一通道即拒，两路皆败才拒）；③ 预检 URI 优先用 resolve 搜索返回的 parentUri（自拼 parentPath 回退）；④ 创建后归属证明（E071 只读 SQL 主 / ADT 请求对象清单备，严格条目匹配 + 函数模块/包含的父组放宽），UNPROVEN/UNKNOWN 按失败终止并禁止自动补偿删除（新码 TRANSPORT_REGISTRATION_UNPROVEN/UNKNOWN）；⑤ 预览与计划视图透出 transportValidation（通道/兼容性/notes/attempts 结构化诊断，消息经 sanitize 不透原始响应）。新增 `src/safe/TransportRegistration.ts` 纯函数层；CreationAdtClient 增可选 runQuery（datapreview）。
+- 门禁：`npm run build` 通过；本轮文件域内 `AbapObjectCreationWorkflow.test.ts`（原 11 + 新 7）与新增 `TransportRegistration.test.ts`（7）25/25 全绿；全量套件此刻含并行 agent 的 transport cleanup 中间态（SafeTransportCreationHandlers.ts 瞬态语法错误/TransportCleanup.test.ts 编译错误），失败与本轮改动无关（归因：0 个测试失败、错误唯一指向对方文件域）。全量绿需等并行轮收尾后复跑确认。
+- 待办：7.51 真机验证由对方用户执行（复测指引见证据文档第 5 节），通过前成熟度结论不变，但 PROGRAM 等创建验证系统基线标注为 7.52+ 行为侧。证据：docs/evidence/creation-transport-gate-751-compat.md。
+
+## 2026-09-29 闲时轮：getUsageExamples（调用片段示例）落地真机验证——analysis.history 纯 SQL 子集全部收编
+
+- 选型：analysis.history 剩余子操作中 usage_examples 经 VSP 本地源码评估（fetchUsageCallerSources + pkg/graph/queries_examples.go FindUsageExamples）为交叉表 SQL + 源码读取呈现层可落地——本轮落地，该行最后一个纯 SQL 子操作收编。
+- 实现：UsageExamplesApi + getUsageExamples 只读工具（analysis 家族同型接线）。候选按目标类型选查询（FUNC→CROSS TYPE='F'；PROG→'R'（SUBMIT）/form 场景 'U'（PERFORM 行 NAME=form）；CLAS/INTF→WBCROSSGT+CROSS 双表 LIKE）；候选归一化、FUGR 不出片段（v1 边界 VSP 同）；逐候选读 source/main 全文做六形态匹配（CALL_FUNCTION/METHOD_CALL/CLASS_REFERENCE/SUBMIT/PERFORM/字面 GREP 兜底 MEDIUM 置信），注释行跳过，片段带前后 3 行行号上下文；排序非测试优先/高置信优先/具体形态优先；maxExamples 默认 10 上限 50。源码读取失败/空源码记 unsearched 不计入 totalCallers；交叉表失败 reason 脱敏固定文案。
+- 真机（sap-demo）：直连 ADT 写链自造数据——创建自有验证类 ZWUEXA3478（引用真机自有类 ZCL_MCP_SM21_ADT_HTTP 的 =>/-> 调用）→ 激活 → 组合链 totalCallers=2、本对象示例命中 CLASS_REFERENCE HIGH → 直连删除 + 缺席复核零残留。SMOKE OK。WBCROSSGT 行形态真机取证：INCLUDE 30 位填充池（ZWUEXB35660===================CM001）、OTYPE=TY、NAME=目标名——与 LIKE 候选查询、normalizeLoadName 完全吻合；行激活即时生成且跨会话立即可见（immediate/5s/15s 三探一致）。
+- 首跑 totalCallers=0 的根因为激活→查询竞态（5s 等待后稳定通过）；失败路径已改为保留对象取证。
+- 门禁全绿：177 suites / 1905 tests（+10）、build、coverage、parity、git diff --check。profile 计数（dev=195/workbench=162/diag=146/full=209）与 STRICT_TOOL_FIELDS、ModernProtocol 运行时计数同步。
+- 矩阵：analysis.history 维持 PARTIAL，taskPath 增 getUsageExamples，restrictionReason 更新（纯 SQL 子集全部收编；剩余 impact/health/graph_stats 为图引擎轮、E070A 服务器未配置）。证据：docs/evidence/usage-examples-real-dev-verified.md。
+- 下一轮建议：analysis.history 与 knowledge-queries 的纯 SQL/呈现层子集已全部收编完毕；剩余（execute-abap/amdp-adt 受控链大轮、集群解析器工程轮、图引擎轮）均需所有者立项输入。工作区含 where_used_config 与本两轮未提交成果，可提请所有者审查后并入下版。
+
+## 2026-09-30 轮：全工作流八阶段真机战役（sap-demo）——五缺陷真机修复 + 门禁语义首证
+
+- 范围：0.9.0 三线功能全量回归（MCP v2 双栈 / 受控传输创建+清理链 / 受控创建链传输登记门禁）+ 三条 MRTR 确认链 + 恢复链。八阶段全部 SMOKE OK，证据 docs/evidence/full-workflow-smoke-verified.md。
+- 门禁真机首证：preview 透出 review.transportValidation（ADT 通道 status=D、SAP_CONFIRMED）；不存在请求号正确拒（修 D3 后语义升级为"E070 未找到"）；apply 终态 APPLIED 含归属证明；getTransportScope + E071 SQL 双外部佐证；确认型 apply 串行门零死锁。
+- 五缺陷真机修复（均有回归测试）：① getUsageExamples 漏 operations-readonly 名单（54，矩阵契约同步）；② description smoke 硬编码 sap-dev.env 误连 ED1（改 argv+sap-demo 默认+红线）；③ AbapObjectCreationWorkflow 两处 runQuery 裸引用丢 this（bind 修复，SQL 通道复活）；④ transportDetails 解析漏 tm:all_objects 包装（parseRequest 兼容，条目属性无 tm:obj_func）；⑤ 清理核验键 LIMU/REPS vs 登记条目 R3TR/PROG 失配（补别名）+ all_objects 合并视图同身份重复（三元组去重，"重复即腐坏"语义作废）。
+- SAP 真机语义记录：对象删除后 E071 行不消失（含历史请求不可清，红线正确拒 S4HK900029）；清理链只接受归属校验传输的对象；ADT 删除留 TADIR 孤儿行。ED1 偶然佐证：7.51 双通道皆败时门禁正确拒（preview-only 零写入）。
+- 门禁：178 suites / 1908 tests 全绿（+TransportsParser 2 例 +绑定回归 1 例 + 清理语义测试改写）、build、coverage 28 REAL_DEV_VERIFIED 零缺证据、git diff --check。
+- 残留：S4HK900029（+任务 030）含 5 条中性历史行 + ZPRGWF* 源码已删的 TADIR 孤儿行，留属主 SE09；其余零残留。脚本新增 scripts/full-workflow-stage5-creation-gate.mjs、full-workflow-residue-cleanup.mjs、full-workflow-gate-probe.mjs。

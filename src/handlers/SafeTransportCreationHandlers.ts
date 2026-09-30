@@ -1,18 +1,24 @@
 /**
- * 受控传输请求创建的 MCP 工具处理器（SafeTransportCreationHandlers）。
+ * 受控传输请求创建与清理的 MCP 工具处理器（SafeTransportCreationHandlers）。
  *
- * 暴露 3 个工具（与受控激活三件套同构）：
- * - previewTransportCreation：只读 CTS 预检并冻结创建 plan（read-only）。
- * - applyTransportCreation：发起原生确认并单次执行冻结 plan（mutating）。
- * - getTransportCreationStatus：本地查询 plan 状态（local 语义）。
+ * 暴露两组三件套（与受控激活三件套同构）：
+ * - 创建（cts.create-request 专属动作）：
+ *   previewTransportCreation：只读 CTS 预检并冻结创建 plan（read-only）。
+ *   applyTransportCreation：发起原生确认并单次执行冻结 plan（mutating）。
+ *   getTransportCreationStatus：本地查询 plan 状态（local 语义）。
+ * - 清理（所有者 2026-09-29 边界调整：空请求允许删除）：
+ *   previewTransportCleanup：只读核验"未释放 + 零对象 + 本人属主"三条红线
+ *   并冻结清理 plan（read-only）；任一红线不满足即拒。
+ *   applyTransportCleanup：发起原生确认并单次删除 + 缺席验证（mutating）。
+ *   getTransportCleanupStatus：本地查询清理 plan 状态（local 语义）。
  *
  * 安全规则：
- * - 仅创建：apply 只调用 ADT 创建端点；释放、删除、改属主、改 E071/E071K
- *   不在本链路的任何工具中，也没有对应入参。
- * - apply 不接受调用方布尔确认，只走 TransportCreationConfirmation 的
- *   MCP form elicitation 原生确认；plan 之外的任何 URL/请求号一律不可传入。
+ * - 创建：仅创建一个动作；清理：仅删空请求。释放、改属主、加用户与直改
+ *   E071/E071K 不在任何工具的入参或链路里。
+ * - apply 不接受调用方布尔确认，只走各自 Confirmation 的 MCP form
+ *   elicitation 原生确认；plan 之外的任何 URL/请求号一律不可传入。
  * - profile/role 门控由 ToolOperationPolicy 与 ToolProfiles 承担：
- *   三工具仅 DEV + development/development-workbench 可见可用。
+ *   六工具均仅 DEV + development/development-workbench 可见可用。
  */
 import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import {
@@ -20,11 +26,21 @@ import {
   type TransportCreationConfirmationOptions,
   type TransportCreationStatusReader
 } from '../safe/TransportCreationConfirmation.js';
+import {
+  TransportCleanupConfirmation,
+  type TransportCleanupConfirmationOptions,
+  type TransportCleanupStatusReader
+} from '../safe/TransportCleanupConfirmation.js';
 import type {
   PreviewTransportCreationInput,
   TransportCreationPlanView,
   TransportCreationPreviewResult
 } from '../safe/transportCreationTypes.js';
+import type {
+  PreviewTransportCleanupInput,
+  TransportCleanupPlanView,
+  TransportCleanupPreviewResult
+} from '../safe/transportCleanupTypes.js';
 import type { ToolDefinition } from '../types/tools.js';
 
 /** handlers 依赖的工作流端口（便于测试 mock）。 */
@@ -32,21 +48,35 @@ export interface SafeTransportCreationWorkflowPort extends TransportCreationStat
   preview(input: PreviewTransportCreationInput): Promise<TransportCreationPreviewResult>;
 }
 
-/** 本 handlers 拥有的工具名集合（supports 判定用）。 */
+/** handlers 依赖的清理工作流端口（便于测试 mock）。 */
+export interface SafeTransportCleanupWorkflowPort extends TransportCleanupStatusReader {
+  preview(input: PreviewTransportCleanupInput): Promise<TransportCleanupPreviewResult>;
+}
+
+/** 本 handlers 拥有的工具名集合（supports 判定用）：创建三件套 + 清理三件套。 */
 const SAFE_TRANSPORT_CREATION_TOOL_NAMES = new Set([
   'previewTransportCreation',
   'applyTransportCreation',
-  'getTransportCreationStatus'
+  'getTransportCreationStatus',
+  'previewTransportCleanup',
+  'applyTransportCleanup',
+  'getTransportCleanupStatus'
 ]);
 
 export class SafeTransportCreationHandlers {
   private readonly confirmation: TransportCreationConfirmation;
+  private readonly cleanupConfirmation?: TransportCleanupConfirmation;
 
   constructor(
     private readonly workflow: SafeTransportCreationWorkflowPort,
-    confirmationOptions: TransportCreationConfirmationOptions
+    confirmationOptions: TransportCreationConfirmationOptions,
+    private readonly cleanupWorkflow?: SafeTransportCleanupWorkflowPort,
+    cleanupConfirmationOptions?: TransportCleanupConfirmationOptions
   ) {
     this.confirmation = new TransportCreationConfirmation(workflow, confirmationOptions);
+    if (cleanupWorkflow && cleanupConfirmationOptions) {
+      this.cleanupConfirmation = new TransportCleanupConfirmation(cleanupWorkflow, cleanupConfirmationOptions);
+    }
   }
 
   /** 是否由本 handlers 处理该工具。 */
@@ -54,9 +84,9 @@ export class SafeTransportCreationHandlers {
     return SAFE_TRANSPORT_CREATION_TOOL_NAMES.has(toolName);
   }
 
-  /** 工具定义：preview/status 只读，apply 需原生确认。 */
-  getTools(): ToolDefinition[] {
-    return [
+  /** 工具定义：preview/status 只读，apply 需原生确认；清理三件套可选收录。 */
+  getTools(includeCleanup = true): ToolDefinition[] {
+    const tools = [
       creationTool(
         'previewTransportCreation',
         'Run a read-only CTS preflight for one package and freeze one bounded transport-request creation plan without creating anything.',
@@ -79,6 +109,33 @@ export class SafeTransportCreationHandlers {
         false
       )
     ];
+    if (includeCleanup) {
+      // 清理三件套（空请求边界：未释放 + 零对象 + 本人属主，preview 全量核验）
+      tools.push(
+        creationTool(
+          'previewTransportCleanup',
+          'Verify one transport request is unreleased, empty, and owned by the current user (read-only) and freeze one bounded cleanup plan without deleting anything.',
+          cleanupPreviewSchema(),
+          true,
+          false
+        ),
+        creationTool(
+          'applyTransportCleanup',
+          'Open one native confirmation and delete the frozen empty transport request exactly once; absence is verified after deletion and unknown outcomes are never retried.',
+          cleanupPlanIdSchema(),
+          false,
+          true
+        ),
+        creationTool(
+          'getTransportCleanupStatus',
+          'Read the local status and bounded result summary of one transport-cleanup plan.',
+          cleanupPlanIdSchema(),
+          true,
+          false
+        )
+      );
+    }
+    return tools;
   }
 
   /** 工具分发：apply 走原生确认链，preview/status 直接读工作流。 */
@@ -93,9 +150,34 @@ export class SafeTransportCreationHandlers {
           status: 'success',
           plan: this.workflow.status(String(args.transportCreationPlanId || ''))
         });
+      case 'previewTransportCleanup':
+        return render(await this.requireCleanupWorkflow().preview(
+          args as unknown as PreviewTransportCleanupInput
+        ));
+      case 'applyTransportCleanup':
+        if (!this.cleanupConfirmation) throw new SafeCleanupConfigurationError();
+        return this.cleanupConfirmation.confirmAndRun(String(args.transportCleanupPlanId || ''));
+      case 'getTransportCleanupStatus':
+        return render({
+          status: 'success',
+          plan: this.requireCleanupWorkflow().status(String(args.transportCleanupPlanId || ''))
+        });
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown transport creation tool: ${toolName}`);
     }
+  }
+
+  /** 清理工作流未配置时的确定性错误。 */
+  private requireCleanupWorkflow(): SafeTransportCleanupWorkflowPort {
+    if (!this.cleanupWorkflow) throw new SafeCleanupConfigurationError();
+    return this.cleanupWorkflow;
+  }
+}
+
+/** 清理工作流未装配时抛出的确定性错误（与创建工作流未装配同语义）。 */
+class SafeCleanupConfigurationError extends McpError {
+  constructor() {
+    super(ErrorCode.InternalError, 'Transport cleanup workflow is not configured.');
   }
 }
 
@@ -142,6 +224,28 @@ function planIdSchema(): ToolDefinition['inputSchema'] {
       transportCreationPlanId: { type: 'string', minLength: 1, maxLength: 128 }
     },
     required: ['transportCreationPlanId']
+  };
+}
+
+/** 清理 preview 输入：仅 10 位请求号一个字段。 */
+function cleanupPreviewSchema(): ToolDefinition['inputSchema'] {
+  return {
+    type: 'object',
+    properties: {
+      transportNumber: { type: 'string', minLength: 10, maxLength: 10 }
+    },
+    required: ['transportNumber']
+  };
+}
+
+/** 清理 apply/status 输入：仅接受 server 生成的清理 plan id。 */
+function cleanupPlanIdSchema(): ToolDefinition['inputSchema'] {
+  return {
+    type: 'object',
+    properties: {
+      transportCleanupPlanId: { type: 'string', minLength: 1, maxLength: 128 }
+    },
+    required: ['transportCleanupPlanId']
   };
 }
 

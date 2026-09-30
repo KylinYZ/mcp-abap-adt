@@ -30,9 +30,13 @@ export class AbapCreationResolver {
       } else if (object.objectType === 'FUNCTION_MODULE' || object.objectType === 'FUNCTION_GROUP_INCLUDE') {
         const parent = await this.requireExactObject('FUNCTION_GROUP', object.parentFunctionGroup as string);
         object.packageName = String(parent['adtcore:packageName'] || '').trim().toUpperCase();
+        // 记录搜索返回的父组 URI：软检查优先用它，避免依赖自拼 URL 形态（7.51 兼容）。
+        object.parentUri = safeParentUri(parent['adtcore:uri']);
         this.policy.assertTransportablePackage(object.packageName);
       } else {
-        await this.requireExactObject('PACKAGE', object.packageName);
+        const packageObject = await this.requireExactObject('PACKAGE', object.packageName);
+        // 记录搜索返回的包 URI（7.51 兼容：软检查不再只用自拼 parentPath）。
+        object.parentUri = safeParentUri(packageObject['adtcore:uri']);
       }
     }
     return objects;
@@ -285,6 +289,22 @@ function deriveFunctionGroupIncludeName(functionGroup: string, suffix: string): 
 
 function packageUrl(packageName: string): string {
   return `/sap/bc/adt/packages/${encodeSegment(packageName)}`;
+}
+
+/**
+ * 校验搜索返回的父对象 URI：只接受相对 ADT 路径形态；绝对 URL、越界段、
+ * 查询串一律弃用（返回 undefined，调用方回退自拼 parentPath）。软检查的
+ * URI 来源从"自拼"升级为"SAP 搜索返回"，但形态仍要过这道防线。
+ */
+function safeParentUri(value: unknown): string | undefined {
+  const uri = String(value ?? '').trim();
+  if (!/^\/sap\/bc\/adt\//.test(uri)
+    || uri.includes('://')
+    || /(^|\/)\.\.(\/|$)/.test(uri)
+    || /[?#]/.test(uri)) {
+    return undefined;
+  }
+  return uri;
 }
 
 function functionGroupUrl(functionGroup: string): string {

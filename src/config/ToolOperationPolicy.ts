@@ -67,6 +67,19 @@ export const CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES = new Set([
   'getTransportCreationStatus'
 ]);
 
+/**
+ * 受控传输请求清理工具集合（所有者 2026-09-29 边界调整：空请求允许删除）：
+ * preview（只读核验"未释放 + 零对象 + 本人属主"三条红线 + 冻结 plan）→
+ * apply（原生确认后单次删除 + 缺席验证）→ status（本地查询）。
+ * 非空/已释放/他人属主请求仍一律不可删；释放/改属主/加用户仍禁止。
+ * 仅 DEV 角色 + development/development-workbench。
+ */
+export const CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES = new Set([
+  'previewTransportCleanup',
+  'applyTransportCleanup',
+  'getTransportCleanupStatus'
+]);
+
 // 受控对象重命名链（refactor.rename 一站式工作流）：单确认两步（克隆新对象
 // +受控删除旧对象），与受控创建/清理/克隆同面的 DEV 受控 profiles 专属链。
 export const CONTROLLED_RENAME_TOOL_NAMES = new Set([
@@ -94,7 +107,7 @@ const LOCAL_TOOL_NAMES = new Set([
   'getDebugOperationStatus', 'revokeDebugSession', 'getQualityCheckStatus', 'getDescriptionChangeStatus',
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
   'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus',
-  'getTransportCreationStatus',
+  'getTransportCreationStatus', 'getTransportCleanupStatus',
   'getMessageTextChangeStatus'
 ]);
 
@@ -129,6 +142,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 受控传输创建 preview（cts.create-request 专属动作）：只读 CTS 预检
   //（transportInfo 端点）+ 本地冻结 plan，不触碰创建写路径
   'previewTransportCreation',
+  // 受控传输清理 preview（空请求边界）：只读 transportDetails 核验三条红线
+  //（未释放+零对象+本人属主）+ 本地冻结 plan，不触碰删除写路径
+  'previewTransportCleanup',
   // CDS 依赖分析三工具（能力矩阵 read.cds-analysis 行）：底层仅发只读 ADT GET/
   // usageReferences 查询，归入 read-only 类——QAS/PRD 角色自动可见可用
   'getCdsDependencies', 'getCdsImpactAnalysis', 'getCdsElementInfo',
@@ -188,6 +204,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   'getFmTestDataSets',
   'getWhereUsedConfig',
+  'getUsageExamples',
   // 传输历史只读二工具（矩阵 analysis.history 行子集）：E071/E070 自由 SQL
   //（真机复测可用）；VSP 图引擎类 impact/boundaries 不在子集
   'getCrHistory', 'getCoChange',
@@ -246,7 +263,10 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'applyControlledRename',
   // 受控传输请求创建 apply（cts.create-request 专属动作）：仅创建工作台请求，
   // 单确认单执行；释放/删除/改属主/直改 E071·E071K 不在本链路面
-  'applyTransportCreation'
+  'applyTransportCreation',
+  // 受控传输请求清理 apply（空请求边界）：仅删"未释放+零对象+本人属主"请求，
+  // 单确认单执行 + 缺席验证；非空/已释放/他人请求仍不可删
+  'applyTransportCleanup'
 ]);
 
 const QUALITY_EXECUTION_TOOL_NAMES = new Set([
@@ -284,6 +304,8 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_MESSAGE_TEXT_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输创建链：任何一环都不应在 QAS/PRD/未知角色下面世（仅创建、DEV 专属）
   if (CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  // 受控传输清理链（空请求边界）：同上，删除动作整体 DEV 专属
+  if (CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   return systemRole === 'DEV' || operationClass === 'local' || operationClass === 'read-only';
 }
 
@@ -386,6 +408,16 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled transport creation requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控传输清理链（空请求边界）：仅 DEV + development/development-workbench；
+  // 红线（未释放+零对象+本人属主）在工作流 preview 内核验，此处只管 profile/role 面。
+  if (CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled transport cleanup requires DEV development or development-workbench profile.'
     );
   }
   if (QUALITY_EXECUTION_TOOL_NAMES.has(toolName)

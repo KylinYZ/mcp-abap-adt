@@ -11,6 +11,8 @@ export type SafeErrorCode =
   | 'SOURCE_VERIFY_FAILED'
   | 'COMPENSATION_FAILED'
   | 'TRANSPORT_INVALID'
+  | 'TRANSPORT_REGISTRATION_UNPROVEN'
+  | 'TRANSPORT_REGISTRATION_UNKNOWN'
   | 'SYNTAX_CHECK_FAILED'
   | 'SOURCE_DRIFT'
   | 'PLAN_NOT_FOUND'
@@ -89,6 +91,9 @@ function nextStepFor(code: SafeErrorCode): string {
       return 'Check the creation plan status and inspect the listed objects, locks, and transport in ADT before retrying.';
     case 'TRANSPORT_INVALID':
       return 'Choose an existing unreleased transport that SAP reports as available for this object.';
+    case 'TRANSPORT_REGISTRATION_UNPROVEN':
+    case 'TRANSPORT_REGISTRATION_UNKNOWN':
+      return 'The object exists in SAP but its transport registration could not be proven; inspect the request in SE10/ADT and move or clean up the object manually. Automatic retry and deletion are forbidden.';
     case 'SYNTAX_CHECK_FAILED':
       return 'Correct the reported ABAP syntax errors and create a new preview.';
     case 'SOURCE_DRIFT':
