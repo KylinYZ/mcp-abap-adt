@@ -1,4 +1,4 @@
-REPORT ZTABDATA_TOOL NO STANDARD PAGE HEADING.
+REPORT ZTABDATA_TOOL.
 
 " =====================================================================
 " ZTABDATA_TOOL - 表数据导出/导入/备份/恢复工具（选择屏幕壳）
@@ -90,7 +90,8 @@ CLASS lcl_runner DEFINITION CREATE PRIVATE.
              value    TYPE string,   " 数值/结果
              note     TYPE string,   " 补充说明
            END OF ty_result,
-           ty_results TYPE STANDARD TABLE OF ty_result WITH DEFAULT KEY.
+           ty_results TYPE STANDARD TABLE OF ty_result WITH DEFAULT KEY,
+           ty_warn    TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
 
     CLASS-METHODS get_instance
       RETURNING VALUE(ro_runner) TYPE REF TO lcl_runner.
@@ -122,7 +123,7 @@ CLASS lcl_runner DEFINITION CREATE PRIVATE.
         iv_strict       TYPE abap_bool                         " 恢复=true：新增字段也拒绝
         iv_label        TYPE string                            " 错误定位标签
       RETURNING
-        VALUE(rt_warn)  TYPE STANDARD TABLE OF string WITH DEFAULT KEY
+        VALUE(rt_warn)  TYPE ty_warn
       RAISING
         zcx_tabdata_error.
 
