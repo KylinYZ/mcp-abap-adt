@@ -1,7 +1,7 @@
 " =====================================================================
-" ZCL_TABDATA_TABLE_ACCESS - 动态表访问与写路径（含安全护栏）
+" ZCL_TABLDATA_TABLE_ACCESS - 动态表访问与写路径（含安全护栏）
 " ---------------------------------------------------------------------
-" 用途：ZTABDATA_TOOL 表数据工具的表读写层。
+" 用途：ZTABLDATA_TOOL 表数据工具的表读写层。
 "       load_catalog()       取 DDIC 字段目录（排除 MANDT，标记键/hex）
 "       guard_table()        表来源护栏（黑名单硬拒 / 默认仅 ZY / 放行标准表）
 "       select_data()        动态全量/条件 SELECT -> 字符串矩阵
@@ -20,7 +20,7 @@
 "   4. 本类不做 COMMIT/ROLLBACK——LUW 边界由报表壳统一控制，
 "      保证"任一步失败整体回滚"的原子性承诺。
 " =====================================================================
-CLASS zcl_tabdata_table_access DEFINITION
+CLASS zcl_tbldata_table_access DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
@@ -42,9 +42,9 @@ CLASS zcl_tabdata_table_access DEFINITION
       IMPORTING
         !iv_table        TYPE tabname
       RETURNING
-        VALUE(rt_fields) TYPE zcl_tabdata_type_conv=>ty_fields
+        VALUE(rt_fields) TYPE zcl_tbldata_type_conv=>ty_fields
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     CLASS-METHODS guard_table
       IMPORTING
@@ -52,39 +52,39 @@ CLASS zcl_tabdata_table_access DEFINITION
         !iv_allow_std TYPE abap_bool        " 是否放行标准表（用户勾选）
         !iv_reason    TYPE string           " 放行标准表时强制的原因说明
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     CLASS-METHODS select_data
       IMPORTING
         !iv_table        TYPE tabname
-        !it_fields       TYPE zcl_tabdata_type_conv=>ty_fields
+        !it_fields       TYPE zcl_tbldata_type_conv=>ty_fields
         !iv_where        TYPE string DEFAULT ''  " 可选 WHERE 子句（用户输入，单引号需自行转义）
         !iv_max_rows     TYPE i DEFAULT 1000000  " 行数上限保护
       RETURNING
-        VALUE(rt_matrix) TYPE zcl_tabdata_type_conv=>ty_matrix
+        VALUE(rt_matrix) TYPE zcl_tbldata_type_conv=>ty_matrix
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     CLASS-METHODS upsert
       IMPORTING
         !iv_table        TYPE tabname
-        !it_fields       TYPE zcl_tabdata_type_conv=>ty_fields
-        !it_matrix       TYPE zcl_tabdata_type_conv=>ty_matrix
+        !it_fields       TYPE zcl_tbldata_type_conv=>ty_fields
+        !it_matrix       TYPE zcl_tbldata_type_conv=>ty_matrix
         !iv_mode         TYPE c DEFAULT gc_mode_upsert
       RETURNING
         VALUE(rs_result) TYPE ty_upsert_result
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     CLASS-METHODS replace_all
       IMPORTING
         !iv_table          TYPE tabname
-        !it_fields         TYPE zcl_tabdata_type_conv=>ty_fields
-        !it_matrix         TYPE zcl_tabdata_type_conv=>ty_matrix
+        !it_fields         TYPE zcl_tbldata_type_conv=>ty_fields
+        !it_matrix         TYPE zcl_tbldata_type_conv=>ty_matrix
       RETURNING
         VALUE(rv_inserted) TYPE i
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     CLASS-METHODS count_rows
       IMPORTING
@@ -92,7 +92,7 @@ CLASS zcl_tabdata_table_access DEFINITION
       RETURNING
         VALUE(rv_count) TYPE i
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -108,12 +108,12 @@ CLASS zcl_tabdata_table_access DEFINITION
     CLASS-METHODS fill_dynamic_table
       IMPORTING
         !iv_table     TYPE tabname
-        !it_fields    TYPE zcl_tabdata_type_conv=>ty_fields
-        !it_matrix    TYPE zcl_tabdata_type_conv=>ty_matrix
+        !it_fields    TYPE zcl_tbldata_type_conv=>ty_fields
+        !it_matrix    TYPE zcl_tbldata_type_conv=>ty_matrix
       RETURNING
         VALUE(rr_tab) TYPE REF TO data
       RAISING
-        zcx_tabdata_error.
+        zcx_tbldata_error.
 
     " SQL 字面值转义（动态 WHERE 拼接前的单引号加倍）
     CLASS-METHODS quote_value
@@ -125,32 +125,21 @@ CLASS zcl_tabdata_table_access DEFINITION
 ENDCLASS.
 
 
-CLASS zcl_tabdata_table_access IMPLEMENTATION.
+CLASS zcl_tbldata_table_access IMPLEMENTATION.
 
   METHOD load_catalog.
 
-    DATA: lt_dfies TYPE STANDARD TABLE OF dfies WITH DEFAULT KEY.
+    DATA: lt_dfies TYPE STANDARD TABLE OF dfies WITH DEFAULT KEY,
+          ls_x030l TYPE x030l.
 
-    DATA lv_tabclass TYPE c LENGTH 10.
-
-    " ---- 仅透明表校验：X030L 无 TABCLASS 组件，改查 DD02L 活动版本 ----
-    " 动态源场景统一经典 Open SQL 形态（@ 严格形态与 fs 目标不兼容）
-    SELECT SINGLE tabclass FROM dd02l
-      INTO lv_tabclass
-      WHERE tabname = iv_table AND as4local = 'A'.
-    IF sy-subrc <> 0.
-      zcx_tabdata_error=>raise( |表 { iv_table } 不存在（DD02L 无活动版本）| ).
-    ENDIF.
-    IF lv_tabclass <> 'TRANSP'.
-      zcx_tabdata_error=>raise( |表 { iv_table } 类别为 { lv_tabclass }（非透明表），本工具仅支持透明表| ).
-    ENDIF.
-
-    " ---- DDIF_FIELDINFO_GET：DDIC 权威字段目录 ----
+    " ---- DDIF_FIELDINFO_GET：DDIC 权威字段目录 + 表类别 ----
     CALL FUNCTION 'DDIF_FIELDINFO_GET'
       EXPORTING
         tabname   = iv_table
         langu     = sy-langu
         all_types = 'X'
+      IMPORTING
+        x030l_wa  = ls_x030l
       TABLES
         dfies_tab = lt_dfies
       EXCEPTIONS
@@ -158,7 +147,12 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         OTHERS    = 2.
 
     IF sy-subrc <> 0 OR lt_dfies IS INITIAL.
-      zcx_tabdata_error=>raise( |表 { iv_table } 无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）| ).
+      zcx_tbldata_error=>raise( |表 { iv_table } 不存在或无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）| ).
+    ENDIF.
+
+    " ---- 仅透明表：簇表/池表的动态读写语义不同，直接拒绝 ----
+    IF ls_x030l-tabclass <> 'TRANSP'.
+      zcx_tbldata_error=>raise( |表 { iv_table } 类别为 { ls_x030l-tabclass }（非透明表），本工具仅支持透明表| ).
     ENDIF.
 
     " ---- 组装字段目录；MANDT 不导出不导入（依赖 Open SQL 自动客户端处理） ----
@@ -167,7 +161,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
       CHECK <fs_df>-fieldname <> 'MANDT'.
 
       " 未知类型类别在 to_text/from_text 中会被防御性拒绝，这里直接透传
-      APPEND VALUE zcl_tabdata_type_conv=>ty_field(
+      APPEND VALUE zcl_tbldata_type_conv=>ty_field(
             name     = <fs_df>-fieldname
             kind     = <fs_df>-inttype
             length   = <fs_df>-leng
@@ -186,7 +180,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
     " ---- 黑名单优先：不受放行开关影响 ----
     IF is_blacklisted( iv_table ) = abap_true.
-      zcx_tabdata_error=>raise( |表 { iv_table } 属于系统关键表黑名单（DDIC 元数据/传输系统/系统安全表），任何模式下都禁止操作| ).
+      zcx_tbldata_error=>raise( |表 { iv_table } 属于系统关键表黑名单（DDIC 元数据/传输系统/系统安全表），任何模式下都禁止操作| ).
     ENDIF.
 
     " ---- 默认仅 Z/Y 自定义表；标准表需显式放行 + 原因说明 ----
@@ -195,11 +189,11 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     ENDIF.
 
     IF iv_allow_std <> abap_true.
-      zcx_tabdata_error=>raise( |表 { iv_table } 不是 Z/Y 自定义表。如确需操作标准表，请勾选"放行标准表"并填写业务原因| ).
+      zcx_tbldata_error=>raise( |表 { iv_table } 不是 Z/Y 自定义表。如确需操作标准表，请勾选"放行标准表"并填写业务原因| ).
     ENDIF.
 
     IF iv_reason IS INITIAL.
-      zcx_tabdata_error=>raise( |放行标准表 { iv_table } 必须填写业务原因（审计要求）| ).
+      zcx_tbldata_error=>raise( |放行标准表 { iv_table } 必须填写业务原因（审计要求）| ).
     ENDIF.
 
     " 放行合法：审计输出由报表壳负责（原因已校验非空）
@@ -243,51 +237,51 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA: lr_tab TYPE REF TO data.
 
     IF iv_max_rows <= 0.
-      zcx_tabdata_error=>raise( |行数上限必须为正数（当前 { iv_max_rows }）| ).
+      zcx_tbldata_error=>raise( |行数上限必须为正数（当前 { iv_max_rows }）| ).
     ENDIF.
 
     " ---- 动态创建结果内表并读取 ----
     TRY.
         CREATE DATA lr_tab TYPE STANDARD TABLE OF (iv_table).
       CATCH cx_sy_create_data_error INTO DATA(lo_cd).
-        zcx_tabdata_error=>raise( text_message = |表 { iv_table } 动态类型创建失败: { lo_cd->get_text( ) }| previous = lo_cd ).
-    ENDTRY.
-
-    " 动态 Open SQL：SELECT 的 INTO 目标在新内核禁止 field symbol（含 @<fs>），
-    " 用 data ref 解引用 @lr_tab->* 作为 host 目标；遍历前再 ASSIGN
-    TRY.
-        IF iv_where IS INITIAL.
-          SELECT * FROM (iv_table)
-            ORDER BY PRIMARY KEY
-            INTO TABLE @lr_tab->*
-            UP TO @iv_max_rows ROWS.
-        ELSE.
-          SELECT * FROM (iv_table)
-            WHERE (iv_where)
-            ORDER BY PRIMARY KEY
-            INTO TABLE @lr_tab->*
-            UP TO @iv_max_rows ROWS.
-        ENDIF.
-      CATCH cx_sy_dynamic_osql_semantics cx_sy_dynamic_osql_syntax
-            cx_sy_open_sql_db INTO DATA(lo_sql).
-        zcx_tabdata_error=>raise( text_message = |表 { iv_table } 读取失败: { lo_sql->get_text( ) }| previous = lo_sql ).
+        zcx_tbldata_error=>raise( text_message = |表 { iv_table } 动态类型创建失败: { lo_cd->get_text( ) }| previous = lo_cd ).
     ENDTRY.
 
     ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
 
+    " 动态 Open SQL：WHERE 可选；按主键排序保证导出顺序稳定可复现；
+    " 经典语法顺序：UP TO n ROWS 置于 ORDER BY 之后
+    TRY.
+        IF iv_where IS INITIAL.
+          SELECT * FROM (iv_table)
+            INTO TABLE <lt_tab>
+            ORDER BY PRIMARY KEY
+            UP TO iv_max_rows ROWS.
+        ELSE.
+          SELECT * FROM (iv_table)
+            INTO TABLE <lt_tab>
+            WHERE (iv_where)
+            ORDER BY PRIMARY KEY
+            UP TO iv_max_rows ROWS.
+        ENDIF.
+      CATCH cx_sy_dynamic_osql_semantics cx_sy_dynamic_osql_syntax
+            cx_sy_open_sql_db INTO DATA(lo_sql).
+        zcx_tbldata_error=>raise( text_message = |表 { iv_table } 读取失败: { lo_sql->get_text( ) }| previous = lo_sql ).
+    ENDTRY.
+
     " ---- 逐字段文本化为矩阵（列序与字段目录一致） ----
     LOOP AT <lt_tab> ASSIGNING FIELD-SYMBOL(<ls_row>).
 
-      DATA(lt_row) = VALUE zcl_tabdata_type_conv=>ty_row( ).
+      DATA(lt_row) = VALUE zcl_tbldata_type_conv=>ty_row( ).
 
       LOOP AT it_fields ASSIGNING FIELD-SYMBOL(<fs_f>).
 
         ASSIGN COMPONENT <fs_f>-name OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_comp>).
         IF sy-subrc <> 0.
-          zcx_tabdata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
+          zcx_tbldata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
         ENDIF.
 
-        APPEND zcl_tabdata_type_conv=>to_text(
+        APPEND zcl_tbldata_type_conv=>to_text(
                  iv_kind     = <fs_f>-kind
                  iv_decimals = <fs_f>-decimals
                  iv_value    = <lv_comp> )
@@ -306,8 +300,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
     " ---- 构建动态类型标准表（行类型 = 源表结构） ----
     CREATE DATA rr_tab TYPE STANDARD TABLE OF (iv_table).
-    FIELD-SYMBOLS <lt_tab> TYPE STANDARD TABLE.
-    ASSIGN rr_tab->* TO <lt_tab>.
+    ASSIGN rr_tab->* TO FIELD-SYMBOL(<lt_tab>).
 
     DATA: lr_row TYPE REF TO data,
           lv_line_no TYPE i.     " 矩阵行号（错误定位）
@@ -317,7 +310,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
       lv_line_no = sy-tabix.
 
       IF lines( <fs_row> ) <> lines( it_fields ).
-        zcx_tabdata_error=>raise( |表 { iv_table }：第 { lv_line_no } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致| ).
+        zcx_tbldata_error=>raise( |表 { iv_table }：第 { lv_line_no } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致| ).
       ENDIF.
 
       " 单行动态结构；MANDT 未映射保持初值（写入时 Open SQL 自动写 SY-MANDT）
@@ -329,13 +322,13 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
         ASSIGN COMPONENT <fs_f>-name OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_comp>).
         IF sy-subrc <> 0.
-          zcx_tabdata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
+          zcx_tbldata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
         ENDIF.
 
         " 列号与字段目录同序
         READ TABLE <fs_row> INTO DATA(lv_text) INDEX sy-tabix.
 
-        zcl_tabdata_type_conv=>from_text(
+        zcl_tbldata_type_conv=>from_text(
           EXPORTING
             iv_kind     = <fs_f>-kind
             iv_decimals = <fs_f>-decimals
@@ -361,21 +354,21 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA(lr_tab) = fill_dynamic_table( iv_table  = iv_table
                                        it_fields = it_fields
                                        it_matrix = it_matrix ).
-    FIELD-SYMBOLS <lt_tab> TYPE STANDARD TABLE.
-    ASSIGN lr_tab->* TO <lt_tab>.
+    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
 
     " ---- 主键字段清单（WHERE 拼接依据） ----
-    DATA(lt_key_fields) = VALUE zcl_tabdata_type_conv=>ty_fields( ).
+    DATA(lt_key_fields) = VALUE zcl_tbldata_type_conv=>ty_fields( ).
     LOOP AT it_fields ASSIGNING FIELD-SYMBOL(<fs_f>) WHERE key = abap_true.
       APPEND <fs_f> TO lt_key_fields.
     ENDLOOP.
     IF lt_key_fields IS INITIAL.
-      zcx_tabdata_error=>raise( |表 { iv_table } 无主键字段，无法执行按主键 upsert| ).
+      zcx_tbldata_error=>raise( |表 { iv_table } 无主键字段，无法执行按主键 upsert| ).
     ENDIF.
 
     " ---- 动态行 wa（存在性探测用，避免覆盖待写行） ----
     DATA: lr_probe TYPE REF TO data.
     CREATE DATA lr_probe TYPE (iv_table).
+    ASSIGN lr_probe->* TO FIELD-SYMBOL(<ls_probe>).
 
     " ---- 逐行存在性判定 + 写入（LUW 边界由报表壳控制） ----
     DATA(lv_src_line) = 0.
@@ -402,18 +395,16 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
       ENDLOOP.
 
-      " 存在性探测（经典形态：动态源+fs 目标不加 @）
-      SELECT SINGLE * FROM (iv_table)
-        WHERE (lv_cond)
-        INTO @lr_probe->*.
+      " 存在性探测
+      SELECT SINGLE * FROM (iv_table) INTO <ls_probe> WHERE (lv_cond).
 
       IF sy-subrc = 0.
         " 已存在：按模式更新或跳过
         CASE iv_mode.
           WHEN gc_mode_upsert OR gc_mode_update.
-            UPDATE (iv_table) FROM @<ls_row>.
+            UPDATE (iv_table) FROM <ls_row>.
             IF sy-subrc <> 0.
-              zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 UPDATE 失败（SY-SUBRC { sy-subrc }）| ).
+              zcx_tbldata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 UPDATE 失败（SY-SUBRC { sy-subrc }）| ).
             ENDIF.
             rs_result-updated = rs_result-updated + 1.
           WHEN gc_mode_insert.
@@ -423,9 +414,9 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         " 不存在：按模式插入或跳过
         CASE iv_mode.
           WHEN gc_mode_upsert OR gc_mode_insert.
-            INSERT (iv_table) FROM @<ls_row>.
+            INSERT (iv_table) FROM <ls_row>.
             IF sy-subrc <> 0.
-              zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 INSERT 失败（SY-SUBRC { sy-subrc }，主键冲突或约束不符）| ).
+              zcx_tbldata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 INSERT 失败（SY-SUBRC { sy-subrc }，主键冲突或约束不符）| ).
             ENDIF.
             rs_result-inserted = rs_result-inserted + 1.
           WHEN gc_mode_update.
@@ -444,19 +435,18 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA(lr_tab) = fill_dynamic_table( iv_table  = iv_table
                                        it_fields = it_fields
                                        it_matrix = it_matrix ).
-    FIELD-SYMBOLS <lt_tab> TYPE STANDARD TABLE.
-    ASSIGN lr_tab->* TO <lt_tab>.
+    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
 
     " ---- 时点全量替换：先清后灌（LUW 由报表壳控制，失败整体回滚） ----
     DELETE FROM (iv_table).
     IF sy-subrc <> 0.
-      zcx_tabdata_error=>raise( |表 { iv_table } 全表 DELETE 失败（SY-SUBRC { sy-subrc }）| ).
+      zcx_tbldata_error=>raise( |表 { iv_table } 全表 DELETE 失败（SY-SUBRC { sy-subrc }）| ).
     ENDIF.
 
     IF lines( <lt_tab> ) > 0.
-      INSERT (iv_table) FROM TABLE @<lt_tab>.
+      INSERT (iv_table) FROM TABLE <lt_tab>.
       IF sy-subrc <> 0.
-        zcx_tabdata_error=>raise( |表 { iv_table } 批量 INSERT 失败（SY-SUBRC { sy-subrc }），当前 LUW 将被回滚| ).
+        zcx_tbldata_error=>raise( |表 { iv_table } 批量 INSERT 失败（SY-SUBRC { sy-subrc }），当前 LUW 将被回滚| ).
       ENDIF.
     ENDIF.
 
@@ -467,10 +457,8 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
   METHOD count_rows.
 
-    " 行数统计（恢复前差异摘要展示用）；经典形态
-    DATA lv_cnt TYPE i.
-    SELECT COUNT(*) FROM (iv_table)
-      INTO lv_cnt.
+    " 行数统计（恢复前差异摘要展示用）
+    SELECT COUNT(*) FROM (iv_table) INTO @DATA(lv_cnt).
     rv_count = lv_cnt.
 
   ENDMETHOD.
