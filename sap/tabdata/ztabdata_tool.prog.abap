@@ -47,9 +47,9 @@ SELECTION-SCREEN BEGIN OF BLOCK b_imp WITH FRAME TITLE gv_tim.
 PARAMETERS:
   p_fimp   TYPE string LOWER CASE MODIF ID mim,   " 导入文件路径（.xlsx）
   p_impbak TYPE abap_bool AS CHECKBOX DEFAULT 'X' MODIF ID mim,  " 导入前自动备份
-  p_umode  TYPE c LENGTH 1 RADIOBUTTON GROUP umo MODIF ID mim DEFAULT 'X',  " upsert
-  p_uonlyi TYPE c LENGTH 1 RADIOBUTTON GROUP umo MODIF ID mim,              " 仅插入
-  p_uonlyu TYPE c LENGTH 1 RADIOBUTTON GROUP umo MODIF ID mim.              " 仅更新
+  p_umode  RADIOBUTTON GROUP umo MODIF ID mim DEFAULT 'X',  " upsert
+  p_uonlyi RADIOBUTTON GROUP umo MODIF ID mim,              " 仅插入
+  p_uonlyu RADIOBUTTON GROUP umo MODIF ID mim.              " 仅更新
 SELECTION-SCREEN END OF BLOCK b_imp.
 
 SELECTION-SCREEN BEGIN OF BLOCK b_bak WITH FRAME TITLE gv_tbk.

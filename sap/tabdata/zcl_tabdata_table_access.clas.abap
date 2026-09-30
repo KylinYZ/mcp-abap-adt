@@ -129,17 +129,28 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
   METHOD load_catalog.
 
-    DATA: lt_dfies TYPE STANDARD TABLE OF dfies WITH DEFAULT KEY,
-          ls_x030l TYPE x030l.
+    DATA: lt_dfies TYPE STANDARD TABLE OF dfies WITH DEFAULT KEY.
 
-    " ---- DDIF_FIELDINFO_GET：DDIC 权威字段目录 + 表类别 ----
+    DATA lv_tabclass TYPE c LENGTH 10.
+
+    " ---- 仅透明表校验：X030L 无 TABCLASS 组件，改查 DD02L 活动版本 ----
+    " 动态源场景统一经典 Open SQL 形态（@ 严格形态与 fs 目标不兼容）
+    SELECT SINGLE tabclass FROM dd02l
+      INTO lv_tabclass
+      WHERE tabname = iv_table AND as4local = 'A'.
+    IF sy-subrc <> 0.
+      zcx_tabdata_error=>raise( |表 { iv_table } 不存在（DD02L 无活动版本）| ).
+    ENDIF.
+    IF lv_tabclass <> 'TRANSP'.
+      zcx_tabdata_error=>raise( |表 { iv_table } 类别为 { lv_tabclass }（非透明表），本工具仅支持透明表| ).
+    ENDIF.
+
+    " ---- DDIF_FIELDINFO_GET：DDIC 权威字段目录 ----
     CALL FUNCTION 'DDIF_FIELDINFO_GET'
       EXPORTING
         tabname   = iv_table
         langu     = sy-langu
         all_types = 'X'
-      IMPORTING
-        x030l_wa  = ls_x030l
       TABLES
         dfies_tab = lt_dfies
       EXCEPTIONS
@@ -147,12 +158,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         OTHERS    = 2.
 
     IF sy-subrc <> 0 OR lt_dfies IS INITIAL.
-      zcx_tabdata_error=>raise( |表 { iv_table } 不存在或无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）| ).
-    ENDIF.
-
-    " ---- 仅透明表：簇表/池表的动态读写语义不同，直接拒绝 ----
-    IF ls_x030l-tabclass <> 'TRANSP'.
-      zcx_tabdata_error=>raise( |表 { iv_table } 类别为 { ls_x030l-tabclass }（非透明表），本工具仅支持透明表| ).
+      zcx_tabdata_error=>raise( |表 { iv_table } 无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）| ).
     ENDIF.
 
     " ---- 组装字段目录；MANDT 不导出不导入（依赖 Open SQL 自动客户端处理） ----
@@ -252,16 +258,18 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     " 动态 Open SQL：WHERE 可选；按主键排序保证导出顺序稳定可复现；
     " 经典语法顺序：UP TO n ROWS 置于 ORDER BY 之后
     TRY.
+        " 经典 Open SQL 形态（动态源+fs 目标的唯一兼容写法）：
+        " 子句序 FROM->WHERE->ORDER BY->INTO->UP TO，fs 目标不加 @
         IF iv_where IS INITIAL.
           SELECT * FROM (iv_table)
-            INTO TABLE <lt_tab>
             ORDER BY PRIMARY KEY
+            INTO TABLE <lt_tab>
             UP TO iv_max_rows ROWS.
         ELSE.
           SELECT * FROM (iv_table)
-            INTO TABLE <lt_tab>
             WHERE (iv_where)
             ORDER BY PRIMARY KEY
+            INTO TABLE <lt_tab>
             UP TO iv_max_rows ROWS.
         ENDIF.
       CATCH cx_sy_dynamic_osql_semantics cx_sy_dynamic_osql_syntax
@@ -300,7 +308,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
     " ---- 构建动态类型标准表（行类型 = 源表结构） ----
     CREATE DATA rr_tab TYPE STANDARD TABLE OF (iv_table).
-    ASSIGN rr_tab->* TO FIELD-SYMBOL(<lt_tab>).
+    ASSIGN rr_tab->* TO FIELD-SYMBOL(<lt_tab> TYPE STANDARD TABLE).
 
     DATA: lr_row TYPE REF TO data,
           lv_line_no TYPE i.     " 矩阵行号（错误定位）
@@ -354,7 +362,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA(lr_tab) = fill_dynamic_table( iv_table  = iv_table
                                        it_fields = it_fields
                                        it_matrix = it_matrix ).
-    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
+    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab> TYPE STANDARD TABLE).
 
     " ---- 主键字段清单（WHERE 拼接依据） ----
     DATA(lt_key_fields) = VALUE zcl_tabdata_type_conv=>ty_fields( ).
@@ -368,7 +376,6 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     " ---- 动态行 wa（存在性探测用，避免覆盖待写行） ----
     DATA: lr_probe TYPE REF TO data.
     CREATE DATA lr_probe TYPE (iv_table).
-    ASSIGN lr_probe->* TO FIELD-SYMBOL(<ls_probe>).
 
     " ---- 逐行存在性判定 + 写入（LUW 边界由报表壳控制） ----
     DATA(lv_src_line) = 0.
@@ -395,14 +402,16 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
       ENDLOOP.
 
-      " 存在性探测
-      SELECT SINGLE * FROM (iv_table) INTO <ls_probe> WHERE (lv_cond).
+      " 存在性探测（经典形态：动态源+fs 目标不加 @）
+      SELECT SINGLE * FROM (iv_table)
+        WHERE (lv_cond)
+        INTO @lr_probe->*.
 
       IF sy-subrc = 0.
         " 已存在：按模式更新或跳过
         CASE iv_mode.
           WHEN gc_mode_upsert OR gc_mode_update.
-            UPDATE (iv_table) FROM <ls_row>.
+            UPDATE (iv_table) FROM @<ls_row>.
             IF sy-subrc <> 0.
               zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 UPDATE 失败（SY-SUBRC { sy-subrc }）| ).
             ENDIF.
@@ -414,7 +423,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         " 不存在：按模式插入或跳过
         CASE iv_mode.
           WHEN gc_mode_upsert OR gc_mode_insert.
-            INSERT (iv_table) FROM <ls_row>.
+            INSERT (iv_table) FROM @<ls_row>.
             IF sy-subrc <> 0.
               zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 INSERT 失败（SY-SUBRC { sy-subrc }，主键冲突或约束不符）| ).
             ENDIF.
@@ -435,7 +444,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA(lr_tab) = fill_dynamic_table( iv_table  = iv_table
                                        it_fields = it_fields
                                        it_matrix = it_matrix ).
-    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
+    ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab> TYPE STANDARD TABLE).
 
     " ---- 时点全量替换：先清后灌（LUW 由报表壳控制，失败整体回滚） ----
     DELETE FROM (iv_table).
@@ -444,7 +453,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     ENDIF.
 
     IF lines( <lt_tab> ) > 0.
-      INSERT (iv_table) FROM TABLE <lt_tab>.
+      INSERT (iv_table) FROM TABLE @<lt_tab>.
       IF sy-subrc <> 0.
         zcx_tabdata_error=>raise( |表 { iv_table } 批量 INSERT 失败（SY-SUBRC { sy-subrc }），当前 LUW 将被回滚| ).
       ENDIF.
@@ -457,8 +466,10 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
   METHOD count_rows.
 
-    " 行数统计（恢复前差异摘要展示用）
-    SELECT COUNT(*) FROM (iv_table) INTO @DATA(lv_cnt).
+    " 行数统计（恢复前差异摘要展示用）；经典形态
+    DATA lv_cnt TYPE i.
+    SELECT COUNT(*) FROM (iv_table)
+      INTO lv_cnt.
     rv_count = lv_cnt.
 
   ENDMETHOD.
