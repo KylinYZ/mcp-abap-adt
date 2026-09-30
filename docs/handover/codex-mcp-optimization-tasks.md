@@ -100,7 +100,7 @@
 
 ---
 
-## D. 从 sess_7d40bb2c 借鉴：文本元素能力（本 MCP 缺失，已有成熟实现）
+## D. 从 sess_7d40bb2c 借鉴：文本元素能力（实现路径已打通，受控面待补）
 
 ### D1 [P1] 文本元素能力——实现路径已由 sess_7d40bb2c 打通，受控链借鉴接入
 
@@ -108,11 +108,12 @@
   1. **ZADT_VSP WebSocket 基础设施已部署**：`$ZADT_VSP` 包 10 个 ABAP 对象全部创建激活（ZIF_VSP_SERVICE、ZCL_VSP_UTILS、ZCL_VSP_RFC_SERVICE、ZCL_VSP_DEBUG_SERVICE、ZCL_VSP_AMDP_SERVICE、ZCL_VSP_GIT_SERVICE、ZCL_VSP_REPORT_SERVICE、ZCL_VSP_APC_HANDLER、ZCL_ADT_00_AMDP_TEST；ZADT_CL_TADIR_MOVE 源码已存激活被拒锁残留）。部署过程修复内嵌源码 4 类 bug（修正副本在 vibing-steampunk `embedded/abap/_s4d_fix/`）：`COND #()` 推导成 C(4) 装不下 'false'（→COND string）、`TYPE syuname` 拼写（→SYUNAME）、`FIND REGEX` POSIX 警告卡保存（→FIND PCRE）、首次导入仅落空壳需重导。
   2. **剩余手工步骤（SAP GUI，无公开 API）**：事务 SAPC 创建 APC 应用（ID=ZADT_VSP，Handler=ZCL_VSP_APC_HANDLER，Stateful）+ SICF 激活 `/sap/bc/apc/sap/zadt_vsp` 节点。配好后 sap-adt 服务器的 `SetTextElements` 即可用。
   3. **备用路径也已就绪**：`ZVSP_COMPAT_751` 门面 FM（S4D 的 Z001 包内，含 TEXTPOOL_GET/TEXTPOOL_SET=RPY_TEXTELEMENTS_INSERT+读回核验）实测可走经典 RFC。
+- **能力勘误（2026-09-30 复核）**："本 MCP 缺失"的说法不准确——本仓库已有纯 ADT REST 的 `setTextElements`（`src/adt/api/textelements.ts`，symbols/selections/headings 三类，含 S/4 真机固化的"每符号独立 @MaxLength"协议），只是仅注册在专家原子面（legacy-full），受控 profile（development/development-workbench）没有暴露。ZTABDATA 战役未走通是因为当时未尝试本工具（ED1 的 404 是 7.51 无 textelements 资源；sap-adt 的 500 是其 WebSocket 通道 SAPC/SICF 未配置）——本仓库 REST 通道在 Basis 816 上从未试过、预期可用。
 - **借鉴任务（本仓库）**：
-  1. 参照 sap-adt 的 `SetTextElements`（WebSocket 通道，sess_7d40bb2c 已验证）与本仓库受控链纪律，新增**受控文本元素工具对** `previewTextElementsChange` / `applyTextElementsChange`：ABAP 端走 Basis 816 上已存在的 ADT textelements 资源（REST，无需 WebSocket），plan/确认/auto/审计纪律与对象创建链一致；
-  2. 或最小方案：文档化"sap-adt server 的 SetTextElements"作为文本元素官方通道，与本仓库工具矩阵互认；
-  3. 保留 `ZVSP_COMPAT_751` 作为 7.51 类旧系统降级路径的参考实现。
-- **验收**：为 ZTABDATA_TOOL 写入中文选择屏标题文本元素后在 SAP GUI 可见。
+  1. 参照 sap-adt 的 `SetTextElements`（WebSocket 通道，sess_7d40bb2c 已验证）与本仓库受控链纪律，新增**受控文本元素工具对** `previewTextElementsChange` / `applyTextElementsChange`：ABAP 端走 Basis 816 上已存在的 ADT textelements 资源（REST，无需 WebSocket），plan/确认/auto/审计纪律与对象创建链一致；**注意本仓库 `src/adt/api/textelements.ts` 已有全部底层协议实现，只需包受控工作流壳**；
+  2. 或最小方案：把现有原子 `setTextElements` 纳入 focused profiles 的写工具清单（执行门写槽 + DEV 角色），并文档化其与受控链的边界；
+  3. 保留 `ZVSP_COMPAT_751` 作为 7.51 类旧系统降级路径的参考实现（7.51 无 ADT textelements 资源，只能 RPY 路线）。
+- **验收**：为 ZTABDATA_TOOL 写入中文选择屏文本元素后在 SAP GUI 可见——优先验证本仓库 REST 通道（S4D），ZVSP_COMPAT_751 仅作旧系统验证。
 
 ### D2 [P2] 评估 ZVSP_COMPAT_751 的 TABLE_CREATE 与受控 CreateTable 差异
 
@@ -155,8 +156,58 @@
 
 ---
 
+## F. VSP 能力对齐借鉴清单（剩余 17 行差距的可落地项）
+
+> 基线：`docs/evidence/vsp-capability-parity-matrix.md`（71 行，MCP_SUPERSET+EQUIVALENT=54/71）。
+> 剩余 = 5 PARTIAL + 2 GAP + 10 INTENTIONAL_RESTRICTION。本节只列**可借鉴落地**的行；其余属有意限制（QAS/PRD 安全边界、abaplint 引擎不可得、不自动部署 SAP 端对象），保持不动。
+
+### F1 [P1] 程序文本池写入：已有能力入 focused profiles + 受控化（矩阵行 report.text-elements 复核）
+
+- 见 D1 能力勘误。矩阵该行评 MCP_SUPERSET 依据的是 DDIC 数据元素标签受控链 + 专家原子 `setTextElements`；**程序文本池（selection texts/text symbols）的受控写路径确实缺失**，ZTABDATA 17 条选择文本实战已暴露。
+- **任务**：
+  1. 最小方案：原子 `setTextElements` 纳入 focused profiles 写工具清单（DEV 角色、执行门写槽），补 profile 可用性运行时验证（防 [[focused-tools-profile-availability]] 陷阱：声明 profile 必须真机验证）；
+  2. 完整方案：`previewTextPoolChange` / `applyTextPoolChange` 受控工具对（复用 `src/adt/api/textelements.ts` 全部协议实现 + `src/safe/DdicPropertyChangeWorkflow.ts` 的 SET_TEXT_ELEMENTS 模式扩展 PROGRAM 子对象）；
+  3. 矩阵 JSON 同步修正（`vsp-capability-parity-matrix.json`，MD 生成视图勿手改）。
+- **验收**：S4D 上写 ZTABDATA_TOOL 17 条选择文本 GUI 可见；`npm test -- --runInBand` 全绿。
+
+### F2 [P1] SAP 端 helper 状态诊断：checkInstallPrerequisites 深化（install.zadt-vsp 解除条件达成）
+
+- **背景**：S4D 的 `$ZADT_VSP` 包 10 对象已由用户部署激活（SAPC/SICF 两步手工配置仍缺）；矩阵行 install.zadt-vsp 的解除条件"用户自行安装后，本项目提供只读前置检查与诊断"已满足。
+- **任务**：`checkInstallPrerequisites` 的 ZADT_VSP 探测从"对象 TADIR 存在性"深化为**可用性诊断**：1) 关键对象（ZCL_VSP_APC_HANDLER 等）激活状态；2) APC/SICF 服务面探测——HTTP 探测 `/sap/bc/apc/sap/zadt_vsp`（404=节点未激活 / 其他响应=服务存在），区分"对象在但服务面未配"与"完全未装"；3) 输出人可读结论（如"对象 10/10 激活，WebSocket 面未配置：SAPC/SICF 待做"）。
+- **验收**：当前 sap-demo 上运行报告"对象在、服务面未配置"；用户完成 SAPC/SICF 后复测报告 ready。
+
+### F3 [P2] 报表执行面评估（report.run / report.async / report.variants，3×INTENTIONAL_RESTRICTION）
+
+- **决策项**：解除条件是所有者重新放开方向 + 受控执行工作流设计评审。现状：S4D 已部署 ZCL_VSP_REPORT_SERVICE（WebSocket 底座）；sap-adt 服务器的 RunReport/RunReportAsync/GetVariants 是可对照的成熟实现（后台作业+spool 取回）。
+- **若放开**：设计要点——preview/确认/apply 纪律、作业与 spool 清理、QAS/PRD 硬拒、负载护栏（作业名白名单/超时上限）。先评审后实施，默认不开。
+
+### F4 [P2] transport.merge-move（GAP）：请求合并/对象跨请求移动
+
+- 本仓库传输链已覆盖仅创建/仅删空请求；合并与移动可补偿清理场景（如残留 S4HK900029 这类"待属主处理"请求的整理）。需按受控链设计（不可直改 E071/E071K 红线不变）。
+
+### F5 [P2] ui5.write（GAP）：UI5 BSP 应用与文件的受控创建/上传/删除
+
+- 本仓库仅读（ui5ListApps/ui5GetApp/ui5GetFileContent）。写入面需受控工作流设计评审；优先级低于 F1-F4。
+
+### F6 [P2] diagnostics.knowledge-queries 收尾（PARTIAL）
+
+- fm_test_data **payload 级解码**（18KB S/2 cluster 二进制解析器）——目录语义与多片段组装已真机验证（git 13851e0/c1a31e0），剩余是 payload 解码；cluster_read 未覆盖。对照 VSP `fm_test_data` 实现。
+
+### F7 [P2] git.abapgit 收尾（PARTIAL）
+
+- 本仓库仅 repo 信息读；GitTypes/GitExport 包/对象导出缺位。定论（记忆 vsp-parity-wave1）：新版 abapGit 已移除 ADT REST 面，导出只能走 ZADT_VSP WebSocket Git 服务——该服务 S4D 已激活（ZCL_VSP_GIT_SERVICE），底座成立。导出属只读，可评估单独放开（跳过确认链、保留审计），但依赖 helper 前置检查（F2）先行。
+
+### F8 [P2] 其余 PARTIAL 缺口处置结论（不立任务，记录定性）
+
+- `devtools.execute-abap`：runClass 仅 legacy-full 属有意收窄（任意代码执行风险），维持。
+- `debug.amdp-adt`：ADT 原生 AMDP 调试仅 checkAmdpDebugger 探测；如需补全再立受控会话工作流任务（对照 sap-adt AMDPDebugger* 工具族），非当前优先。
+- `analysis.history`：loads/transport-crossref/where_used_config/usage_examples 已真机验证（见 docs/evidence 四份证据），仅 health 等残项，基本闭合。
+- `analysis.lint`：abaplint 引擎不可得维持限制；已知替代：外部 abap-docs MCP 服务器的 `abap_lint` 工具可做离线静态分析（interop 方向，非本仓库任务）。
+
+---
+
 ## 执行顺序建议
 
-1. **立即可做（无外部依赖）**：A1 剩余审计+单测、A3 错误明细、A5 协议文案修正、C 规则集转 abaplint、D1 文本元素工具开发（对照 ZVSP_COMPAT_751）。
-2. **等锁释放（约 30 分钟后）**：E1 report 重建 → E3 ABAP Unit → E4 GUI 验证。
-3. **需要决策**：A2 补偿策略变更（涉及纪律文档更新）、A4 配置拆分（涉及部署模板）、D2 双通道评估。
+1. **立即可做（无外部依赖）**：A1 剩余审计+单测、A3 错误明细、A5 协议文案修正、C 规则集转 abaplint、F1 文本元素（协议已备，包受控壳+profile 纳入）、F2 helper 状态诊断深化。
+2. **等锁释放（约 30 分钟后）**：E1 report 重建 → E3 ABAP Unit → E4 GUI 验证；F1 验收直接复用 E1 产物（17 条选择文本写入）。
+3. **需要决策**：A2 补偿策略变更（涉及纪律文档更新）、A4 配置拆分（涉及部署模板）、D2 双通道评估、F3 报表执行面放开（先设计评审后实施）、F4/F5 受控工作流立项。
