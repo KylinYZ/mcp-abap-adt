@@ -178,7 +178,7 @@ export class TraceHandlers extends BaseHandler {
     async handleTracesList(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const traces = await this.adtclient.tracesList(args.user);
+            const traces = await this.readDomain.tracesList(args.user);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -203,7 +203,7 @@ export class TraceHandlers extends BaseHandler {
     async handleTracesListRequests(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const requests = await this.adtclient.tracesListRequests(args.user);
+            const requests = await this.readDomain.tracesListRequests(args.user);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -228,7 +228,7 @@ export class TraceHandlers extends BaseHandler {
     async handleTracesHitList(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const hitList = await this.adtclient.tracesHitList(args.id, args.withSystemEvents);
+            const hitList = await this.readDomain.tracesHitList(args.id, args.withSystemEvents);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -253,7 +253,7 @@ export class TraceHandlers extends BaseHandler {
     async handleTracesDbAccess(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const dbAccess = await this.adtclient.tracesDbAccess(args.id, args.withSystemEvents);
+            const dbAccess = await this.readDomain.tracesDbAccess(args.id, args.withSystemEvents);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -278,7 +278,7 @@ export class TraceHandlers extends BaseHandler {
     async handleTracesStatements(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const statements = await this.adtclient.tracesStatements(args.id, args.options);
+            const statements = await this.readDomain.tracesStatements(args.id, args.options);
             this.trackRequest(startTime, true);
             return {
                 content: [

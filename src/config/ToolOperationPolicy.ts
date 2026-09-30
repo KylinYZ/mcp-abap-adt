@@ -285,6 +285,34 @@ const CLASS_SETS: ReadonlyArray<readonly [ToolOperationClass, Set<string>]> = [
 
 export const CLASSIFIED_TOOL_NAMES = new Set(CLASS_SETS.flatMap(([, names]) => [...names]));
 
+/**
+ * 受控写链的只读前段工具（挂写槽特判集合）。
+ *
+ * 这些工具在操作分类上属 read-only（不直接触碰写路径），但它们的执行
+ * 绑定写域主客户端（常驻 stateful 会话）：受控链是一体的写流程，preview
+ * 是写链的前半段，与其 apply 同槽串行既避免读槽并发打在 stateful 会话上，
+ * 也让同一受控链的 preview→apply 天然互斥。写槽（=1）下永无 stateful 并发。
+ */
+export const CONTROLLED_WRITE_CHAIN_READONLY_TOOLS = new Set<string>([
+  // SafeAbap 源码/对象创建链的 preview
+  'previewAbapChange', 'previewAbapObjectCreation',
+  // 受控描述修改链的 preview（crud.set-description，确认层自持写槽同面）
+  'previewDescriptionChange',
+  // 调试受控链的 preview（执行体绑定写域调试会话）
+  'previewDebugOperation', 'previewDebugVariableChange',
+  // 质量检查链的 preview（runQualityCheck 同链，已在豁免清单）
+  'previewQualityCheck',
+  // 各受控链的 preview（apply/status 同集合，status 为本地读取挂哪侧都安全）
+  ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES,
+  ...CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES,
+  ...CONTROLLED_MESSAGE_TEXT_TOOL_NAMES,
+  ...CONTROLLED_CLONE_TOOL_NAMES,
+  ...CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES,
+  ...CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES,
+  ...CONTROLLED_RENAME_TOOL_NAMES,
+  ...CONTROLLED_ACTIVATION_TOOL_NAMES
+]);
+
 export function toolOperationClass(toolName: string): ToolOperationClass | undefined {
   return CLASS_SETS.find(([, names]) => names.has(toolName))?.[0];
 }

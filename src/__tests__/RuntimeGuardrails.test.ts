@@ -5,6 +5,7 @@ describe('RuntimeGuardrails', () => {
     expect(RuntimeGuardrails.fromEnvironment({})).toEqual({
       adtTimeoutMs: 60_000,
       maxConcurrentTools: 1,
+      maxReadConcurrentTools: 2,
       maxQueuedTools: 50,
       queryDefaultRows: 200,
       queryMaxRows: 5_000,
@@ -25,6 +26,8 @@ describe('RuntimeGuardrails', () => {
     ['SAP_MCP_ADT_TIMEOUT_MS', '5000', 5_000],
     ['SAP_MCP_ADT_TIMEOUT_MS', '600000', 600_000],
     ['SAP_MCP_MAX_CONCURRENT_TOOLS', '8', 8],
+    ['SAP_MCP_MAX_READ_CONCURRENT_TOOLS', '8', 8],
+    ['SAP_MCP_MAX_READ_CONCURRENT_TOOLS', '1', 1],
     ['SAP_MCP_MAX_QUEUED_TOOLS', '0', 0],
     ['SAP_MCP_SOURCE_CACHE_MAX_ENTRIES', '0', 0],
     ['SAP_MCP_SOURCE_CACHE_TTL_SECONDS', '3600', 3_600_000]

@@ -3,6 +3,7 @@ export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 export interface RuntimeGuardrailValues {
   adtTimeoutMs: number;
   maxConcurrentTools: number;
+  maxReadConcurrentTools: number;
   maxQueuedTools: number;
   queryDefaultRows: number;
   queryMaxRows: number;
@@ -34,7 +35,13 @@ export class RuntimeGuardrails {
   static fromEnvironment(environment: Environment = process.env): RuntimeGuardrailValues {
     const values: RuntimeGuardrailValues = {
       adtTimeoutMs: integer(environment, 'SAP_MCP_ADT_TIMEOUT_MS', 60_000, 5_000, 600_000),
+      // 写槽并发：SAP 写路径（stateful 会话/锁链）必须串行，默认 1。
       maxConcurrentTools: integer(environment, 'SAP_MCP_MAX_CONCURRENT_TOOLS', 1, 1, 8),
+      // 读槽并发：read-only 类工具走独立读域会话（永远 stateless），
+      // 可安全并发。默认 2——零配置即获得"多个只读工具同时发"的收益
+      //（此前全局串行门会把并行只读调用排队进各自的 30s 客户端计时，
+      // 偶发慢请求即放大成双超时）。写槽语义不受本值影响。
+      maxReadConcurrentTools: integer(environment, 'SAP_MCP_MAX_READ_CONCURRENT_TOOLS', 2, 1, 8),
       maxQueuedTools: integer(environment, 'SAP_MCP_MAX_QUEUED_TOOLS', 50, 0, 1_000),
       queryDefaultRows: integer(environment, 'SAP_MCP_QUERY_DEFAULT_ROWS', 200, 1, 100_000),
       queryMaxRows: integer(environment, 'SAP_MCP_QUERY_MAX_ROWS', 5_000, 1, 100_000),

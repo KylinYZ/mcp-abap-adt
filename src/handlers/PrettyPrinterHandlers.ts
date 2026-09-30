@@ -65,7 +65,7 @@ export class PrettyPrinterHandlers extends BaseHandler {
     async handlePrettyPrinterSetting(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const settings = await this.adtclient.prettyPrinterSetting();
+            const settings = await this.readDomain.prettyPrinterSetting();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -115,7 +115,7 @@ export class PrettyPrinterHandlers extends BaseHandler {
     async handlePrettyPrinter(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const source = await this.adtclient.prettyPrinter(args.source);
+            const source = await this.readDomain.prettyPrinter(args.source);
             this.trackRequest(startTime, true);
             return {
                 content: [

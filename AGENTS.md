@@ -49,7 +49,7 @@ npm run test:repository-verified-domain-preview -- "C:\Users\068157\.codex\sap-a
 ## 安全边界
 
 - 先用 CodeGraph 定位，再用 `rg` 做完整性确认。
-- 真实 SAP 调用保持串行，默认 `SAP_MCP_MAX_CONCURRENT_TOOLS=1`。
+- 真实 SAP 调用走分级执行门（2026-09-30 起）：写入/锁链/受控 apply 走写槽串行（`SAP_MCP_MAX_CONCURRENT_TOOLS=1`）；read-only 工具走读槽并发（`SAP_MCP_MAX_READ_CONCURRENT_TOOLS=2`）并绑定读域 stateless 会话（`SAP_MCP_STATELESS_READS=true`，读槽安全性的前提）；受控链只读 preview 挂写槽（绑定写域 stateful 主会话，保证 stateful 永无并发）。
 - QAS、PRD、缺失或未知系统角色只允许本地/只读工具；隐藏和 dispatch 拒绝必须同时保留。
 - 所有受控写入必须经过 server 生成的 preview plan、一次原生确认和 apply；不得接受调用方确认布尔值、任意 URL、XML、JSON、媒体类型或 lock handle。唯一例外：`SAP_MCP_CONFIRMATION_MODE=auto`（默认 native）时部署者显式授权跳过人工确认，apply 一次调用直接执行；该模式仅 DEV 角色可配置（非 DEV 启动即报错），仅由部署环境变量控制、调用方无任何参数可触发，审计如实记 `confirmationMode=auto-config`，plan 状态机与漂移校验保持不变。
 - `REAL_DEV_VERIFIED` 只能由完整 create/readback/transport/cleanup/absence 证据启用；未知结果不得重放或自动删除。

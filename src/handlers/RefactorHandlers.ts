@@ -77,7 +77,7 @@ export class RefactorHandlers extends BaseHandler {
             case 'changePackagePreview':
                 return this.executeClientCall(
                     'Package change preview',
-                    () => this.adtclient.changePackagePreview(args.refactoring, args.transport)
+                    () => this.readDomain.changePackagePreview(args.refactoring, args.transport)
                 );
             case 'changePackageExecute':
                 return this.executeClientCall(
@@ -104,7 +104,7 @@ export class RefactorHandlers extends BaseHandler {
         const startTime = performance.now();
         try {
             const range = this.parseObjectArg<Range>(args.range, 'range');
-            const result = await this.adtclient.extractMethodEvaluate(args.uri, range);
+            const result = await this.readDomain.extractMethodEvaluate(args.uri, range);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -130,7 +130,7 @@ export class RefactorHandlers extends BaseHandler {
         const startTime = performance.now();
         try {
             const proposal = this.parseObjectArg<ExtractMethodProposal>(args.proposal, 'proposal');
-            const result = await this.adtclient.extractMethodPreview(proposal);
+            const result = await this.readDomain.extractMethodPreview(proposal);
             this.trackRequest(startTime, true);
             return {
                 content: [

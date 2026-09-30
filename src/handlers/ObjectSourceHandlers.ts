@@ -77,7 +77,7 @@ export class ObjectSourceHandlers extends BaseHandler {
       const cachedSource = hasPaging ? sourceCache.get(args.objectSourceUrl) : undefined;
       const sourceOrigin = cachedSource === undefined ? 'sap' : 'cache';
       const fullSource = cachedSource === undefined
-        ? await this.adtclient.getObjectSource(args.objectSourceUrl, args.options)
+        ? await this.readDomain.getObjectSource(args.objectSourceUrl, args.options)
         : cachedSource;
       // Remember the source so a later syntaxCheckCode on the same URL can reuse
       // it without the caller re-sending it (issue #2).

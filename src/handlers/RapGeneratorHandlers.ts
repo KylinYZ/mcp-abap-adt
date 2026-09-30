@@ -48,19 +48,19 @@ export class RapGeneratorHandlers extends BaseHandler {
   async handle(toolName: string, args: Record<string, any>): Promise<Record<string, unknown>> {
     switch (toolName) {
       case 'rapGenValidateInitial':
-        return this.executeClientCall('RAP initial validation', () => this.adtclient.rapGenValidateInitial(args.genId, args.refObjectUri, args.packageName, args.checks));
+        return this.executeClientCall('RAP initial validation', () => this.readDomain.rapGenValidateInitial(args.genId, args.refObjectUri, args.packageName, args.checks));
       case 'rapGenGetSchema':
-        return this.executeClientCall('RAP schema read', () => this.adtclient.rapGenGetSchema(args.genId, args.refObjectUri, args.packageName));
+        return this.executeClientCall('RAP schema read', () => this.readDomain.rapGenGetSchema(args.genId, args.refObjectUri, args.packageName));
       case 'rapGenGetContent':
-        return this.executeClientCall('RAP content read', () => this.adtclient.rapGenGetContent(args.genId, args.refObjectUri, args.packageName));
+        return this.executeClientCall('RAP content read', () => this.readDomain.rapGenGetContent(args.genId, args.refObjectUri, args.packageName));
       case 'rapGenGetUiConfig':
-        return this.executeClientCall('RAP UI configuration read', () => this.adtclient.rapGenGetUiConfig(args.genId, args.refObjectUri, args.packageName));
+        return this.executeClientCall('RAP UI configuration read', () => this.readDomain.rapGenGetUiConfig(args.genId, args.refObjectUri, args.packageName));
       case 'rapGenValidateContent':
-        return this.executeClientCall('RAP content validation', () => this.adtclient.rapGenValidateContent(args.genId, args.refObjectUri, args.content));
+        return this.executeClientCall('RAP content validation', () => this.readDomain.rapGenValidateContent(args.genId, args.refObjectUri, args.content));
       case 'rapGenPreview':
-        return this.executeClientCall('RAP generation preview', () => this.adtclient.rapGenPreview(args.genId, args.refObjectUri, args.content));
+        return this.executeClientCall('RAP generation preview', () => this.readDomain.rapGenPreview(args.genId, args.refObjectUri, args.content));
       case 'rapGenIsAvailable':
-        return this.executeClientCall('RAP availability check', () => this.adtclient.rapGenIsAvailable(args.genId));
+        return this.executeClientCall('RAP availability check', () => this.readDomain.rapGenIsAvailable(args.genId));
       case 'rapGenGenerate':
         return this.executeClientCall('RAP generation', () => this.adtclient.rapGenGenerate(args.genId, args.refObjectUri, args.transport, args.content));
       case 'rapGenPublishService':

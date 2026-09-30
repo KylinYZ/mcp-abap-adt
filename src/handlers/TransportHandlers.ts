@@ -307,7 +307,7 @@ export class TransportHandlers extends BaseHandler {
     async handleTransportInfo(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const transportInfo = await this.adtclient.transportInfo(
+            const transportInfo = await this.readDomain.transportInfo(
                 args.objSourceUrl,
                 args.devClass,
                 args.operation
@@ -367,7 +367,7 @@ export class TransportHandlers extends BaseHandler {
     async handleHasTransportConfig(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const hasConfig = await this.adtclient.hasTransportConfig();
+            const hasConfig = await this.readDomain.hasTransportConfig();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -392,7 +392,7 @@ export class TransportHandlers extends BaseHandler {
     async handleTransportConfigurations(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const configurations = await this.adtclient.transportConfigurations();
+            const configurations = await this.readDomain.transportConfigurations();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -417,7 +417,7 @@ export class TransportHandlers extends BaseHandler {
     async handleGetTransportConfiguration(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const configuration = await this.adtclient.getTransportConfiguration(args.url);
+            const configuration = await this.readDomain.getTransportConfiguration(args.url);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -492,7 +492,7 @@ export class TransportHandlers extends BaseHandler {
     async handleUserTransports(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const transports = await this.adtclient.userTransports(args.user, args.targets);
+            const transports = await this.readDomain.userTransports(args.user, args.targets);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -517,7 +517,7 @@ export class TransportHandlers extends BaseHandler {
     async handleTransportsByConfig(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const transports = await this.adtclient.transportsByConfig(args.configUri, args.targets);
+            const transports = await this.readDomain.transportsByConfig(args.configUri, args.targets);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -642,7 +642,7 @@ export class TransportHandlers extends BaseHandler {
     async handleSystemUsers(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const users = await this.adtclient.systemUsers();
+            const users = await this.readDomain.systemUsers();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -667,7 +667,7 @@ export class TransportHandlers extends BaseHandler {
     async handleTransportReference(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const reference = await this.adtclient.transportReference(args.pgmid, args.obj_wbtype, args.obj_name, args.tr_number);
+            const reference = await this.readDomain.transportReference(args.pgmid, args.obj_wbtype, args.obj_name, args.tr_number);
             this.trackRequest(startTime, true);
             return {
                 content: [

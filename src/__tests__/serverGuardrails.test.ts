@@ -1,7 +1,7 @@
 import { RuntimeGuardrails } from '../config/RuntimeGuardrails';
 import { SafeAbapHandlers } from '../handlers/SafeAbapHandlers';
 import { ToolExecutionGate } from '../lib/ToolExecutionGate';
-import { adtClientOptions, executeGuardedToolCall, usesSapExecutionGate } from '../lib/serverGuardrails';
+import { adtClientOptions, createGateSelector, executeGuardedToolCall, usesSapExecutionGate } from '../lib/serverGuardrails';
 import type { AbapChangeWorkflow, ApplyChangeInput } from '../safe/AbapChangeWorkflow';
 import type { AbapObjectCreationWorkflow } from '../safe/AbapObjectCreationWorkflow';
 import type { ApplyCreationInput, CreationPlanView } from '../safe/creationTypes';
@@ -22,38 +22,54 @@ const errorResult = (error: unknown) => {
 };
 
 describe('server guardrail integration helpers', () => {
+  // 分级门公共夹具:writeGate=写槽(串行1),readGate=读槽(并发2)
+  const writeGate = new ToolExecutionGate(1, 2);
+  const readGate = new ToolExecutionGate(2, 2);
+  const selector = createGateSelector(readGate, writeGate);
+
   it('passes the parsed timeout to ADT client options', () => {
     expect(adtClientOptions({ ...guardrails, adtTimeoutMs: 12_345 })).toEqual({ timeout: 12_345, keepAlive: true });
   });
 
   it('applies argument limits before dispatch', async () => {
     const dispatch = jest.fn(async () => ({ content: [] }));
-    await executeGuardedToolCall('runQuery', { sqlQuery: 'SELECT *' }, guardrails, new ToolExecutionGate(1, 1), true, dispatch, value => value, errorResult);
+    await executeGuardedToolCall('runQuery', { sqlQuery: 'SELECT *' }, guardrails, selector, dispatch, value => value, errorResult);
     expect(dispatch).toHaveBeenCalledWith({ sqlQuery: 'SELECT *', rowNumber: 200 });
   });
 
-  it('uses one gate for safe and legacy calls', async () => {
-    const gate = new ToolExecutionGate(1, 2);
+  it('runs read-only tools concurrently in the read gate and queues the third', async () => {
     const order: string[] = [];
     let release!: () => void;
     const blocker = new Promise<void>(resolve => { release = resolve; });
-    const first = executeGuardedToolCall('inspectAbapObject', {}, guardrails, gate, true, async () => {
-      order.push('safe-start'); await blocker; order.push('safe-end'); return { content: [] };
+    // 三个 read-only 工具：读槽并发 2 → 前两个同时执行，第三个排队
+    const mk = (tag: string) => executeGuardedToolCall(tag, {}, guardrails, selector, async () => {
+      order.push(`${tag}-start`);
+      if (tag === 'inspectAbapObject') await blocker;
+      order.push(`${tag}-end`);
+      return { content: [] };
     }, value => value, errorResult);
-    const second = executeGuardedToolCall('searchObject', {}, guardrails, gate, true, async () => {
-      order.push('legacy'); return { content: [] };
-    }, value => value, errorResult);
+    const first = mk('inspectAbapObject');
+    const second = mk('searchObject');
+    const third = mk('getObjectSource');
     await Promise.resolve();
-    expect(order).toEqual(['safe-start']);
+    await Promise.resolve();
+    // 读槽并发 2：first 阻塞、second 并行完成；second 释放的槽位立即被
+    // third 补位（并发槽的正确行为），first 仍被 blocker 阻塞
+    expect(order).toEqual([
+      'inspectAbapObject-start', 'searchObject-start', 'searchObject-end',
+      'getObjectSource-start', 'getObjectSource-end'
+    ]);
     release();
-    await Promise.all([first, second]);
-    expect(order).toEqual(['safe-start', 'safe-end', 'legacy']);
+    await Promise.all([first, second, third]);
+    expect(order).toEqual([
+      'inspectAbapObject-start', 'searchObject-start', 'searchObject-end',
+      'getObjectSource-start', 'getObjectSource-end', 'inspectAbapObject-end'
+    ]);
   });
 
   it('rejects oversized serialized responses', async () => {
     await expect(executeGuardedToolCall(
-      'healthcheck', {}, { ...guardrails, maxResponseBytes: 3 }, new ToolExecutionGate(1, 1),
-      false,
+      'healthcheck', {}, { ...guardrails, maxResponseBytes: 3 }, selector,
       async () => 'large', value => ({ content: [{ type: 'text', text: String(value) }] }), errorResult
     )).resolves.toMatchObject({ isError: true });
   });
@@ -112,8 +128,7 @@ describe('server guardrail integration helpers', () => {
         toolName,
         argumentsValue,
         guardrails,
-        gate,
-        usesSapExecutionGate(toolName),
+        selector,
         dispatch,
         value => value,
         errorResult
@@ -135,11 +150,12 @@ describe('server guardrail integration helpers', () => {
       return { content: [] };
     });
     await Promise.resolve();
-    expect(order).toEqual(['apply-start']);
+    // 分级门:searchObject 走读槽,不被写槽上的 apply 阻塞
+    expect(order).toEqual(['apply-start', 'legacy']);
 
     releaseApply();
     await Promise.all([apply, legacy]);
-    expect(order).toEqual(['apply-start', 'apply-end', 'legacy']);
+    expect(order).toEqual(['apply-start', 'legacy', 'apply-end']);
   });
 
   it('keeps creation confirmation outside the SAP gate and gates the complete creation apply', async () => {
@@ -192,8 +208,7 @@ describe('server guardrail integration helpers', () => {
         toolName,
         argumentsValue,
         guardrails,
-        gate,
-        usesSapExecutionGate(toolName),
+        selector,
         dispatch,
         value => value,
         errorResult
@@ -221,11 +236,12 @@ describe('server guardrail integration helpers', () => {
       return { content: [] };
     });
     await Promise.resolve();
-    expect(order).toEqual(['creation-start']);
+    // 分级门:searchObject 走读槽,不被写槽上的 creation apply 阻塞
+    expect(order).toEqual(['creation-start', 'legacy']);
 
     releaseApply();
     await Promise.all([apply, legacy]);
-    expect(order).toEqual(['creation-start', 'creation-end', 'legacy']);
+    expect(order).toEqual(['creation-start', 'legacy', 'creation-end']);
   });
 
   it('keeps repository-object confirmation outside the SAP gate without self-deadlocking', async () => {
@@ -240,8 +256,7 @@ describe('server guardrail integration helpers', () => {
       toolName,
       {},
       guardrails,
-      gate,
-      usesSapExecutionGate(toolName),
+      selector,
       dispatch,
       value => value,
       errorResult
@@ -282,8 +297,7 @@ describe('server guardrail integration helpers', () => {
       toolName,
       {},
       guardrails,
-      gate,
-      usesSapExecutionGate(toolName),
+      selector,
       dispatch,
       value => value,
       errorResult
@@ -371,8 +385,7 @@ describe('server guardrail integration helpers', () => {
       'getAbapChangeStatus',
       {},
       { ...guardrails, maxResponseBytes: 200 },
-      new ToolExecutionGate(1, 1),
-      false,
+      selector,
       async () => {
         throw new SafeAbapError('VERIFY_FAILED', 'verify', secret, { payload: secret });
       },
@@ -392,8 +405,7 @@ describe('server guardrail integration helpers', () => {
       'getAbapChangeStatus',
       {},
       guardrails,
-      new ToolExecutionGate(1, 1),
-      false,
+      selector,
       async () => { throw new McpError(400, 'small validation error'); },
       value => value,
       errorResult

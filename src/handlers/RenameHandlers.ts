@@ -84,7 +84,7 @@ export class RenameHandlers extends BaseHandler {
     async handleRenameEvaluate(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.renameEvaluate(
+            const result = await this.readDomain.renameEvaluate(
                 args.uri,
                 args.line,
                 args.startColumn,
@@ -114,7 +114,7 @@ export class RenameHandlers extends BaseHandler {
     async handleRenamePreview(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.renamePreview(
+            const result = await this.readDomain.renamePreview(
                 args.renameRefactoring,
                 args.transport
             );

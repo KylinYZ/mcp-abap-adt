@@ -109,19 +109,19 @@ export class DdicHandlers extends BaseHandler {
             case 'packageSearchHelp':
                 return this.handlePackageSearchHelp(args);
             case 'getDomainProperties':
-                return this.executeClientCall('Domain property read', () => this.adtclient.getDomainProperties(args.domainUrl, args.version));
+                return this.executeClientCall('Domain property read', () => this.readDomain.getDomainProperties(args.domainUrl, args.version));
             case 'setDomainProperties':
                 return this.executeClientCall('Domain property write', () => this.adtclient.setDomainProperties(
                     args.domainUrl, args.properties, args.metaData, args.lockHandle, args.transport
                 ));
             case 'getDataElementProperties':
-                return this.executeClientCall('Data element property read', () => this.adtclient.getDataElementProperties(args.dataElementUrl, args.version));
+                return this.executeClientCall('Data element property read', () => this.readDomain.getDataElementProperties(args.dataElementUrl, args.version));
             case 'setDataElementProperties':
                 return this.executeClientCall('Data element property write', () => this.adtclient.setDataElementProperties(
                     args.dataElementUrl, args.properties, args.metaData, args.lockHandle, args.transport
                 ));
             case 'getTextElements':
-                return this.executeClientCall('Text element read', () => this.adtclient.getTextElements(args.url, args.category));
+                return this.executeClientCall('Text element read', () => this.readDomain.getTextElements(args.url, args.category));
             case 'setTextElements':
                 return this.executeClientCall('Text element write', () => this.adtclient.setTextElements(
                     args.url, args.category, args.elements, args.lockHandle, args.transport
@@ -134,7 +134,7 @@ export class DdicHandlers extends BaseHandler {
     async handleAnnotationDefinitions(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.annotationDefinitions();
+            const result = await this.readDomain.annotationDefinitions();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -159,7 +159,7 @@ export class DdicHandlers extends BaseHandler {
     async handleDdicElement(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.ddicElement(
+            const result = await this.readDomain.ddicElement(
                 args.path,
                 args.getTargetForAssociation,
                 args.getExtensionViews,
@@ -189,7 +189,7 @@ export class DdicHandlers extends BaseHandler {
     async handleDdicRepositoryAccess(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.ddicRepositoryAccess(args.path);
+            const result = await this.readDomain.ddicRepositoryAccess(args.path);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -214,7 +214,7 @@ export class DdicHandlers extends BaseHandler {
     async handlePackageSearchHelp(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.packageSearchHelp(args.type, args.name);
+            const result = await this.readDomain.packageSearchHelp(args.type, args.name);
             this.trackRequest(startTime, true);
             return {
                 content: [

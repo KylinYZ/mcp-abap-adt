@@ -6,6 +6,12 @@ import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 
 export abstract class BaseHandler {
   protected readonly adtclient: ADTClient;
+  /**
+   * 读域客户端：read-only 类工具的方法必须走它（stateless 克隆会话，
+   * 与写域结构性隔离，支撑读槽并发）。混合型 handler 在装配处传入；
+   * 不传时回退主客户端（= 旧行为，写域），保证既有子类/测试零改动。
+   */
+  protected readonly readDomain: ADTClient;
   protected readonly logger = createLogger(this.constructor.name);
   private readonly metrics = {
     requestCount: 0,
@@ -14,8 +20,9 @@ export abstract class BaseHandler {
     totalTime: 0
   };
 
-  constructor(adtclient: ADTClient) {
+  constructor(adtclient: ADTClient, readDomain?: ADTClient) {
     this.adtclient = adtclient;
+    this.readDomain = readDomain ?? adtclient;
   }
 
   protected trackRequest(startTime: number, success: boolean): void {

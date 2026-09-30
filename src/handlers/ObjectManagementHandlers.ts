@@ -191,7 +191,7 @@ export class ObjectManagementHandlers extends BaseHandler {
   async handleInactiveObjects(args: any): Promise<any> {
     const startTime = performance.now();
     try {
-      const result: InactiveObjectRecord[] = await this.adtclient.inactiveObjects();
+      const result: InactiveObjectRecord[] = await this.readDomain.inactiveObjects();
       this.trackRequest(startTime, true);
       return {
         content: [{

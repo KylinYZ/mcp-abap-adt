@@ -199,7 +199,7 @@ export class AtcHandlers extends BaseHandler {
             case 'atcChangeContact':
                 return this.handleAtcChangeContact(args);
             case 'atcDocumentation':
-                return this.executeClientCall('ATC documentation read', () => this.adtclient.atcDocumentation(args.docUri));
+                return this.executeClientCall('ATC documentation read', () => this.readDomain.atcDocumentation(args.docUri));
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown ATC tool: ${toolName}`);
         }
@@ -208,7 +208,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcCustomizing(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcCustomizing();
+            const result = await this.readDomain.atcCustomizing();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -233,7 +233,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcCheckVariant(args: { variant: string }): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcCheckVariant(args.variant);
+            const result = await this.readDomain.atcCheckVariant(args.variant);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -283,7 +283,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcWorklists(args: { runResultId: string, timestamp?: number, usedObjectSet?: string, includeExempted?: boolean }): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcWorklists(args.runResultId, args.timestamp || 0, args.usedObjectSet || "", args.includeExempted);
+            const result = await this.readDomain.atcWorklists(args.runResultId, args.timestamp || 0, args.usedObjectSet || "", args.includeExempted);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -308,7 +308,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcUsers(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcUsers();
+            const result = await this.readDomain.atcUsers();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -333,7 +333,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcExemptProposal(args: { markerId: string }): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcExemptProposal(args.markerId);
+            const result = await this.readDomain.atcExemptProposal(args.markerId);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -383,7 +383,7 @@ export class AtcHandlers extends BaseHandler {
     async handleIsProposalMessage(args: { proposal: AtcProposal }): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.isProposalMessage(args.proposal);
+            const result = await this.readDomain.isProposalMessage(args.proposal);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -408,7 +408,7 @@ export class AtcHandlers extends BaseHandler {
     async handleAtcContactUri(args: { findingUri: string }): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.atcContactUri(args.findingUri);
+            const result = await this.readDomain.atcContactUri(args.findingUri);
             this.trackRequest(startTime, true);
             return {
                 content: [

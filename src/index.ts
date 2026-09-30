@@ -99,7 +99,7 @@ import { SafeAbapError } from './safe/errors.js';
 import { SafetyPolicy } from './safe/SafetyPolicy.js';
 import { RuntimeGuardrails, type RuntimeGuardrailValues } from './config/RuntimeGuardrails.js';
 import { ToolExecutionGate } from './lib/ToolExecutionGate.js';
-import { adtClientOptions, executeGuardedToolCall, usesSapExecutionGate } from './lib/serverGuardrails.js';
+import { adtClientOptions, createGateSelector, executeGuardedToolCall } from './lib/serverGuardrails.js';
 import type { ToolDefinition } from './types/tools.js';
 import { sourceCache } from './lib/sourceCache.js';
 import { configureLogLevel } from './lib/logger.js';
@@ -194,6 +194,8 @@ export class AbapAdtServer extends Server {
   private safetyPolicy: SafetyPolicy;
   private readonly guardrails: RuntimeGuardrailValues;
   private readonly executionGate: ToolExecutionGate;
+  private readonly readExecutionGate: ToolExecutionGate;
+  private readonly gateSelector: (toolName: string) => ToolExecutionGate | undefined;
   private readonly sessionResilience: SessionResilienceConfig;
   private toolCatalog: ToolDefinition[] = [];
   private safeAbapHandlers: SafeAbapHandlers;
@@ -291,7 +293,15 @@ export class AbapAdtServer extends Server {
     this.guardrails = RuntimeGuardrails.fromEnvironment();
     this.sessionResilience = sessionResilienceConfigFromEnvironment();
     configureLogLevel(this.guardrails.logLevel);
+    // 分级执行门（读槽/写槽）：
+    // - 写槽：SAP 写路径（stateful 会话/锁链/受控 apply）必须串行，默认 1。
+    //   受控链确认层内部的 applyConfirmed 等调用点也复用本实例（自持写槽）。
+    // - 读槽：read-only 类工具绑定读域会话（statelessClone，永远 stateless），
+    //   可安全并发；默认 2，SAP_MCP_MAX_READ_CONCURRENT_TOOLS 可调。
+    // 两槽独立排队与 429 背压，互不占对方的槽。
     this.executionGate = new ToolExecutionGate(this.guardrails.maxConcurrentTools, this.guardrails.maxQueuedTools);
+    this.readExecutionGate = new ToolExecutionGate(this.guardrails.maxReadConcurrentTools, this.guardrails.maxQueuedTools);
+    this.gateSelector = createGateSelector(this.readExecutionGate, this.executionGate);
     sourceCache.configure({
       maxEntries: this.guardrails.sourceCacheMaxEntries,
       maxItemBytes: this.guardrails.sourceCacheMaxItemBytes,
@@ -337,32 +347,11 @@ export class AbapAdtServer extends Server {
     const sm21Config = sm21ConfigFromEnvironment();
     
     // Initialize handlers
-    this.authHandlers = new AuthHandlers(this.adtClient);
-    this.transportHandlers = new TransportHandlers(this.adtClient);
-    this.objectHandlers = new ObjectHandlers(this.adtClient);
-    this.classHandlers = new ClassHandlers(this.adtClient);
-    this.codeAnalysisHandlers = new CodeAnalysisHandlers(this.adtClient);
-    this.objectLockHandlers = new ObjectLockHandlers(this.adtClient);
-    this.objectSourceHandlers = new ObjectSourceHandlers(this.adtClient);
-    this.objectDeletionHandlers = new ObjectDeletionHandlers(this.adtClient);
-    this.objectManagementHandlers = new ObjectManagementHandlers(this.adtClient);
-    this.objectRegistrationHandlers = new ObjectRegistrationHandlers(this.adtClient);
-    this.nodeHandlers = new NodeHandlers(this.adtClient);
-    this.discoveryHandlers = new DiscoveryHandlers(this.adtClient);
-    this.unitTestHandlers = new UnitTestHandlers(this.adtClient);
-    this.prettyPrinterHandlers = new PrettyPrinterHandlers(this.adtClient);
-    this.gitHandlers = new GitHandlers(this.adtClient);
-    this.ddicHandlers = new DdicHandlers(this.adtClient);
-    this.serviceBindingHandlers = new ServiceBindingHandlers(this.adtClient);
-    this.queryHandlers = new QueryHandlers(this.adtClient);
-    this.feedHandlers = new FeedHandlers(this.adtClient);
-    this.debugHandlers = new DebugHandlers(this.adtClient);
-    this.renameHandlers = new RenameHandlers(this.adtClient);
-    this.atcHandlers = new AtcHandlers(this.adtClient);
-    this.traceHandlers = new TraceHandlers(this.adtClient);
-    this.refactorHandlers = new RefactorHandlers(this.adtClient);
-    this.revisionHandlers = new RevisionHandlers(this.adtClient);
-    this.rapGeneratorHandlers = new RapGeneratorHandlers(this.adtClient);
+    // 读域客户端：read-only 类工具统一走 stateless 克隆（永远 stateless），
+    // 与写域（主实例，按需 stateful + 写槽串行）结构性隔离。读域懒创建——
+    // 构造不发起任何 SAP 请求，首次读请求才登录；SAP 侧 stateless 请求
+    // 处理完即释放会话，不占常驻会话。SAP_MCP_STATELESS_READS=false 可
+    // 显式退回单会话旧行为（此时读槽并发安全性由部署者自行保证）。
     const readClient = this.sessionResilience.statelessReads
       ? this.adtClient.statelessClone
       : this.adtClient;
@@ -370,6 +359,35 @@ export class AbapAdtServer extends Server {
     const readObjectResolver = this.sessionResilience.statelessReads
       ? new AbapObjectResolver(readClient)
       : objectResolver;
+    this.authHandlers = new AuthHandlers(this.adtClient);
+    this.transportHandlers = new TransportHandlers(this.adtClient, readClient);
+    this.objectHandlers = new ObjectHandlers(this.adtClient, readClient);
+    // 纯读 handler（全部工具 ∈ read-only 类）：绑定读域客户端
+    this.classHandlers = new ClassHandlers(readClient);
+    this.nodeHandlers = new NodeHandlers(readClient);
+    this.discoveryHandlers = new DiscoveryHandlers(readClient);
+    this.feedHandlers = new FeedHandlers(readClient);
+    this.queryHandlers = new QueryHandlers(readClient);
+    this.revisionHandlers = new RevisionHandlers(readClient);
+    this.transportHandlers = new TransportHandlers(this.adtClient);
+    this.objectHandlers = new ObjectHandlers(this.adtClient);
+    this.codeAnalysisHandlers = new CodeAnalysisHandlers(this.adtClient, readClient);
+    this.objectLockHandlers = new ObjectLockHandlers(this.adtClient);
+    this.objectSourceHandlers = new ObjectSourceHandlers(this.adtClient, readClient);
+    this.objectDeletionHandlers = new ObjectDeletionHandlers(this.adtClient);
+    this.objectManagementHandlers = new ObjectManagementHandlers(this.adtClient, readClient);
+    this.objectRegistrationHandlers = new ObjectRegistrationHandlers(this.adtClient, readClient);
+    this.unitTestHandlers = new UnitTestHandlers(this.adtClient, readClient);
+    this.prettyPrinterHandlers = new PrettyPrinterHandlers(this.adtClient, readClient);
+    this.gitHandlers = new GitHandlers(this.adtClient, readClient);
+    this.ddicHandlers = new DdicHandlers(this.adtClient, readClient);
+    this.serviceBindingHandlers = new ServiceBindingHandlers(this.adtClient, readClient);
+    this.debugHandlers = new DebugHandlers(this.adtClient, readClient);
+    this.renameHandlers = new RenameHandlers(this.adtClient, readClient);
+    this.atcHandlers = new AtcHandlers(this.adtClient, readClient);
+    this.traceHandlers = new TraceHandlers(this.adtClient, readClient);
+    this.refactorHandlers = new RefactorHandlers(this.adtClient, readClient);
+    this.rapGeneratorHandlers = new RapGeneratorHandlers(this.adtClient, readClient);
     // dump 增值分析（groupRuntimeDumps/findSimilarDumps）与 readRuntimeDumps
     // 共享同一个 RuntimeDumpReader（无状态，可安全复用）
     const dumpReader = new RuntimeDumpReader(readClient);
@@ -392,7 +410,7 @@ export class AbapAdtServer extends Server {
     // 相同复用 readClient 的 AdtHTTP 会话；getCallees 的交叉表查询经 bindRunSqlToAdtQuery
     // 走 runQuery 的 datapreview 通道（decode=true，DIRECT 标志依赖解码）。
     this.sourceGrepHandlers = new SourceGrepHandlers(createSourceGrepClient(readClient.httpClient));
-    this.unitCoverageHandlers = new UnitCoverageHandlers(createUnitCoverageClient(readClient.httpClient));
+    this.unitCoverageHandlers = new UnitCoverageHandlers(createUnitCoverageClient(this.adtClient.httpClient));
     this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
     this.crossReferenceHandlers = new CrossReferenceHandlers(
       createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
@@ -872,7 +890,14 @@ export class AbapAdtServer extends Server {
     });
 
     this.focusedTaskHandlers = new FocusedTaskHandlers(
-      (toolName, argumentsValue) => this.executionGate.run(() => this.dispatchTool(toolName, argumentsValue)),
+      // sap 委托链按"被委托工具"的操作分类选槽与域：委托只读工具（如
+      // getObjectSource）走读槽+读域，委托写工具（如 edit 链）走写槽+写域。
+      // sap 自身外层豁免门（usesSapExecutionGate=false），不双重占槽。
+      (toolName, argumentsValue) => {
+        const gate = this.gateSelector(toolName);
+        const dispatch = () => this.dispatchTool(toolName, argumentsValue);
+        return gate ? gate.run(dispatch) : dispatch();
+      },
       () => this.healthcheckResult()
     );
 
@@ -1000,8 +1025,7 @@ export class AbapAdtServer extends Server {
           request.params.name,
           callArguments,
           this.guardrails,
-          this.executionGate,
-          usesSapExecutionGate(request.params.name),
+          (toolName: string) => this.gateSelector(toolName),
           limitedArguments => {
             // 限额参数可能与原始参数不同：port 绑定用原始调用参数（重试请求逐字节一致）
             const dispatchArgs = limitedArguments;

@@ -53,6 +53,8 @@ VSP 的会话模型是直接参照：按语义域（debug 域、amdp 域）分�
 
 （质量执行类内部：previewQualityCheck 属 read-only 类走读槽；runQualityCheck 在豁免清单不过门。）
 
+**实施演进（2026-09-30，安全收紧）**：受控链的只读 preview 工具（`previewAbapChange`、`previewObjectActivation`、`previewTransportCreation/Cleanup`、`previewCloneObject`、`previewControlledRename`、`previewDescriptionChange`、`previewMessageTextChange`、DDIC/package/RAP/debug/quality 各 preview 及所属链工具）**特判挂写槽**（`ToolOperationPolicy.CONTROLLED_WRITE_CHAIN_READONLY_TOOLS`），不进读槽。原因：这些 preview 的执行绑定写域主客户端（常驻 stateful 会话），若走读槽并发会打在 stateful 会话上；挂写槽后 stateful 会话永无并发，且同一受控链的 preview 与 apply 天然互斥（语义上也更正确——preview 本就是写链的前半段）。读槽只服务真正绑定读域 stateless 会话的 read-only 工具。
+
 - 两槽独立排队、独立 429 背压（队列上限共用现有 `SAP_MCP_MAX_QUEUED_TOOLS`）。
 - **读写互不占对方槽、互不串会话**：写操作执行（写域 stateful）时，读槽照常在读域服务。
 - **豁免清单不变**：`usesSapExecutionGate` 现有豁免（确认型 apply 防自我死锁、本地 status 工具、healthcheck/sapDoctor/sap 外层豁免）原样保留；确认型 apply 在确认层内部自持**写槽**（`applyConfirmed` 等内部调用点指向写槽实例 + 写域客户端），互斥语义与今天一致。

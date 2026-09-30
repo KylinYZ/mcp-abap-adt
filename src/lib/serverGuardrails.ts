@@ -1,4 +1,5 @@
 import type { RuntimeGuardrailValues } from '../config/RuntimeGuardrails.js';
+import { CONTROLLED_WRITE_CHAIN_READONLY_TOOLS, toolOperationClass } from '../config/ToolOperationPolicy.js';
 import { ToolExecutionGate } from './ToolExecutionGate.js';
 import { applyToolArgumentLimits, assertToolResponseSize } from './requestLimits.js';
 
@@ -56,12 +57,37 @@ export function usesSapExecutionGate(toolName: string): boolean {
     && toolName !== 'healthcheck';
 }
 
+/**
+ * 分级执行门选择器（读槽/写槽/豁免）。
+ *
+ * - read-only 类工具 → 读槽（绑读域 stateless 会话，可并发）；
+ * - 受控写链只读前段（CONTROLLED_WRITE_CHAIN_READONLY_TOOLS）→ 写槽：
+ *   它们绑定写域主客户端（常驻 stateful），挂写槽保证 stateful 会话
+ *   永无并发，且与同链 apply 天然互斥；
+ * - 其余 SAP 类工具（写入/锁链/调试/受控 apply）→ 写槽（串行）；
+ * - 豁免清单（usesSapExecutionGate 为 false：确认型 apply 防自我死锁、
+ *   本地 status、healthcheck 等）→ undefined（不过门）。
+ *
+ * 保守兜底：分类缺失（toolOperationClass 返回 undefined）按写槽处理——
+ * 宁可错串行，不可错并发。
+ */
+export function createGateSelector(
+  readGate: ToolExecutionGate,
+  writeGate: ToolExecutionGate
+): (toolName: string) => ToolExecutionGate | undefined {
+  return toolName => {
+    if (!usesSapExecutionGate(toolName)) return undefined;
+    if (CONTROLLED_WRITE_CHAIN_READONLY_TOOLS.has(toolName)) return writeGate;
+    const operationClass = toolOperationClass(toolName);
+    return operationClass === 'read-only' ? readGate : writeGate;
+  };
+}
+
 export async function executeGuardedToolCall<T>(
   toolName: string,
   argumentsValue: Record<string, unknown> | undefined,
   guardrails: RuntimeGuardrailValues,
-  gate: ToolExecutionGate,
-  useSapGate: boolean,
+  selectGate: (toolName: string) => ToolExecutionGate | undefined,
   dispatch: (limitedArguments: Record<string, unknown>) => Promise<unknown>,
   serialize: (result: unknown) => T,
   serializeError: (error: unknown) => T
@@ -70,8 +96,9 @@ export async function executeGuardedToolCall<T>(
   try {
     // Reject invalid request sizes before reserving a scarce SAP execution slot.
     const limitedArguments = applyToolArgumentLimits(toolName, argumentsValue, guardrails);
+    const gate = selectGate(toolName);
     const operation = () => dispatch(limitedArguments);
-    const result = await (useSapGate ? gate.run(operation) : operation());
+    const result = await (gate ? gate.run(operation) : operation());
     finalResult = serialize(result);
   } catch (error) {
     finalResult = serializeError(error);

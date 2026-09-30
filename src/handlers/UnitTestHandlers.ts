@@ -131,7 +131,7 @@ export class UnitTestHandlers extends BaseHandler {
     async handleUnitTestEvaluation(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.unitTestEvaluation(args.clas, args.flags);
+            const result = await this.readDomain.unitTestEvaluation(args.clas, args.flags);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -156,7 +156,7 @@ export class UnitTestHandlers extends BaseHandler {
     async handleUnitTestOccurrenceMarkers(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const markers = await this.adtclient.unitTestOccurrenceMarkers(args.url, args.source);
+            const markers = await this.readDomain.unitTestOccurrenceMarkers(args.url, args.source);
             this.trackRequest(startTime, true);
             return {
                 content: [

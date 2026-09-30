@@ -361,7 +361,7 @@ export class DebugHandlers extends BaseHandler {
     async handleDebuggerListeners(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.debuggerListeners(
+            const result = await this.readDomain.debuggerListeners(
                 args.debuggingMode,
                 args.terminalId,
                 args.ideId,
@@ -577,7 +577,7 @@ export class DebugHandlers extends BaseHandler {
     async handleDebuggerStackTrace(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.debuggerStackTrace(args.semanticURIs);
+            const result = await this.readDomain.debuggerStackTrace(args.semanticURIs);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -602,7 +602,7 @@ export class DebugHandlers extends BaseHandler {
     async handleDebuggerVariables(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.debuggerVariables(args.parents);
+            const result = await this.readDomain.debuggerVariables(args.parents);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -627,7 +627,7 @@ export class DebugHandlers extends BaseHandler {
     async handleDebuggerChildVariables(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.debuggerChildVariables(args.parent);
+            const result = await this.readDomain.debuggerChildVariables(args.parent);
             this.trackRequest(startTime, true);
             return {
                 content: [

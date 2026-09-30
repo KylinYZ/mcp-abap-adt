@@ -259,12 +259,12 @@ export class CodeAnalysisHandlers extends BaseHandler {
             case 'typeHierarchy':
                 return this.executeClientCall(
                     'Type hierarchy read',
-                    () => this.adtclient.typeHierarchy(args.url, args.body, args.line, args.offset, args.superTypes)
+                    () => this.readDomain.typeHierarchy(args.url, args.body, args.line, args.offset, args.superTypes)
                 );
             case 'objectEnhancements':
                 return this.executeClientCall(
                     'Object enhancement read',
-                    () => this.adtclient.objectEnhancements(args.sourceMainPath, args.contextUri, args.includeSource)
+                    () => this.readDomain.objectEnhancements(args.sourceMainPath, args.contextUri, args.includeSource)
                 );
             default:
                 throw new McpError(ErrorCode.MethodNotFound, `Unknown code analysis tool: ${toolName}`);
@@ -273,7 +273,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleSyntaxCheckCdsUrl(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.syntaxCheck(args.cdsUrl);
+            const result = await this.readDomain.syntaxCheck(args.cdsUrl);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -314,7 +314,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
 
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.syntaxCheck(args.url, args?.mainUrl, code, args?.mainProgram, args?.version);
+            const result = await this.readDomain.syntaxCheck(args.url, args?.mainUrl, code, args?.mainProgram, args?.version);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -340,7 +340,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleCodeCompletion(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.codeCompletion(
+            const result = await this.readDomain.codeCompletion(
                 args.sourceUrl,
                 args.source,
                 args.line,
@@ -370,7 +370,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleFindDefinition(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.findDefinition(
+            const result = await this.readDomain.findDefinition(
                 args.url,
                 args.source,
                 args.line,
@@ -403,7 +403,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleUsageReferences(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.usageReferences(
+            const result = await this.readDomain.usageReferences(
                 args.url,
                 args.line,
                 args.column
@@ -432,7 +432,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleSyntaxCheckTypes(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.syntaxCheckTypes();
+            const result = await this.readDomain.syntaxCheckTypes();
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -457,7 +457,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleCodeCompletionFull(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.codeCompletionFull(args.sourceUrl, args.source, args.line, args.column, args.patternKey);
+            const result = await this.readDomain.codeCompletionFull(args.sourceUrl, args.source, args.line, args.column, args.patternKey);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -507,7 +507,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleCodeCompletionElement(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.codeCompletionElement(args.sourceUrl, args.source, args.line, args.column);
+            const result = await this.readDomain.codeCompletionElement(args.sourceUrl, args.source, args.line, args.column);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -532,7 +532,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleUsageReferenceSnippets(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.usageReferenceSnippets(args.references);
+            const result = await this.readDomain.usageReferenceSnippets(args.references);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -557,7 +557,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleFixProposals(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.fixProposals(args.url, args.source, args.line, args.column);
+            const result = await this.readDomain.fixProposals(args.url, args.source, args.line, args.column);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -607,7 +607,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleFragmentMappings(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.fragmentMappings(args.url, args.type, args.name);
+            const result = await this.readDomain.fragmentMappings(args.url, args.type, args.name);
             this.trackRequest(startTime, true);
             return {
                 content: [
@@ -632,7 +632,7 @@ export class CodeAnalysisHandlers extends BaseHandler {
     async handleAbapDocumentation(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.adtclient.abapDocumentation(args.objectUri, args.body, args.line, args.column, args.language);
+            const result = await this.readDomain.abapDocumentation(args.objectUri, args.body, args.line, args.column, args.language);
             this.trackRequest(startTime, true);
             return {
                 content: [
