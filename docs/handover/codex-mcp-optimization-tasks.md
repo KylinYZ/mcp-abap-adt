@@ -102,23 +102,30 @@
 
 ## D. 从 sess_7d40bb2c 借鉴：文本元素能力（本 MCP 缺失，已有成熟实现）
 
-### D1 [P1] 新增文本元素/文本池读写工具
+### D1 [P1] 文本元素能力——实现路径已由 sess_7d40bb2c 打通，受控链借鉴接入
 
-- **背景**：ZTABDATA_TOOL report 含 GUI 文本（选择屏标题 gv_t* 等），但两通道都建不了文本元素：ADT textelements 资源 7.52+ 才有（ED1 404）；ZADT_VSP SetTextElements WebSocket 500。
-- **已验证实现**（sess_7d40bb2c，ED1 包 Z001，传输 ED1K925124）：函数组 `ZVSP_COMPAT` 的 FM `ZVSP_COMPAT_751`，操作码分发：
-  - `TEXTPOOL_GET`：`READ TEXTPOOL`（实测读回 ZMM_R067 9 条）
-  - `TEXTPOOL_SET`：`RPY_TEXTELEMENTS_INSERT` 完整 TEXTPOOL 覆盖写 + `E_TEXTPOOL` 读回核验
-  - `TABLE_CREATE`：`RPY_TABLE_INSERT` + `DDIF_TABL_ACTIVATE`
-- **借鉴任务**：在**本仓库受控链**内新增 `previewTextElementsChange` / `applyTextElementsChange` 工具对：
-  1. ABAP 端封装上述两个标准 API（可直接复用 ZVSP_COMPAT_751 的 FM 逻辑，或独立实现）；
-  2. 走与对象创建相同的 plan/确认/auto 模式/审计纪律；
-  3. 支持按对象名 + 语言读取（TEXTPOOL_GET）与整体覆盖写（TEXTPOOL_SET）+ 读回核验；
-  4. **不依赖 ZADT_VSP WebSocket**（纯 RFC/ADT REST 均可），也**不依赖系统版本**（7.51/816 通用）。
-- **验收**：为 ZTABDATA_TOOL 写入选择屏标题文本元素后在 GUI 可见；7.51 与 816 两系统均可运行。
+- **现状（2026-09-30 已完成）**：sess_7d40bb2c 会话已在 S4D（Basis 816，非 ED1/7.51——早期归因有误已更正）上打通文本元素写入全链路：
+  1. **ZADT_VSP WebSocket 基础设施已部署**：`$ZADT_VSP` 包 10 个 ABAP 对象全部创建激活（ZIF_VSP_SERVICE、ZCL_VSP_UTILS、ZCL_VSP_RFC_SERVICE、ZCL_VSP_DEBUG_SERVICE、ZCL_VSP_AMDP_SERVICE、ZCL_VSP_GIT_SERVICE、ZCL_VSP_REPORT_SERVICE、ZCL_VSP_APC_HANDLER、ZCL_ADT_00_AMDP_TEST；ZADT_CL_TADIR_MOVE 源码已存激活被拒锁残留）。部署过程修复内嵌源码 4 类 bug（修正副本在 vibing-steampunk `embedded/abap/_s4d_fix/`）：`COND #()` 推导成 C(4) 装不下 'false'（→COND string）、`TYPE syuname` 拼写（→SYUNAME）、`FIND REGEX` POSIX 警告卡保存（→FIND PCRE）、首次导入仅落空壳需重导。
+  2. **剩余手工步骤（SAP GUI，无公开 API）**：事务 SAPC 创建 APC 应用（ID=ZADT_VSP，Handler=ZCL_VSP_APC_HANDLER，Stateful）+ SICF 激活 `/sap/bc/apc/sap/zadt_vsp` 节点。配好后 sap-adt 服务器的 `SetTextElements` 即可用。
+  3. **备用路径也已就绪**：`ZVSP_COMPAT_751` 门面 FM（S4D 的 Z001 包内，含 TEXTPOOL_GET/TEXTPOOL_SET=RPY_TEXTELEMENTS_INSERT+读回核验）实测可走经典 RFC。
+- **借鉴任务（本仓库）**：
+  1. 参照 sap-adt 的 `SetTextElements`（WebSocket 通道，sess_7d40bb2c 已验证）与本仓库受控链纪律，新增**受控文本元素工具对** `previewTextElementsChange` / `applyTextElementsChange`：ABAP 端走 Basis 816 上已存在的 ADT textelements 资源（REST，无需 WebSocket），plan/确认/auto/审计纪律与对象创建链一致；
+  2. 或最小方案：文档化"sap-adt server 的 SetTextElements"作为文本元素官方通道，与本仓库工具矩阵互认；
+  3. 保留 `ZVSP_COMPAT_751` 作为 7.51 类旧系统降级路径的参考实现。
+- **验收**：为 ZTABDATA_TOOL 写入中文选择屏标题文本元素后在 SAP GUI 可见。
 
 ### D2 [P2] 评估 ZVSP_COMPAT_751 的 TABLE_CREATE 与受控 CreateTable 差异
 
 - ED1 通道用 `RPY_TABLE_INSERT + DDIF_TABL_ACTIVATE` 创建透明表（一步到位）；本仓库受控链用 ADT DDL。两者在旧系统的兼容性可互补：受控链在 7.51 类系统可降级走 RPY 路线（参考 `vsp-751-compat-fallback` 记忆与 `zvsp_compat.ed1-adaptations.md`）。
+
+
+### D3 [P1] ZADT_VSP 部署工具链的问题与改进（sess_7d40bb2c 后半段实测）
+
+- **InstallZADTVSP 一键安装器不可用**：两次运行均在第 3 个对象（ZADT_CL_TADIR_MOVE）上超时卡死且断点不透明——黑盒一次调用串行跑 9 个对象的创建+激活，远超客户端时限。改为 ImportFromFile 逐个部署才完成。
+- **内嵌源码 4 类可移植性 bug**（vibing-steampunk `embedded/abap/`）：`COND #()` 被推导为 C(4) 装不下 'false'（10 处→COND string）；`TYPE syuname` 拼写错（→SYUNAME）；`FIND REGEX` POSIX 弃用警告会让"先检查后保存"工具拒绝写入（→FIND PCRE，S4D 支持 PCRE 佐证新 ABAP Platform）；首次导入仅落空壳（警告拒存+激活失败叠加）需验证源码落地。
+- **建议**：1) InstallZADTVSP 改为逐对象可断点续传（已建对象 upsert 跳过的机制已存在，但单次调用整体超时使续传不可达——需要拆分为多次调用或异步任务）；2) 内嵌源码合并 _s4d_fix 修正；3) ImportFromFile 在"激活被拒"时返回具体语法错误（当前返回空）。
+- **正向结论**：修完后 WebSocket 链路的 8 个主对象全部激活，SetTextElements 只差 SAPC/SICF 两步手工配置即可用。
+
 
 ---
 
