@@ -50,18 +50,20 @@ export class TransportCreationConfirmation {
 
   /** 原生确认并单次执行创建 plan；拒绝时返回 confirmation_declined 而不执行。 */
   async confirmAndRun(transportCreationPlanId: string): Promise<Record<string, unknown>> {
+    const plan = this.statusReader.status(transportCreationPlanId);
+    assertConfirmable(plan);
+    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认，审计如实记 auto-config。
+    // 必须先于 supportsFormElicitation 检查——auto 模式部署下客户端无需具备
+    // elicitation 能力（与 AbapCreationConfirmation 的短路顺序保持同构）。
+    if (this.options.autoApprove?.()) {
+      return this.options.applyConfirmed(transportCreationPlanId);
+    }
     if (!this.options.supportsFormElicitation()) {
       throw new SafeAbapError(
         'CONFIRMATION_UNSUPPORTED',
         'confirmation',
         'Transport creation requires MCP form elicitation; text confirmation fallback is not supported.'
       );
-    }
-    const plan = this.statusReader.status(transportCreationPlanId);
-    assertConfirmable(plan);
-    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
-    if (this.options.autoApprove?.()) {
-      return this.options.applyConfirmed(transportCreationPlanId);
     }
     const elicited = await this.elicit(
       confirmationForm(plan),

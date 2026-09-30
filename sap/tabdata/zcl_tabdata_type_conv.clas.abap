@@ -87,7 +87,8 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
 
     DATA: lv_byte TYPE x,       " 逐字节切片暂存
           lv_c2   TYPE c LENGTH 2, " 单字节 hex 表示（WRITE x TO c 输出大写）
-          lv_off  TYPE i.          " 当前字节偏移
+          lv_off  TYPE i,          " 当前字节偏移
+          lv_dec  TYPE decfloat34. " P/F 文本化中转（具体类型才允许 NUMBER/STYLE 指令）
 
     CASE iv_kind.
 
@@ -99,12 +100,18 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
       WHEN 'P'.
         " DEC/CURR/QUAN：NUMBER = RAW 输出无千分位分组的小数字符串，
         " 避免 WRITE 默认按用户格式加逗号导致还原失败
-        rv_text = |{ iv_value NUMBER = RAW }|.
+        " 经 decfloat34 中转：generic TYPE any 的模板表达式不允许 NUMBER 指令；
+        " p -> decfloat34 是十进制定点互转，无精度损失
+        lv_dec = iv_value.
+        rv_text = |{ lv_dec NUMBER = RAW }|.
 
       WHEN 'F'.
         " FLTP：fltp_string 样式输出全精度（17 位有效数字），
         " 保证 double 无损往返；普通输出会按默认精度截断
-        rv_text = |{ iv_value STYLE = fltp_string }|.
+        " 经 decfloat34 中转：f -> decfloat34 生成可唯一还原的最短十进制表示，
+        " STYLE = scientific 输出科学计数（fltp_string 不是合法模板样式名）
+        lv_dec = iv_value.
+        rv_text = |{ lv_dec STYLE = scientific }|.
 
       WHEN 'I' OR 'b' OR 's' OR '8'.
         " 各类整数：模板直接输出十进制
@@ -122,10 +129,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
 
       WHEN OTHERS.
         " 表字段中出现结构/引用等不受支持类别：防御性拒绝
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |类型类别 { iv_kind } 不支持文本化（仅支持 C/N/D/T/P/F/I/b/s/8/x/y/g）|.
-
+        zcx_tabdata_error=>raise( |类型类别 { iv_kind } 不支持文本化（仅支持 C/N/D/T/P/F/I/b/s/8/x/y/g）| ).
     ENDCASE.
 
   ENDMETHOD.
@@ -153,19 +157,15 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
           WHEN 'C'.
             " CHAR：超长直接拒绝（string -> c 会静默右截断，必须先校验）
             IF iv_max_len > 0 AND strlen( iv_text ) > iv_max_len.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }长度 { strlen( iv_text ) } 超过字段位长 { iv_max_len }|.
+              zcx_tabdata_error=>raise( |{ iv_context }长度 { strlen( iv_text ) } 超过字段位长 { iv_max_len }| ).
             ENDIF.
             cg_value = iv_text.
 
           WHEN 'N'.
             " NUMC：必须全数字且不超过位长（防 Excel 把前导零吃掉后的脏值混入）
-            lv_re = |^([0-9]{{1,{ iv_max_len }}})$|.
+            lv_re = '^[0-9]{1,' && iv_max_len && '}'.  " 正则不用模板拼接（避开 {{ 字面转义，新内核解析歧义）
             IF iv_max_len <= 0 OR find( val = iv_text regex = lv_re ) < 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }值 "{ iv_text }" 不是 { iv_max_len } 位以内的纯数字（NUMC）；若该值曾在 Excel 中编辑过，可能已被转成数字格式丢失前导零|.
+              zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是 { iv_max_len } 位以内的纯数字（NUMC）；若该值曾在 Excel 中编辑过，可能已被转成数字格式丢失前导零| ).
             ENDIF.
             cg_value = iv_text.
 
@@ -173,9 +173,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             " DATS：固定 8 位数字 YYYYMMDD（00000000 为合法初值）
             FIND REGEX '^[0-9]{8}$' IN iv_text.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }值 "{ iv_text }" 不是 8 位 YYYYMMDD 日期（DATS）|.
+              zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是 8 位 YYYYMMDD 日期（DATS）| ).
             ENDIF.
             cg_value = iv_text.
 
@@ -183,9 +181,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             " TIMS：固定 6 位数字 HHMMSS
             FIND REGEX '^[0-9]{6}$' IN iv_text.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }值 "{ iv_text }" 不是 6 位 HHMMSS 时间（TIMS）|.
+              zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是 6 位 HHMMSS 时间（TIMS）| ).
             ENDIF.
             cg_value = iv_text.
 
@@ -198,9 +194,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             " 溢出/非法由 CX_SY_CONVERSION_* 统一捕获
             FIND REGEX '^(-?[0-9]+(\.[0-9]+)?)$' IN iv_text.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }值 "{ iv_text }" 不是合法十进制数（P 类，{ iv_decimals } 位小数）|.
+              zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是合法十进制数（P 类，{ iv_decimals } 位小数）| ).
             ENDIF.
             lv_number = iv_text.
             cg_value = lv_number.
@@ -215,9 +209,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             " 错误消息提示用户把该列设为文本格式）
             FIND REGEX '^(-?[0-9]+)$' IN iv_text.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |{ iv_context }值 "{ iv_text }" 不是整数；若来自 Excel，请将该列设为"文本"格式后重新填写|.
+              zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是整数；若来自 Excel，请将该列设为"文本"格式后重新填写| ).
             ENDIF.
             lv_int = iv_text.
             cg_value = lv_int.
@@ -228,21 +220,13 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
                                     iv_context = iv_context ).
 
           WHEN OTHERS.
-            RAISE EXCEPTION TYPE zcx_tabdata_error
-              EXPORTING
-                text_message = |{ iv_context }类型类别 { iv_kind } 不支持还原|.
-
+            zcx_tabdata_error=>raise( |{ iv_context }类型类别 { iv_kind } 不支持还原| ).
         ENDCASE.
 
-      CATCH cx_sy_conversion_overflow cx_sy_conversion_no_number
-            cx_sy_conversion_bad_init INTO lo_ex.
+      CATCH cx_sy_conversion_overflow cx_sy_conversion_no_number INTO lo_ex.
         " 底层转换异常统一包装，保留上下文与原始异常链
         lv_msg = |{ iv_context }值 "{ iv_text }" 转换失败: { lo_ex->get_text( ) }|.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = lv_msg
-            previous     = lo_ex.
-
+        zcx_tabdata_error=>raise( text_message = lv_msg previous = lo_ex ).
     ENDTRY.
 
   ENDMETHOD.
@@ -256,9 +240,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
 
     " hex 文本必须偶数长度
     IF strlen( iv_text ) MOD 2 <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |{ iv_context }hex 编码值长度为奇数（{ strlen( iv_text ) }），不是合法字节序列|.
+      zcx_tabdata_error=>raise( |{ iv_context }hex 编码值长度为奇数（{ strlen( iv_text ) }），不是合法字节序列| ).
     ENDIF.
 
     CLEAR rv_x.
@@ -269,10 +251,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
       TRY.
           lv_byte = lv_c2.
         CATCH cx_sy_conversion_no_number INTO DATA(lo_ex).
-          RAISE EXCEPTION TYPE zcx_tabdata_error
-            EXPORTING
-              text_message = |{ iv_context }值 "{ iv_text }" 含非 hex 字符片段 "{ lv_c2 }"|
-              previous     = lo_ex.
+          zcx_tabdata_error=>raise( text_message = |{ iv_context }值 "{ iv_text }" 含非 hex 字符片段 "{ lv_c2 }"| previous = lo_ex ).
       ENDTRY.
       CONCATENATE rv_x lv_byte INTO rv_x IN BYTE MODE.
       lv_off = lv_off + 2.

@@ -7,9 +7,9 @@
 "
 " 备份文件格式（.jsonl.gz）：
 "   第 1 行 头 JSON：
-"     {"format":1,"table":"...","system":"...","client":"...","user":"...",
-"      "timestamp":"YYYYMMDDHHMMSS","rows":N,"md5":"...","fields":[...]}
-"   第 2..N+1 行 数据行 JSON：{"v":{"FIELD1":"文本值","FIELD2":""}}
+"     { "format":1,"table":"...","system":"...","client":"...","user":"...",
+"      "timestamp":"YYYYMMDDHHMMSS","rows":N,"md5":"...","fields":[...] }
+"   第 2..N+1 行 数据行 JSON：{ "v":{ "FIELD1":"文本值","FIELD2":"" }}
 "   所有字段值按字符串写入（与 Excel 共用 ZCL_TABDATA_TYPE_CONV 转换规则，
 "   保证两载体语义一致）；全文 UTF-8 后 gzip（CL_ABAP_GZIP）。
 "   md5 = 数据行文本（以 LF 连接、不含头行）的 UTF-8 MD5（大写 hex）。
@@ -113,24 +113,27 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
           lv_fields TYPE string.
 
     " ---- 字段目录 JSON 片段（仅序列化时转换一次） ----
+    " 注：JSON 字面花括号一律用单引号字符串拼接（不用模板 {{ 转义：
+    " 新内核解析器会把 {{ 的第二个 { 误判为表达式起点）
     LOOP AT it_fields ASSIGNING FIELD-SYMBOL(<fs_f>).
       IF lv_fields IS NOT INITIAL.
         lv_fields = lv_fields && ','.
       ENDIF.
       lv_fields = lv_fields
-               && |{{"name":"{ json_escape( <fs_f>-name ) }","kind":"{ <fs_f>-kind }"|
-               && |,"length":{ <fs_f>-length },"decimals":{ <fs_f>-decimals }|
-               && |,"key":{ COND string( WHEN <fs_f>-key = abap_true THEN 'true' ELSE 'false' ) }|
-               && |,"hex":{ COND string( WHEN <fs_f>-hex = abap_true THEN 'true' ELSE 'false' ) }}}|.
+               && '{"name":"' && json_escape( CONV string( <fs_f>-name ) ) && '","kind":"'
+               && <fs_f>-kind
+               && '","length":' && CONV string( <fs_f>-length )
+               && ',"decimals":' && CONV string( <fs_f>-decimals )
+               && ',"key":' && COND string( WHEN <fs_f>-key = abap_true THEN 'true' ELSE 'false' )
+               && ',"hex":' && COND string( WHEN <fs_f>-hex = abap_true THEN 'true' ELSE 'false' )
+               && '}'.
     ENDLOOP.
 
-    " ---- 数据行：{"v":{"F":"val",...}}；行内单元格顺序必须与字段目录一致 ----
+    " ---- 数据行：{ "v":{ "F":"val",... }}；行内单元格顺序必须与字段目录一致 ----
     LOOP AT it_matrix ASSIGNING FIELD-SYMBOL(<fs_row>).
 
       IF lines( <fs_row> ) <> lines( it_fields ).
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份序列化：第 { sy-tabix } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致|.
+        zcx_tabdata_error=>raise( |备份序列化：第 { sy-tabix } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致| ).
       ENDIF.
 
       lv_line = '{"v":{'.
@@ -158,15 +161,16 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
         hash = lv_hash.
 
     " ---- 头行 ----
-    DATA(lv_head) = |{{"format":1|
-                  && |,"table":"{ json_escape( CONV string( iv_table ) ) }"|
-                  && |,"system":"{ sy-sysid }"|
-                  && |,"client":"{ sy-mandt }"|
-                  && |,"user":"{ sy-uname }"|
-                  && |,"timestamp":"{ sy-datum }{ sy-uzeit }"|
-                  && |,"rows":{ lines( lt_lines ) }|
-                  && |,"md5":"{ lv_hash }"|
-                  && |,"fields":[{ lv_fields }]}}|.
+    " （同上：JSON 字面花括号用单引号字符串拼接）
+    DATA(lv_head) = '{"format":1'
+                  && ',"table":"' && json_escape( CONV string( iv_table ) ) && '"'
+                  && ',"system":"' && sy-sysid && '"'
+                  && ',"client":"' && sy-mandt && '"'
+                  && ',"user":"' && sy-uname && '"'
+                  && ',"timestamp":"' && sy-datum && sy-uzeit && '"'
+                  && ',"rows":' && CONV string( lines( lt_lines ) )
+                  && ',"md5":"' && lv_hash && '"'
+                  && ',"fields":[' && lv_fields && ']}'.
 
     " ---- 全文：头 + 数据行，UTF-8 后 gzip ----
     DATA(lv_full) = lv_head && |\n| && concat_lines_of( table = lt_lines sep = |\n| ).
@@ -183,14 +187,13 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
 
   METHOD deserialize.
 
-    DATA: lt_lines TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
-          lv_text  TYPE string,
-          lv_x     TYPE xstring.
+    DATA: lt_lines      TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+          lt_data_lines LIKE lt_lines,   " 数据行（剔除头行）
+          lv_text       TYPE string,
+          lv_x          TYPE xstring.
 
     IF iv_gzip IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：文件内容为空|.
+      zcx_tabdata_error=>raise( |备份读取：文件内容为空| ).
     ENDIF.
 
     " ---- 解压 ----
@@ -206,17 +209,13 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
     SPLIT lv_text AT |\n| INTO TABLE lt_lines.
 
     IF lines( lt_lines ) < 1.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：解压后内容为空，不是合法备份文件|.
+      zcx_tabdata_error=>raise( |备份读取：解压后内容为空，不是合法备份文件| ).
     ENDIF.
 
     " ---- 头行解析：手拼 JSON 用 /UI2/CL_JSON 还原（头字段名固定） ----
     DATA(lv_head_line) = lt_lines[ 1 ].
     IF lv_head_line(1) <> '{'.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：首行不是 JSON 头，文件不是本工具产生的备份|.
+      zcx_tabdata_error=>raise( |备份读取：首行不是 JSON 头，文件不是本工具产生的备份| ).
     ENDIF.
 
     /ui2/cl_json=>deserialize(
@@ -226,26 +225,19 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
         data = es_header ).
 
     IF es_header-format <> 1.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：格式版本 { es_header-format } 不受支持（当前支持 1）|.
+      zcx_tabdata_error=>raise( |备份读取：格式版本 { es_header-format } 不受支持（当前支持 1）| ).
     ENDIF.
     IF es_header-table IS INITIAL OR es_header-fields IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：头信息缺少表名或字段目录|.
+      zcx_tabdata_error=>raise( |备份读取：头信息缺少表名或字段目录| ).
     ENDIF.
 
     " ---- 数据行解析 + MD5 校验 ----
-    DATA(lt_data_lines) = VALUE STANDARD TABLE OF string WITH DEFAULT KEY( ).
     LOOP AT lt_lines INTO DATA(lv_data_line) FROM 2.
       APPEND lv_data_line TO lt_data_lines.
     ENDLOOP.
 
     IF lines( lt_data_lines ) <> es_header-rows.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：实际数据行数 { lines( lt_data_lines ) } 与头声明 { es_header-rows } 不一致|.
+      zcx_tabdata_error=>raise( |备份读取：实际数据行数 { lines( lt_data_lines ) } 与头声明 { es_header-rows } 不一致| ).
     ENDIF.
 
     DATA(lv_md5_text) = concat_lines_of( table = lt_data_lines sep = |\n| ).
@@ -259,9 +251,7 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
         hash = lv_md5.
 
     IF to_upper( lv_md5 ) <> to_upper( es_header-md5 ).
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：MD5 校验失败（文件已损坏或被修改）。头声明 { es_header-md5 }，实际 { lv_md5 }|.
+      zcx_tabdata_error=>raise( |备份读取：MD5 校验失败（文件已损坏或被修改）。头声明 { es_header-md5 }，实际 { lv_md5 }| ).
     ENDIF.
 
     " ---- 逐行还原为矩阵（按头字段目录顺序取值组行） ----
@@ -276,9 +266,7 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
         READ TABLE lt_pairs INTO DATA(ls_pair)
              WITH KEY name = <fs_fj>-name.
         IF sy-subrc <> 0.
-          RAISE EXCEPTION TYPE zcx_tabdata_error
-            EXPORTING
-              text_message = |备份读取：第 { lv_line_no } 行缺少字段 { <fs_fj>-name }|.
+          zcx_tabdata_error=>raise( |备份读取：第 { lv_line_no } 行缺少字段 { <fs_fj>-name }| ).
         ENDIF.
         APPEND ls_pair-value TO lt_row.
       ENDLOOP.
@@ -304,11 +292,16 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
     REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_text WITH '\t'.
 
     " 剔除其余 <0x20 字面控制字符（JSON 字符串内非法且无业务含义）
-    DATA(lv_clean) = VALUE string( ).
-    DATA(lv_i)   = 0.
-    DATA(lv_len) = strlen( rv_text ).
+    " string 偏移访问不能配内联声明（编译器报 Offsets ... STRING）
+    DATA: lv_clean TYPE string,
+          lv_i     TYPE i,
+          lv_len   TYPE i,
+          lv_ch    TYPE c LENGTH 1.
+    lv_clean = ''.
+    lv_i   = 0.
+    lv_len = strlen( rv_text ).
     WHILE lv_i < lv_len.
-      DATA(lv_ch) = rv_text+lv_i(1).
+      lv_ch = rv_text+lv_i(1).
       IF lv_ch >= space
          OR lv_ch = cl_abap_char_utilities=>horizontal_tab
          OR lv_ch = cl_abap_char_utilities=>newline.
@@ -325,31 +318,30 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
 
     DATA: lv_pos TYPE i,     " 当前解析位置（1-based）
           lv_len TYPE i,     " 行长度
+          lv_off TYPE i,     " 0-based 偏移（+pos-1 会被词法误解析为结构组件访问）
           lv_ch  TYPE c LENGTH 1,
           lv_nx  TYPE c LENGTH 1.
 
     CLEAR rt_pairs.
     lv_len = strlen( iv_line ).
 
-    " 严格前缀 {"v":{
+    " 严格前缀 { "v":{
     IF lv_len < 7 OR iv_line(6) <> '{"v":{'.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |备份读取：数据行不是本工具的 {"v":{...}} 格式: { iv_line }|.
+      " 错误文本含模板字面花括号，改普通拼接（模板内裸 { 会被判表达式起点）
+      zcx_tabdata_error=>raise( '备份读取：数据行不是本工具的 {"v":{...}} 格式: ' && iv_line ).
     ENDIF.
 
     lv_pos = 7.  " 从第 7 字符起解析字段对
 
     DO.
       IF lv_pos > lv_len.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份读取：数据行意外结束（缺右花括号）: { iv_line }|.
+        zcx_tabdata_error=>raise( |备份读取：数据行意外结束（缺右花括号）: { iv_line }| ).
       ENDIF.
 
-      lv_ch = iv_line+lv_pos-1(1).
+      lv_off = lv_pos - 1.
+      lv_ch = iv_line+lv_off(1).
 
-      " 行尾：}} 收官
+      " 行尾： }} 收官
       IF lv_ch = '}'.
         EXIT.
       ENDIF.
@@ -362,14 +354,13 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
 
       " ---- 字段名：'"NAME":'（DDIC 字段名不含需转义字符） ----
       IF lv_ch <> '"'.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份读取：数据行字段名格式异常（位置 { lv_pos }）: { iv_line }|.
+        zcx_tabdata_error=>raise( |备份读取：数据行字段名格式异常（位置 { lv_pos }）: { iv_line }| ).
       ENDIF.
       lv_pos = lv_pos + 1.
       DATA(lv_name) = VALUE string( ).
       WHILE lv_pos <= lv_len.
-        lv_ch = iv_line+lv_pos-1(1).
+        lv_off = lv_pos - 1.
+        lv_ch = iv_line+lv_off(1).
         IF lv_ch = '"'.
           EXIT.
         ENDIF.
@@ -377,34 +368,29 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
         lv_pos  = lv_pos + 1.
       ENDWHILE.
       IF lv_ch <> '"'.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份读取：数据行字段名未闭合: { iv_line }|.
+        zcx_tabdata_error=>raise( |备份读取：数据行字段名未闭合: { iv_line }| ).
       ENDIF.
       lv_pos = lv_pos + 1.                  " 过掉结束引号
-      IF lv_pos > lv_len OR iv_line+lv_pos-1(1) <> ':'.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份读取：字段 { lv_name } 后缺少冒号: { iv_line }|.
+      lv_off = lv_pos - 1.
+      IF lv_pos > lv_len OR iv_line+lv_off(1) <> ':'.
+        zcx_tabdata_error=>raise( |备份读取：字段 { lv_name } 后缺少冒号: { iv_line }| ).
       ENDIF.
       lv_pos = lv_pos + 1.                  " 过掉冒号
 
       " ---- 字段值：'"...."'（处理 \ " \\ \n \r \t 转义） ----
-      IF lv_pos > lv_len OR iv_line+lv_pos-1(1) <> '"'.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |备份读取：字段 { lv_name } 的值不是字符串: { iv_line }|.
+      lv_off = lv_pos - 1.
+      IF lv_pos > lv_len OR iv_line+lv_off(1) <> '"'.
+        zcx_tabdata_error=>raise( |备份读取：字段 { lv_name } 的值不是字符串: { iv_line }| ).
       ENDIF.
       lv_pos = lv_pos + 1.
       DATA(lv_val) = VALUE string( ).
       WHILE lv_pos <= lv_len.
-        lv_ch = iv_line+lv_pos-1(1).
+        lv_off = lv_pos - 1.
+        lv_ch = iv_line+lv_off(1).
         IF lv_ch = '\'.
           " 转义序列还原
           IF lv_pos >= lv_len.
-            RAISE EXCEPTION TYPE zcx_tabdata_error
-              EXPORTING
-                text_message = |备份读取：字段 { lv_name } 转义序列意外截断|.
+            zcx_tabdata_error=>raise( |备份读取：字段 { lv_name } 转义序列意外截断| ).
           ENDIF.
           lv_nx = iv_line+lv_pos(1).
           CASE lv_nx.
@@ -419,9 +405,8 @@ CLASS zcl_tabdata_backup IMPLEMENTATION.
             WHEN 't'.
               lv_val = lv_val && cl_abap_char_utilities=>horizontal_tab.
             WHEN OTHERS.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |备份读取：字段 { lv_name } 含不受支持的转义序列 \{ lv_nx }|.
+              " 反斜杠移出模板（\X 均被新内核当转义字面）
+              zcx_tabdata_error=>raise( |备份读取：字段 { lv_name } 含不受支持的转义序列| && '\' && lv_nx ).
           ENDCASE.
           lv_pos = lv_pos + 2.
         ELSEIF lv_ch = '"'.

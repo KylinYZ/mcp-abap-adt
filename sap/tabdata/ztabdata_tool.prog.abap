@@ -285,9 +285,7 @@ CLASS lcl_runner IMPLEMENTATION.
       ENDCASE.
     ENDLOOP.
     IF lt_meta_sheet IS INITIAL OR lt_data_sheet IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |导入：文件缺少 DATA/META 页，不是本工具导出的 Excel|.
+      zcx_tabdata_error=>raise( |导入：文件缺少 DATA/META 页，不是本工具导出的 Excel| ).
     ENDIF.
 
     " 2) 当前 DDIC 目录 + META 解析 + 结构漂移比对
@@ -305,9 +303,7 @@ CLASS lcl_runner IMPLEMENTATION.
                                 ev_system = lv_meta_sys ).
 
     IF to_upper( lv_meta_table ) <> to_upper( CONV string( p_table ) ).
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |导入：Excel 是表 { lv_meta_table } 的导出，与目标表 { p_table } 不一致|.
+      zcx_tabdata_error=>raise( |导入：Excel 是表 { lv_meta_table } 的导出，与目标表 { p_table } 不一致| ).
     ENDIF.
 
     DATA(lt_warn) = compare_structure( it_meta_fields = lt_meta_fields
@@ -422,9 +418,7 @@ CLASS lcl_runner IMPLEMENTATION.
 
     " 2) 目标一致性 + 结构严格比对（恢复要求结构完全一致）
     IF to_upper( ls_header-table ) <> to_upper( CONV string( p_table ) ).
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |恢复：备份是表 { ls_header-table } 的数据，与目标表 { p_table } 不一致|.
+      zcx_tabdata_error=>raise( |恢复：备份是表 { ls_header-table } 的数据，与目标表 { p_table } 不一致| ).
     ENDIF.
 
     DATA(lt_catalog) = zcl_tabdata_table_access=>load_catalog( CONV tabname( p_table ) ).
@@ -468,8 +462,7 @@ CLASS lcl_runner IMPLEMENTATION.
     add_result( iv_category = '统计' iv_item = '恢复前快照' iv_value = lv_snap_path ).
 
     " 5) 最终确认弹窗（差异摘要已展示，用户显式确认才动表）
-    DATA: lv_answer TYPE c LENGTH 1.  " '1'=YES '2'=NO 'A'=CANCEL
-    CLEAR lv_answer.
+    DATA(lv_answer) = CONV c( space ).  " '1'=YES '2'=NO 'A'=CANCEL
     CALL FUNCTION 'POPUP_TO_CONFIRM'
       EXPORTING
         title_bar              = '确认恢复'
@@ -480,9 +473,7 @@ CLASS lcl_runner IMPLEMENTATION.
       EXCEPTIONS
         OTHERS                 = 0.
     IF lv_answer <> '1'.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = '恢复已取消（用户未确认），表数据未变动'.
+      zcx_tabdata_error=>raise( '恢复已取消（用户未确认），表数据未变动' ).
     ENDIF.
 
     " 6) 全量替换（失败由 START-OF-SELECTION 统一 ROLLBACK）
@@ -511,18 +502,14 @@ CLASS lcl_runner IMPLEMENTATION.
       READ TABLE it_catalog ASSIGNING FIELD-SYMBOL(<fs_c>)
            WITH KEY name = <fs_m>-name.
       IF sy-subrc <> 0.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |{ iv_label }：字段 { <fs_m>-name } 在当前表结构中不存在（结构已变化），操作拒绝|.
+        zcx_tabdata_error=>raise( |{ iv_label }：字段 { <fs_m>-name } 在当前表结构中不存在（结构已变化），操作拒绝| ).
       ENDIF.
 
       " 类型/长度/小数位漂移一律拒绝（文本还原规则依赖三者一致）
       IF <fs_m>-kind <> <fs_c>-kind
          OR <fs_m>-length <> <fs_c>-length
          OR <fs_m>-decimals <> <fs_c>-decimals.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |{ iv_label }：字段 { <fs_m>-name } 类型漂移（文件 { <fs_m>-kind }/{ <fs_m>-length }/{ <fs_m>-decimals } vs 当前 { <fs_c>-kind }/{ <fs_c>-length }/{ <fs_c>-decimals }），操作拒绝|.
+        zcx_tabdata_error=>raise( |{ iv_label }：字段 { <fs_m>-name } 类型漂移（文件 { <fs_m>-kind }/{ <fs_m>-length }/{ <fs_m>-decimals } vs 当前 { <fs_c>-kind }/{ <fs_c>-length }/{ <fs_c>-decimals }），操作拒绝| ).
       ENDIF.
 
     ENDLOOP.
@@ -534,9 +521,7 @@ CLASS lcl_runner IMPLEMENTATION.
            WITH KEY name = <fs_c>-name.
       IF sy-subrc <> 0.
         IF iv_strict = abap_true.
-          RAISE EXCEPTION TYPE zcx_tabdata_error
-            EXPORTING
-              text_message = |{ iv_label }：当前表存在备份中没有的字段 { <fs_c>-name }（结构已变化），恢复要求结构完全一致，请重新备份|.
+          zcx_tabdata_error=>raise( |{ iv_label }：当前表存在备份中没有的字段 { <fs_c>-name }（结构已变化），恢复要求结构完全一致，请重新备份| ).
         ELSE.
           APPEND |字段 { <fs_c>-name }（当前表新增）| TO rt_warn.
         ENDIF.
@@ -569,9 +554,7 @@ CLASS lcl_runner IMPLEMENTATION.
           " 字段目录行：6 段竖线分隔
           SPLIT lv_val AT '|' INTO TABLE DATA(lt_seg).
           IF lines( lt_seg ) < 6.
-            RAISE EXCEPTION TYPE zcx_tabdata_error
-              EXPORTING
-                text_message = |导入：META 字段行格式异常: { lv_val }|.
+            zcx_tabdata_error=>raise( |导入：META 字段行格式异常: { lv_val }| ).
           ENDIF.
           APPEND VALUE zcl_tabdata_type_conv=>ty_field(
                 name     = CONV fieldname( lt_seg[ 1 ] )
@@ -586,9 +569,7 @@ CLASS lcl_runner IMPLEMENTATION.
     ENDLOOP.
 
     IF ev_table IS INITIAL OR et_meta_fields IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |导入：META 页缺少表名或字段目录|.
+      zcx_tabdata_error=>raise( |导入：META 页缺少表名或字段目录| ).
     ENDIF.
 
   ENDMETHOD.
@@ -598,24 +579,21 @@ CLASS lcl_runner IMPLEMENTATION.
   " ===================================================================
   METHOD normalize_data_sheet.
 
+    DATA: lt_colmap TYPE STANDARD TABLE OF i WITH DEFAULT KEY.  " Excel 列序 -> catalog 序
+
     " 表头行：列名清单（与 META 字段集合一致性在此隐式校验）
     READ TABLE it_rows INTO DATA(lt_header) INDEX 1.
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |导入：数据页为空|.
+      zcx_tabdata_error=>raise( |导入：数据页为空| ).
     ENDIF.
 
     " 列名 -> 当前字段目录列号映射（未知列名/重复列名直接拒绝）
-    DATA: lt_colmap TYPE STANDARD TABLE OF i WITH DEFAULT KEY.  " Excel 列序 -> catalog 序
     LOOP AT lt_header INTO DATA(lv_colname).
 
       DATA(lv_name_up) = to_upper( lv_colname ).
       DATA(lv_cat_idx) = line_index( it_catalog[ name = CONV fieldname( lv_name_up ) ] ).
       IF lv_cat_idx = 0.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |导入：数据页表头含未知字段 "{ lv_colname }"（可能被手工改过表头）|.
+        zcx_tabdata_error=>raise( |导入：数据页表头含未知字段 "{ lv_colname }"（可能被手工改过表头）| ).
       ENDIF.
       APPEND lv_cat_idx TO lt_colmap.
 
@@ -686,9 +664,7 @@ CLASS lcl_runner IMPLEMENTATION.
         OTHERS            = 4 ).
 
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |读取文件失败（SY-SUBRC { sy-subrc }）: { iv_path }（后台运行/路径不存在均会触发）|.
+      zcx_tabdata_error=>raise( |读取文件失败（SY-SUBRC { sy-subrc }）: { iv_path }（后台运行/路径不存在均会触发）| ).
     ENDIF.
 
     CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
@@ -702,9 +678,7 @@ CLASS lcl_runner IMPLEMENTATION.
         OTHERS       = 1.
 
     IF sy-subrc <> 0 OR rv_data IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |文件内容转换失败: { iv_path }|.
+      zcx_tabdata_error=>raise( |文件内容转换失败: { iv_path }| ).
     ENDIF.
 
   ENDMETHOD.
@@ -738,9 +712,7 @@ CLASS lcl_runner IMPLEMENTATION.
         OTHERS           = 3 ).
 
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |写入文件失败（SY-SUBRC { sy-subrc }）: { iv_path }|.
+      zcx_tabdata_error=>raise( |写入文件失败（SY-SUBRC { sy-subrc }）: { iv_path }| ).
     ENDIF.
 
   ENDMETHOD.
@@ -756,13 +728,15 @@ CLASS lcl_runner IMPLEMENTATION.
     DATA(lv_gzip) = zcl_tabdata_backup=>serialize(
         iv_table = iv_table it_fields = it_catalog it_matrix = lt_matrix ).
 
-    rv_path = |{ iv_table }_{ iv_tag }_{ sy-datum }{ sy-uzeit }.jsonl.gz|.
-
-    " 快照文件保存对话框：用户可改目录；取消视为放弃本次操作
+    " 快照文件保存对话框变量（显式声明前置）
     DATA: lv_action TYPE i,
           lv_full   TYPE string,
           lv_path_s TYPE string,
           lv_fname  TYPE string.
+
+    rv_path = |{ iv_table }_{ iv_tag }_{ sy-datum }{ sy-uzeit }.jsonl.gz|.
+
+    " 快照文件保存对话框：用户可改目录；取消视为放弃本次操作
 
     cl_gui_frontend_services=>file_save_dialog(
       EXPORTING
@@ -778,9 +752,7 @@ CLASS lcl_runner IMPLEMENTATION.
         OTHERS            = 2 ).
 
     IF sy-subrc <> 0 OR lv_action <> 0 OR lv_full IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = '快照保存被取消或失败：安全序列要求先完成快照才能继续写操作'.
+      zcx_tabdata_error=>raise( '快照保存被取消或失败：安全序列要求先完成快照才能继续写操作' ).
     ENDIF.
 
     write_frontend_file( iv_path = lv_full iv_data = lv_gzip ).

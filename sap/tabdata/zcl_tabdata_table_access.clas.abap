@@ -147,16 +147,12 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         OTHERS    = 2.
 
     IF sy-subrc <> 0 OR lt_dfies IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 不存在或无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 不存在或无字段信息（DDIF_FIELDINFO_GET 返回 { sy-subrc }）| ).
     ENDIF.
 
     " ---- 仅透明表：簇表/池表的动态读写语义不同，直接拒绝 ----
     IF ls_x030l-tabclass <> 'TRANSP'.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 类别为 { ls_x030l-tabclass }（非透明表），本工具仅支持透明表|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 类别为 { ls_x030l-tabclass }（非透明表），本工具仅支持透明表| ).
     ENDIF.
 
     " ---- 组装字段目录；MANDT 不导出不导入（依赖 Open SQL 自动客户端处理） ----
@@ -184,9 +180,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
     " ---- 黑名单优先：不受放行开关影响 ----
     IF is_blacklisted( iv_table ) = abap_true.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 属于系统关键表黑名单（DDIC 元数据/传输系统/系统安全表），任何模式下都禁止操作|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 属于系统关键表黑名单（DDIC 元数据/传输系统/系统安全表），任何模式下都禁止操作| ).
     ENDIF.
 
     " ---- 默认仅 Z/Y 自定义表；标准表需显式放行 + 原因说明 ----
@@ -195,15 +189,11 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     ENDIF.
 
     IF iv_allow_std <> abap_true.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 不是 Z/Y 自定义表。如确需操作标准表，请勾选"放行标准表"并填写业务原因|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 不是 Z/Y 自定义表。如确需操作标准表，请勾选"放行标准表"并填写业务原因| ).
     ENDIF.
 
     IF iv_reason IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |放行标准表 { iv_table } 必须填写业务原因（审计要求）|.
+      zcx_tabdata_error=>raise( |放行标准表 { iv_table } 必须填写业务原因（审计要求）| ).
     ENDIF.
 
     " 放行合法：审计输出由报表壳负责（原因已校验非空）
@@ -247,19 +237,14 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     DATA: lr_tab TYPE REF TO data.
 
     IF iv_max_rows <= 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |行数上限必须为正数（当前 { iv_max_rows }）|.
+      zcx_tabdata_error=>raise( |行数上限必须为正数（当前 { iv_max_rows }）| ).
     ENDIF.
 
     " ---- 动态创建结果内表并读取 ----
     TRY.
         CREATE DATA lr_tab TYPE STANDARD TABLE OF (iv_table).
       CATCH cx_sy_create_data_error INTO DATA(lo_cd).
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |表 { iv_table } 动态类型创建失败: { lo_cd->get_text( ) }|
-            previous     = lo_cd.
+        zcx_tabdata_error=>raise( text_message = |表 { iv_table } 动态类型创建失败: { lo_cd->get_text( ) }| previous = lo_cd ).
     ENDTRY.
 
     ASSIGN lr_tab->* TO FIELD-SYMBOL(<lt_tab>).
@@ -281,10 +266,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
         ENDIF.
       CATCH cx_sy_dynamic_osql_semantics cx_sy_dynamic_osql_syntax
             cx_sy_open_sql_db INTO DATA(lo_sql).
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |表 { iv_table } 读取失败: { lo_sql->get_text( ) }|
-            previous     = lo_sql.
+        zcx_tabdata_error=>raise( text_message = |表 { iv_table } 读取失败: { lo_sql->get_text( ) }| previous = lo_sql ).
     ENDTRY.
 
     " ---- 逐字段文本化为矩阵（列序与字段目录一致） ----
@@ -296,9 +278,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
         ASSIGN COMPONENT <fs_f>-name OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_comp>).
         IF sy-subrc <> 0.
-          RAISE EXCEPTION TYPE zcx_tabdata_error
-            EXPORTING
-              text_message = |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配|.
+          zcx_tabdata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
         ENDIF.
 
         APPEND zcl_tabdata_type_conv=>to_text(
@@ -330,9 +310,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
       lv_line_no = sy-tabix.
 
       IF lines( <fs_row> ) <> lines( it_fields ).
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |表 { iv_table }：第 { lv_line_no } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致|.
+        zcx_tabdata_error=>raise( |表 { iv_table }：第 { lv_line_no } 行单元格数 { lines( <fs_row> ) } 与字段目录 { lines( it_fields ) } 不一致| ).
       ENDIF.
 
       " 单行动态结构；MANDT 未映射保持初值（写入时 Open SQL 自动写 SY-MANDT）
@@ -344,9 +322,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
 
         ASSIGN COMPONENT <fs_f>-name OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_comp>).
         IF sy-subrc <> 0.
-          RAISE EXCEPTION TYPE zcx_tabdata_error
-            EXPORTING
-              text_message = |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配|.
+          zcx_tabdata_error=>raise( |表 { iv_table } 字段 { <fs_f>-name } 与运行时结构不匹配| ).
         ENDIF.
 
         " 列号与字段目录同序
@@ -386,9 +362,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
       APPEND <fs_f> TO lt_key_fields.
     ENDLOOP.
     IF lt_key_fields IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 无主键字段，无法执行按主键 upsert|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 无主键字段，无法执行按主键 upsert| ).
     ENDIF.
 
     " ---- 动态行 wa（存在性探测用，避免覆盖待写行） ----
@@ -430,9 +404,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
           WHEN gc_mode_upsert OR gc_mode_update.
             UPDATE (iv_table) FROM <ls_row>.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |表 { iv_table } 第 { lv_src_line } 行 UPDATE 失败（SY-SUBRC { sy-subrc }）|.
+              zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 UPDATE 失败（SY-SUBRC { sy-subrc }）| ).
             ENDIF.
             rs_result-updated = rs_result-updated + 1.
           WHEN gc_mode_insert.
@@ -444,9 +416,7 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
           WHEN gc_mode_upsert OR gc_mode_insert.
             INSERT (iv_table) FROM <ls_row>.
             IF sy-subrc <> 0.
-              RAISE EXCEPTION TYPE zcx_tabdata_error
-                EXPORTING
-                  text_message = |表 { iv_table } 第 { lv_src_line } 行 INSERT 失败（SY-SUBRC { sy-subrc }，主键冲突或约束不符）|.
+              zcx_tabdata_error=>raise( |表 { iv_table } 第 { lv_src_line } 行 INSERT 失败（SY-SUBRC { sy-subrc }，主键冲突或约束不符）| ).
             ENDIF.
             rs_result-inserted = rs_result-inserted + 1.
           WHEN gc_mode_update.
@@ -470,17 +440,13 @@ CLASS zcl_tabdata_table_access IMPLEMENTATION.
     " ---- 时点全量替换：先清后灌（LUW 由报表壳控制，失败整体回滚） ----
     DELETE FROM (iv_table).
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |表 { iv_table } 全表 DELETE 失败（SY-SUBRC { sy-subrc }）|.
+      zcx_tabdata_error=>raise( |表 { iv_table } 全表 DELETE 失败（SY-SUBRC { sy-subrc }）| ).
     ENDIF.
 
     IF lines( <lt_tab> ) > 0.
       INSERT (iv_table) FROM TABLE <lt_tab>.
       IF sy-subrc <> 0.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |表 { iv_table } 批量 INSERT 失败（SY-SUBRC { sy-subrc }），当前 LUW 将被回滚|.
+        zcx_tabdata_error=>raise( |表 { iv_table } 批量 INSERT 失败（SY-SUBRC { sy-subrc }），当前 LUW 将被回滚| ).
       ENDIF.
     ENDIF.
 

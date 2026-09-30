@@ -50,18 +50,18 @@ export class TransportCleanupConfirmation {
 
   /** 原生确认并单次执行清理 plan；拒绝时返回 confirmation_declined 而不执行。 */
   async confirmAndRun(transportCleanupPlanId: string): Promise<Record<string, unknown>> {
+    const plan = this.statusReader.status(transportCleanupPlanId);
+    assertConfirmable(plan);
+    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    if (this.options.autoApprove?.()) {
+      return this.options.applyConfirmed(transportCleanupPlanId);
+    }
     if (!this.options.supportsFormElicitation()) {
       throw new SafeAbapError(
         'CONFIRMATION_UNSUPPORTED',
         'confirmation',
         'Transport cleanup requires MCP form elicitation; text confirmation fallback is not supported.'
       );
-    }
-    const plan = this.statusReader.status(transportCleanupPlanId);
-    assertConfirmable(plan);
-    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
-    if (this.options.autoApprove?.()) {
-      return this.options.applyConfirmed(transportCleanupPlanId);
     }
     const elicited = await this.elicit(
       confirmationForm(plan),

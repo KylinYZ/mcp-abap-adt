@@ -157,9 +157,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     ENDLOOP.
 
     IF lv_idx = 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 写入：至少需要一个 sheet|.
+      zcx_tabdata_error=>raise( |xlsx 写入：至少需要一个 sheet| ).
     ENDIF.
 
     " ---- [Content_Types].xml ----
@@ -204,13 +202,18 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
 
   METHOD read.
 
-    DATA: lo_zip    TYPE REF TO cl_abap_zip,
-          lv_shared TYPE ty_row.   " sharedStrings 顺序文本表
+    DATA: lo_zip      TYPE REF TO cl_abap_zip,
+          lv_shared   TYPE zcl_tabdata_type_conv=>ty_row,   " sharedStrings 顺序文本表
+          " CL_ABAP_ZIP=>GET 为 EXPORTING 风格（无 RETURNING），内容变量前置声明
+          lv_shared_x TYPE xstring,
+          lv_workbook TYPE xstring,
+          lv_wbrels_x TYPE xstring,
+          lv_sheet_x  TYPE xstring,
+          lv_n        TYPE i,
+          lv_n2       TYPE i.
 
     IF iv_xlsx IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 读取：文件内容为空|.
+      zcx_tabdata_error=>raise( |xlsx 读取：文件内容为空| ).
     ENDIF.
 
     " ---- 解压 ----
@@ -218,7 +221,8 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     lo_zip->load( zip = iv_xlsx ).
 
     " ---- sharedStrings（本工具原产文件没有此 part，可缺席） ----
-    DATA(lv_shared_x) = lo_zip->get( name = 'xl/sharedStrings.xml' ).
+    CLEAR lv_shared_x.
+    lo_zip->get( EXPORTING name = 'xl/sharedStrings.xml' IMPORTING content = lv_shared_x ).
     IF lv_shared_x IS NOT INITIAL.
       DATA(lo_ss_ixml) = cl_ixml=>create( ).
       DATA(lo_ss_doc)  = lo_ss_ixml->create_document( ).
@@ -227,9 +231,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
                             istream        = lo_ss_ixml->create_stream_factory( )->create_istream_xstring( lv_shared_x )
                             document       = lo_ss_doc ).
       IF lo_ss_par->parse( ) <> 0.
-        RAISE EXCEPTION TYPE zcx_tabdata_error
-          EXPORTING
-            text_message = |xlsx 读取：sharedStrings.xml 解析失败|.
+        zcx_tabdata_error=>raise( |xlsx 读取：sharedStrings.xml 解析失败| ).
       ENDIF.
 
       " 每个 <si> 是一条字符串；富文本 si 含多个 <t> 片段，顺序拼接
@@ -247,11 +249,10 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     ENDIF.
 
     " ---- workbook.xml：sheet 名 + 关系 id ----
-    DATA(lv_workbook) = lo_zip->get( name = 'xl/workbook.xml' ).
+    CLEAR lv_workbook.
+    lo_zip->get( EXPORTING name = 'xl/workbook.xml' IMPORTING content = lv_workbook ).
     IF lv_workbook IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 读取：缺少 xl/workbook.xml，不是合法 xlsx 包|.
+      zcx_tabdata_error=>raise( |xlsx 读取：缺少 xl/workbook.xml，不是合法 xlsx 包| ).
     ENDIF.
 
     DATA(lo_wb_ixml) = cl_ixml=>create( ).
@@ -261,14 +262,13 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
                            istream        = lo_wb_ixml->create_stream_factory( )->create_istream_xstring( lv_workbook )
                            document       = lo_wb_doc ).
     IF lo_wb_par->parse( ) <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 读取：workbook.xml 解析失败|.
+      zcx_tabdata_error=>raise( |xlsx 读取：workbook.xml 解析失败| ).
     ENDIF.
 
     " ---- workbook.xml.rels：rId -> sheet 文件路径（"rIdN"按下标存 Target） ----
     DATA(lv_rel_map) = VALUE ty_row( ).
-    DATA(lv_wbrels_x) = lo_zip->get( name = 'xl/_rels/workbook.xml.rels' ).
+    CLEAR lv_wbrels_x.
+    lo_zip->get( EXPORTING name = 'xl/_rels/workbook.xml.rels' IMPORTING content = lv_wbrels_x ).
     IF lv_wbrels_x IS NOT INITIAL.
       DATA(lo_rel_ixml) = cl_ixml=>create( ).
       DATA(lo_rel_doc)  = lo_rel_ixml->create_document( ).
@@ -282,7 +282,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
           DATA(lv_rid) = CONV string( lo_rel->get_attribute( 'Id' ) ).
           DATA(lv_tgt) = CONV string( lo_rel->get_attribute( 'Target' ) ).
           IF lv_rid CP 'rId*' AND lv_rid+3 CO '0123456789' AND lv_rid+3 IS NOT INITIAL.
-            DATA(lv_n) = CONV i ( lv_rid+3 ).
+            lv_n = lv_rid+3.
             " 稀疏 rId 用空串补位
             WHILE lines( lv_rel_map ) < lv_n.
               APPEND '' TO lv_rel_map.
@@ -302,7 +302,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
       DATA(lv_rid2) = CONV string( lo_sheet_node->get_attribute( 'r:id' ) ).
 
       IF lv_rid2 CP 'rId*' AND lv_rid2+3 CO '0123456789' AND lv_rid2+3 IS NOT INITIAL.
-        DATA(lv_n2) = CONV i ( lv_rid2+3 ).
+        lv_n2 = lv_rid2+3.
         IF lv_n2 BETWEEN 1 AND lines( lv_rel_map ).
           DATA(lv_tgt2) = lv_rel_map[ lv_n2 ].
           IF lv_tgt2 IS NOT INITIAL.
@@ -311,7 +311,8 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
             ELSE.
               lv_tgt2 = |xl/{ lv_tgt2 }|. " 相对路径在 xl/ 目录下
             ENDIF.
-            DATA(lv_sheet_x) = lo_zip->get( name = lv_tgt2 ).
+            CLEAR lv_sheet_x.
+            lo_zip->get( EXPORTING name = lv_tgt2 IMPORTING content = lv_sheet_x ).
             IF lv_sheet_x IS NOT INITIAL.
               APPEND VALUE ty_sheet(
                     name = lv_name
@@ -330,9 +331,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     ENDWHILE.
 
     IF rt_sheets IS INITIAL.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 读取：未解析出任何 worksheet|.
+      zcx_tabdata_error=>raise( |xlsx 读取：未解析出任何 worksheet| ).
     ENDIF.
 
   ENDMETHOD.
@@ -346,7 +345,8 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
           lo_data   TYPE REF TO if_ixml_element,
           lo_row    TYPE REF TO if_ixml_element,
           lo_c      TYPE REF TO if_ixml_element,
-          lv_maxcol TYPE i.                 " 全表最大列数（短行补齐用）
+          lv_maxcol TYPE i,                 " 全表最大列数（短行补齐用）
+          lv_sidx   TYPE i.                 " sharedStrings 下标
 
     lo_ixml = cl_ixml=>create( ).
     lo_doc  = lo_ixml->create_document( ).
@@ -355,9 +355,7 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
                     istream        = lo_ixml->create_stream_factory( )->create_istream_xstring( iv_xml )
                     document       = lo_doc ).
     IF lo_parser->parse( ) <> 0.
-      RAISE EXCEPTION TYPE zcx_tabdata_error
-        EXPORTING
-          text_message = |xlsx 读取：sheet "{ iv_sheet_label }" XML 解析失败|.
+      zcx_tabdata_error=>raise( |xlsx 读取：sheet "{ iv_sheet_label }" XML 解析失败| ).
     ENDIF.
 
     lo_data = lo_doc->find_from_name( name = 'sheetData' ).
@@ -367,20 +365,20 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     ENDIF.
 
     " 逐 row 逐 cell；cell 位置以 r 属性为准，缺 r 时按出现顺序兜底
-    lo_row = lo_data->get_first_child( ).
+    lo_row ?= lo_data->get_first_child( ).
     WHILE lo_row IS BOUND.
 
       DATA(lt_line) = VALUE ty_row( ).  " 当前行按列号展开
       DATA(lv_fb_col) = 0.              " 缺 r 属性时的顺序列号兜底
 
-      lo_c = lo_row->get_first_child( ).
+      lo_c ?= lo_row->get_first_child( ).
       WHILE lo_c IS BOUND.
 
         lv_fb_col = lv_fb_col + 1.
 
         " 列号：优先 r 属性（如 C5 -> 列 3）
         DATA(lv_ref) = CONV string( lo_c->get_attribute( 'r' ) ).
-        DATA(lv_col) = CONV i ( 0 ).
+        DATA(lv_col) = 0.
         IF lv_ref IS NOT INITIAL.
           parse_cell_ref( EXPORTING iv_ref = lv_ref
                           IMPORTING ev_col = lv_col
@@ -417,13 +415,11 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
             lv_val = lo_v->get_value( ).
             IF lv_t = 's'.
               " sharedStrings 下标解引用；越界视为文件损坏
-              DATA(lv_sidx) = CONV i ( lv_val ).
+              lv_sidx = lv_val.
               IF lv_sidx BETWEEN 1 AND iv_shared_cnt.
                 lv_val = it_shared[ lv_sidx ].
               ELSE.
-                RAISE EXCEPTION TYPE zcx_tabdata_error
-                  EXPORTING
-                    text_message = |xlsx 读取：sheet "{ iv_sheet_label }" sharedStrings 下标 { lv_sidx } 越界（共 { iv_shared_cnt } 条）|.
+                zcx_tabdata_error=>raise( |xlsx 读取：sheet "{ iv_sheet_label }" sharedStrings 下标 { lv_sidx } 越界（共 { iv_shared_cnt } 条）| ).
               ENDIF.
             ENDIF.
           ENDIF.
@@ -469,11 +465,15 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf(1) IN rv_text WITH '&#13;'.
 
     " 剔除 XML 1.0 非法字面控制字符（保留 TAB 与 LF；CR 已实体化）
-    DATA(lv_clean) = VALUE string( ).
-    DATA(lv_i)   = 0.
-    DATA(lv_len) = strlen( rv_text ).
+    DATA: lv_clean TYPE string,
+          lv_i     TYPE i,
+          lv_len   TYPE i,
+          lv_ch    TYPE c LENGTH 1.  " string 偏移访问不能配内联声明
+    lv_clean = ''.
+    lv_i   = 0.
+    lv_len = strlen( rv_text ).
     WHILE lv_i < lv_len.
-      DATA(lv_ch) = rv_text+lv_i(1).
+      lv_ch = rv_text+lv_i(1).
       IF lv_ch >= space
          OR lv_ch = cl_abap_char_utilities=>horizontal_tab
          OR lv_ch = cl_abap_char_utilities=>newline.
@@ -511,16 +511,17 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
 
     CONSTANTS lc_alpha TYPE c LENGTH 26 VALUE 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.
 
+    DATA lv_ch2 TYPE c LENGTH 1.  " string 偏移访问不能配内联声明
     rv_col = 0.
     lv_up  = to_upper( iv_letters ).
     lv_i   = 0.
     WHILE lv_i < strlen( lv_up ).
-      DATA(lv_ch) = lv_up+lv_i(1).
-      IF lv_ch < 'A' OR lv_ch > 'Z'.
+      lv_ch2 = lv_up+lv_i(1).
+      IF lv_ch2 < 'A' OR lv_ch2 > 'Z'.
         rv_col = 0.  " 非字母即非法引用，返回 0 交调用方兜底
         RETURN.
       ENDIF.
-      FIND lv_ch IN lc_alpha MATCH OFFSET DATA(lv_off).
+      FIND lv_ch2 IN lc_alpha MATCH OFFSET DATA(lv_off).
       rv_col = rv_col * 26 + lv_off + 1.
       lv_i   = lv_i + 1.
     ENDWHILE.
@@ -530,11 +531,16 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
 
   METHOD parse_cell_ref.
 
+    " 显式声明全部前置（ABAP 方法内 DATA 声明不得出现在可执行语句之后）
+    DATA: lv_len     TYPE i,
+          lv_pos     TYPE i,
+          lv_row_txt TYPE string.
+
     CLEAR: ev_col, ev_row.
 
     " r 属性形如 "AB12"：前缀字母为列，后缀数字为行
-    DATA(lv_len) = strlen( iv_ref ).
-    DATA(lv_pos) = 0.
+    lv_len = strlen( iv_ref ).
+    lv_pos = 0.
     WHILE lv_pos < lv_len.
       IF iv_ref+lv_pos(1) CA '0123456789'.
         EXIT.
@@ -543,10 +549,14 @@ CLASS zcl_tabdata_xlsx IMPLEMENTATION.
     ENDWHILE.
 
     IF lv_pos > 0.
-      ev_col = letters_to_col( iv_ref(lv_pos) ).
+      " string 源+变量长度偏移被禁，用 substring 内置函数取列字母前缀
+      ev_col = letters_to_col( substring( val = iv_ref len = lv_pos ) ).
     ENDIF.
     IF lv_pos < lv_len.
-      ev_row = CONV i ( iv_ref+lv_pos ).
+      " 用 SHIFT 截取数字行号（string 类型禁止无长度偏移语法）
+      lv_row_txt = iv_ref.
+      SHIFT lv_row_txt BY lv_pos PLACES.
+      ev_row = lv_row_txt.
     ENDIF.
 
   ENDMETHOD.
