@@ -33,7 +33,7 @@ describe('tool catalog integrity and raw advanced role policy', () => {
     ['development', 195],
     ['diagnostic-readonly', 146],
     ['legacy-full', 209],
-    ['development-workbench', 162],
+    ['development-workbench', 165],
     ['business-readonly', 18],
     // operations-readonly 54：53 + getUsageExamples（analysis.usage_examples，
     // 与 vsp-capability-parity-matrix 的 operations-readonly 声明同步收录）

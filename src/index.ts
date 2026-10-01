@@ -1358,8 +1358,15 @@ export class AbapAdtServer extends Server {
           );
         }
 
+        // F1（交接文档 2026-09-30）：程序文本池原子写 setTextElements 及其配套
+        // lock/unLock（"caller manages locking" 模式，锁句柄须与写调用同 server
+        // 会话）纳入 development-workbench（focused/developer 入口）写路径——
+        // 仍 DEV 专属、分类与执行槽不变，其余非只读 legacy 工具照旧拒绝。
+        const f1LegacyWriteAllowlist = toolName === 'setTextElements'
+          || toolName === 'lock' || toolName === 'unLock';
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
-          && !isReadOnlyLegacyTool(toolName)) {
+          && !isReadOnlyLegacyTool(toolName)
+          && !(f1LegacyWriteAllowlist && this.safetyPolicy.systemRole === 'DEV')) {
           throw new McpError(ErrorCode.MethodNotFound, `Tool '${toolName}' is unavailable in the ${this.safetyPolicy.toolProfile} tool profile.`);
         }
 

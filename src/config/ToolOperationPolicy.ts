@@ -360,7 +360,14 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'QAS, PRD, missing, and unknown system roles permit only local and read-only operations.'
     );
   }
-  if (RAW_ADVANCED_MUTATION_TOOL_NAMES.has(toolName) && (profile !== 'legacy-full' || systemRole !== 'DEV')) {
+  // F1（交接文档 2026-09-30）：程序文本池原子写 setTextElements 纳入
+  // focused/developer 入口（development-workbench），仍 DEV 专属、走写槽；
+  // 其余 raw 族维持 legacy-full 专属。
+  const rawAllowedProfiles: ToolProfile[] = toolName === 'setTextElements'
+    ? ['legacy-full', 'development-workbench']
+    : ['legacy-full'];
+  if (RAW_ADVANCED_MUTATION_TOOL_NAMES.has(toolName)
+    && (!rawAllowedProfiles.includes(profile) || systemRole !== 'DEV')) {
     throw new SafeAbapError(
       'POLICY_DENIED',
       'policy',

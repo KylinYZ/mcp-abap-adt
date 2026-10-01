@@ -62,7 +62,8 @@
     "test:transport-crossref-real-dev": "node ./scripts/transport-crossref-real-dev-smoke.mjs",
     "test:fm-test-data-real-dev": "node ./scripts/fm-test-data-real-dev-smoke.mjs",
     "test:where-used-config-real-dev": "node ./scripts/where-used-config-real-dev-smoke.mjs",
-    "test:usage-examples-real-dev": "node ./scripts/usage-examples-real-dev-smoke.mjs"
+    "test:usage-examples-real-dev": "node ./scripts/usage-examples-real-dev-smoke.mjs",
+    "test:f1-textpool-real-dev": "node ./scripts/f1-textpool-focused-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",

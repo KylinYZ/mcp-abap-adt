@@ -118,7 +118,14 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'probeRfcSystem',
   'readRfcTable',
   'describeRfm',
-  'callRfm'
+  'callRfm',
+  // 程序文本池原子写（F1 最小方案，交接文档 2026-09-30）：DEV 专属
+  // RAW_ADVANCED_MUTATION（调用方自管锁/传输/激活），focused/developer 直达；
+  // 配套 lock/unLock（OTHER_MUTATION，DEV 专属）——"caller manages locking"
+  // 模式的锁句柄必须与写调用同 server 会话，缺锁工具则原子写不可用。
+  'setTextElements',
+  'lock',
+  'unLock'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

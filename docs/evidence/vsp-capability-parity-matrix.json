@@ -1782,7 +1782,7 @@
     "systemRoles": [
      "DEV"
     ],
-    "restrictionReason": "文本元素读取经 ADT 覆盖；写入经受控 DDIC 工作流（SET_TEXT_ELEMENTS：immutable plan→原生确认→REPT 子对象锁→每符号 @MaxLength 载荷→激活→逐字 readback→同值短路→回滚保证）在真实 DEV 端到端验证（2026-09-22，test:ddic-text-real-dev）。协议层比 VSP SetTextElements 强：VSP 走 ZADT_VSP WebSocket helper，本项目纯 ADT REST 无服务器端依赖；S/4 三条件链（stateful 会话/REPT 锁/@MaxLength 每符号指令）为本项目实测固化的协议知识。",
+    "restrictionReason": "受控依据：DDIC 数据元素标签受控链（SET_DATA_ELEMENT_PROPERTIES）+ focused/developer 入口的程序文本池原子写。F1 最小方案（交接文档 2026-09-30）落地（2026-09-30 真机验证，npm run test:f1-textpool-real-dev）：原子 setTextElements 及配套 lock/unLock 纳入 focused/developer（development-workbench）入口——DEV 专属（角色门控滤除 QAS/PRD）、raw 族执行槽、legacy 只读门 F1 开口（setTextElements/lock/unLock 白名单）；'caller manages locking' 模式的锁句柄须与写调用同 server 会话。协议修复（真机 415 取证）：文本池 /source/{category} 端点只认 text/plain——adt.textelements.v1 专用媒体类型 PUT/GET 均被 415 拒绝（'Supported Media Types: text/plain'），GET/PUT 已对称修正并读回断言一致。完整方案（previewTextPoolChange/applyTextPoolChange 受控工具对）仍为后续任务。",
     "liftCondition": ""
    },
    "priority": "P2",

@@ -141,7 +141,10 @@ export async function getTextElements(
   category: TextElementCategory = "symbols"
 ): Promise<TextElementsResult> {
   const programName = url.split("/").pop() || url
-  const accept = `application/vnd.sap.adt.textelements.${category}.v1`
+  // 真机实证（2026-09-30，sap-demo）：该端点只认 text/plain（adt.textelements.v1
+  // 会 415 "The message content is not acceptable"）——响应体即文本池源
+  // （@MaxLength + KEY=TEXT 行），parseTextElements 按源形态解析。
+  const accept = 'text/plain'
   try {
     const response = await h.request(`${url}/source/${category}`, {
       headers: { Accept: accept }
@@ -181,12 +184,15 @@ export async function setTextElements(
 ): Promise<void> {
   const qs: Record<string, string> = { lockHandle }
   if (transport) qs.corrNr = transport
-  const mediaType = `application/vnd.sap.adt.textelements.${category}.v1`
   const body = formatTextElements(elements, category)
-  const headers = {
-    "Content-Type": `${mediaType}; charset=UTF-8`,
-    Accept: mediaType
-  }
   const u = `${url}/source/${category}`
-  await h.request(u, { method: "PUT", headers, qs, body })
+  // 真机实证（2026-09-30，sap-demo 415）：文本池源端点只接受 text/plain——
+  // adt.textelements.v1 专用媒体类型会被服务端 415 拒绝（"Supported Media
+  // Types: text/plain"）。文本池本体就是源码形态（@MaxLength + KEY=TEXT 行）。
+  await h.request(u, {
+    method: "PUT",
+    headers: { "Content-Type": "text/plain; charset=UTF-8", Accept: "text/plain" },
+    qs,
+    body
+  })
 }

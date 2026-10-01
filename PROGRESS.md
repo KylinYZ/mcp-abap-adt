@@ -545,3 +545,13 @@
 - SAP 真机语义记录：对象删除后 E071 行不消失（含历史请求不可清，红线正确拒 S4HK900029）；清理链只接受归属校验传输的对象；ADT 删除留 TADIR 孤儿行。ED1 偶然佐证：7.51 双通道皆败时门禁正确拒（preview-only 零写入）。
 - 门禁：178 suites / 1908 tests 全绿（+TransportsParser 2 例 +绑定回归 1 例 + 清理语义测试改写）、build、coverage 28 REAL_DEV_VERIFIED 零缺证据、git diff --check。
 - 残留：S4HK900029（+任务 030）含 5 条中性历史行 + ZPRGWF* 源码已删的 TADIR 孤儿行，留属主 SE09；其余零残留。脚本新增 scripts/full-workflow-stage5-creation-gate.mjs、full-workflow-residue-cleanup.mjs、full-workflow-gate-probe.mjs。
+
+## 2026-09-30 闲时轮：F1 程序文本池原子写纳入 focused profile——四层门逐层取证修复，真机 SMOKE OK
+
+- 选型：所有者交接文档 9a591ae 新增 F 章任务清单，F1 [P1]（程序文本池写入受控化）为最高优先可落地项。本轮完成**最小方案**：原子 setTextElements 及配套 lock/unLock 纳入 focused/developer（development-workbench）入口。
+- 四层门逐层取证与修复（每层独立实证）：① catalog 可见——DEVELOPMENT_WORKBENCH_TOOL_NAMES 加 setTextElements/lock/unLock（lock/unLock 为 "caller manages locking" 模式的必要配套：锁句柄须与写调用同 server 会话，OTHER_MUTATION 已 DEV 专属）；② 策略门——assertToolOperationAllowed 的 raw 族 legacy-full 专属为 setTextElements/lock/unLock 开 workbench 口（仍 DEV 专属+写槽）；③ legacy 只读分派门——isReadOnlyLegacyTool 拒绝逻辑同口径开口；④ 协议 415——文本池 /source/{category} 端点只认 text/plain（adt.textelements.v1 专用媒体类型 PUT/GET 均 415），GET/PUT 对称修复（@MaxLength 协议不变）。
+- 真机（sap-demo）：focused 面运行时暴露 setTextElements → 直连创建+激活自有验证程序 ZWTXT#### → MCP lock（同会话锁）→ setTextElements 写 2 条中文文本符号 → getTextElements 读回逐条一致 → unLock → 删除+缺席零残留。SMOKE OK。
+- 排障过程记录：四层门逐层定位（每层独立取证后修复，catalog/策略/分派/协议各一）；跨会话锁句柄不可用（直连拿锁+MCP 面写会被 SAP 拒——必须走 MCP lock 工具）；dist 插桩的 require/shebang/转义三坑（ESM import 须在 shebang 后）。
+- 门禁全绿：180 suites / 1933 tests、build、coverage、parity、git diff --check。profile 计数（workbench=165）与 STRICT_TOOL_FIELDS（既有覆盖）同步。
+- 矩阵：report.text-elements 维持 MCP_SUPERSET，restrictionReason 更新（F1 最小方案落地+协议 415 取证；完整方案受控工具对为后续）。证据：docs/evidence/f1-textpool-focused-real-dev-verified.md。
+- 下一轮建议：F1 完整方案（previewTextPoolChange/applyTextPoolChange 受控工具对）或 F2（checkInstallPrerequisites 深化为 ZADT_VSP 可用性诊断）——均为所有者交接文档排定的可落地任务。
