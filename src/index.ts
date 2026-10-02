@@ -114,6 +114,8 @@ import {
 import { WhereUsedConfigHandlers } from './handlers/WhereUsedConfigHandlers.js';
 import { createWhereUsedConfigClient } from './adt/WhereUsedConfigApi.js';
 import { UsageExamplesHandlers } from './handlers/UsageExamplesHandlers.js';
+import { TextPoolHandlers } from './handlers/TextPoolHandlers.js';
+import { TextPoolWorkflow } from './safe/TextPoolWorkflow.js';
 import { createUsageExamplesClient } from './adt/UsageExamplesApi.js';
 import {
   createUnitCoverageClient
@@ -231,6 +233,7 @@ export class AbapAdtServer extends Server {
   private loadGraphHandlers: LoadGraphHandlers;
   private whereUsedConfigHandlers: WhereUsedConfigHandlers;
   private usageExamplesHandlers: UsageExamplesHandlers;
+  private textPoolHandlers: TextPoolHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -445,8 +448,9 @@ export class AbapAdtServer extends Server {
     // vit/wb TRAN 端点无映射，VSP 同源受限）。
     this.transactionReadHandlers = new TransactionReadHandlers(createTransactionReadClient(readClient));
     // 安装前置只读发现工具（install.diagnostics）：ZADT_VSP helper TADIR 探测 +
-    // abapGit 服务可达性分类 + 本地运行时；不做任何安装动作。git repos 的
-    // GET 由 httpClient 直发（状态码分类需要原始 status 而非异常）。
+    // 激活状态核验（SEOCLSRC/REPOSRC）+ APC/SICF WebSocket 服务面探测 +
+    // abapGit 服务可达性分类 + 本地运行时；不做任何安装动作。git repos 与
+    // APC 服务的 GET 由 httpClient 直发（状态码分类需要原始 status 而非异常）。
     this.installDiagnosticsHandlers = new InstallDiagnosticsHandlers(
       createInstallDiagnosticsClient({
         searchObject: (query, objType, max) => readClient.searchObject(query, objType, max),
@@ -454,6 +458,11 @@ export class AbapAdtServer extends Server {
         requestGitRepos: () => readClient.httpClient.request('/sap/bc/adt/abapgit/repos', {
           method: 'GET',
           headers: { Accept: 'application/abapgit.adt.repos.v2+xml' }
+        }),
+        // F2 深化：APC WebSocket 服务面探测（404=未配置；400/405 等其他状态=服务面存在）
+        requestApcService: () => readClient.httpClient.request('/sap/bc/apc/sap/zadt_vsp', {
+          method: 'GET',
+          headers: { Accept: 'application/json' }
         })
       })
     );
@@ -556,6 +565,38 @@ export class AbapAdtServer extends Server {
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs)
+    });
+    // 受控程序文本池写入（F1 完整方案，report.text-elements 受控化收尾）：
+    // 与消息文本链同面的受控写工作流（plan + 原生确认 + 程序对象锁单次执行 +
+    // readback）。锁句柄由本 server 会话持有（真机实证跨会话句柄被拒）。
+    const textPoolWorkflow = new TextPoolWorkflow({
+      read: async (program, category) => {
+        const result = await this.adtClient.getTextElements(
+          `/sap/bc/adt/programs/programs/${program.toLowerCase()}`, category);
+        return result.textElements.map(e => ({
+          id: e.id, text: e.text,
+          ...(e.maxLength && e.maxLength > 0 ? { maxLength: e.maxLength } : {})
+        }));
+      },
+      write: (program, category, elements, lockHandle, transport) =>
+        this.adtClient.setTextElements(
+          `/sap/bc/adt/programs/programs/${program.toLowerCase()}`, category, elements, lockHandle, transport),
+      locks: {
+        lock: async (programUrl, mode) => await this.adtClient.lock(programUrl, mode),
+        unLock: async (programUrl, handle) => await this.adtClient.unLock(programUrl, handle)
+      },
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    });
+    this.textPoolHandlers = new TextPoolHandlers(textPoolWorkflow, {
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
+      planSummary: planId => {
+        const plan = textPoolWorkflow.status(planId);
+        return { program: plan.program, category: plan.category, newCount: plan.newElements.length,
+          systemHost: plan.systemHost, client: plan.client };
+      }
     });
 
     const changeWorkflow = new AbapChangeWorkflow(
@@ -794,11 +835,11 @@ export class AbapAdtServer extends Server {
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
-      applyConfirmed: operationPlanId => this.executionGate.run(async () => {
+      applyConfirmed: (operationPlanId, confirmationMode) => this.executionGate.run(async () => {
         const plan = advancedPlans.get(operationPlanId);
-        if (plan.operationKind === 'CHANGE_PACKAGE') return packageWorkflow.apply(operationPlanId);
-        if (plan.operationKind === 'RAP_GENERATE' || plan.operationKind === 'RAP_PUBLISH_SERVICE') return rapWorkflow.apply(operationPlanId);
-        return ddicWorkflow.apply(operationPlanId);
+        if (plan.operationKind === 'CHANGE_PACKAGE') return packageWorkflow.apply(operationPlanId, confirmationMode);
+        if (plan.operationKind === 'RAP_GENERATE' || plan.operationKind === 'RAP_PUBLISH_SERVICE') return rapWorkflow.apply(operationPlanId, confirmationMode);
+        return ddicWorkflow.apply(operationPlanId, confirmationMode);
       })
     });
 
@@ -820,7 +861,7 @@ export class AbapAdtServer extends Server {
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
-      runConfirmed: qualityPlanId => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId))
+      runConfirmed: (qualityPlanId, confirmationMode) => this.executionGate.run(() => qualityWorkflow.run(qualityPlanId, confirmationMode))
     });
 
     // 受控对象激活工作流（关闭矩阵缺口 devtools.activate）：
@@ -842,7 +883,7 @@ export class AbapAdtServer extends Server {
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
-      applyConfirmed: activationPlanId => this.executionGate.run(() => activationWorkflow.apply(activationPlanId))
+      applyConfirmed: (activationPlanId, confirmationMode) => this.executionGate.run(() => activationWorkflow.apply(activationPlanId, confirmationMode))
     });
 
     // 受控传输请求创建工作流（cts.create-request 专属动作，仅创建）：
@@ -880,13 +921,13 @@ export class AbapAdtServer extends Server {
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
-      applyConfirmed: planId => this.executionGate.run(() => transportCreationWorkflow.apply(planId))
+      applyConfirmed: (planId, confirmationMode) => this.executionGate.run(() => transportCreationWorkflow.apply(planId, confirmationMode))
     }, transportCleanupWorkflow, {
       supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
       // 部署级自动确认开关：SAP_MCP_CONFIRMATION_MODE=auto（仅 DEV）时各确认链跳过人工表单
       autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
       elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
-      applyConfirmed: planId => this.executionGate.run(() => transportCleanupWorkflow.apply(planId))
+      applyConfirmed: (planId, confirmationMode) => this.executionGate.run(() => transportCleanupWorkflow.apply(planId, confirmationMode))
     });
 
     this.focusedTaskHandlers = new FocusedTaskHandlers(
@@ -1059,6 +1100,7 @@ export class AbapAdtServer extends Server {
       ...this.repositoryObjectCreationHandlers.getTools(true),
       ...this.descriptionChangeHandlers.getTools(),
       ...this.messageTextHandlers.getTools(),
+      ...this.textPoolHandlers.getTools(),
       ...this.cloneObjectHandlers.getTools(),
       ...this.renameControlledHandlers.getTools()
     ];
@@ -1335,6 +1377,11 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.messageTextHandlers.supports(toolName)) {
           return this.messageTextHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控程序文本池写入（F1 完整方案）：同型分派（DEV + workbench/development）。
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.textPoolHandlers.supports(toolName)) {
+          return this.textPoolHandlers.handle(toolName, limitedArguments);
         }
         // 受控对象克隆链：profile/role 门控已由 assertToolOperationAllowed 前置把关，
         // catalog 成员检查保证非 development/development-workbench profile 不可见。
