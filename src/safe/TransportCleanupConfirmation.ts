@@ -28,8 +28,11 @@ export interface TransportCleanupConfirmationOptions {
   supportsFormElicitation: () => boolean;
   /** 发起原生确认对话框 */
   elicitInput: (params: ElicitRequestFormParams, timeoutMs: number) => Promise<ElicitResult>;
-  /** 确认通过后的单次执行回调（由 executionGate 包裹的 workflow.apply） */
-  applyConfirmed: (transportCleanupPlanId: string) => Promise<Record<string, unknown>>;
+  /** 确认通过后的单次执行回调（由 executionGate 包裹的 workflow.apply）；confirmationMode 由确认层如实传入 */
+  applyConfirmed: (
+    transportCleanupPlanId: string,
+    confirmationMode?: 'elicitation' | 'auto-config'
+  ) => Promise<Record<string, unknown>>;
   /**
    * 部署级自动确认开关（SAP_MCP_CONFIRMATION_MODE=auto 且 DEV 时由接线层注入）：
    * 返回 true 时跳过人工表单确认直接执行。工具调用方永远无法通过参数触发此路径。
@@ -52,9 +55,11 @@ export class TransportCleanupConfirmation {
   async confirmAndRun(transportCleanupPlanId: string): Promise<Record<string, unknown>> {
     const plan = this.statusReader.status(transportCleanupPlanId);
     assertConfirmable(plan);
-    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）。
+    // 必须先于 supportsFormElicitation 检查——auto 模式部署下客户端无需具备
+    // elicitation 能力（与 AbapCreationConfirmation/TransportCreationConfirmation 的短路顺序保持同构）。
     if (this.options.autoApprove?.()) {
-      return this.options.applyConfirmed(transportCleanupPlanId);
+      return this.options.applyConfirmed(transportCleanupPlanId, 'auto-config');
     }
     if (!this.options.supportsFormElicitation()) {
       throw new SafeAbapError(
@@ -70,7 +75,7 @@ export class TransportCleanupConfirmation {
     if (elicited.action !== 'accept' || elicited.content?.decision !== 'delete_transport') {
       return { status: 'confirmation_declined', transportCleanupPlanId, confirmationMode: 'elicitation' };
     }
-    return this.options.applyConfirmed(transportCleanupPlanId);
+    return this.options.applyConfirmed(transportCleanupPlanId, 'elicitation');
   }
 
   /** 封装 elicitation 调用：客户端超时视为取消，其他失败视为确认通道故障。 */

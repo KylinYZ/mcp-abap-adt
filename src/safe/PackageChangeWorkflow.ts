@@ -82,7 +82,11 @@ export class PackageChangeWorkflow {
     return { status: 'preview', plan: this.plans.view(plan.operationPlanId, advancedContext(this.policy)), confirmationRequired: true };
   }
 
-  async apply(operationPlanId: string): Promise<Record<string, unknown>> {
+  async apply(
+    operationPlanId: string,
+    /** 确认层如实传入的确认方式：native elicitation / 部署级 auto-config；缺省 elicitation 保持旧行为 */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): Promise<Record<string, unknown>> {
     const context = advancedContext(this.policy);
     const previewed = this.plans.getForContext(operationPlanId, context);
     if (previewed.operationKind !== 'CHANGE_PACKAGE') {
@@ -91,7 +95,7 @@ export class PackageChangeWorkflow {
     assertAdvancedMutationAllowed(this.policy, previewed.target.objectName);
     const plan = this.plans.beginApply(operationPlanId, context);
     return guardAdvancedApply(plan, this.plans, this.audit, this.policy, async () => {
-      plan.confirmationMode = 'elicitation';
+      plan.confirmationMode = confirmationMode;
       const payload = plan.payload?.kind === 'CHANGE_PACKAGE' ? plan.payload : undefined;
       if (!payload) throw new SafeAbapError('PLAN_NOT_EXECUTABLE', 'advanced-plan', 'The package plan payload is unavailable.');
       await appendStage(plan, { stage: 'CONFIRM', success: true }, stage => this.plans.recordStage(operationPlanId, stage), this.audit, this.policy);

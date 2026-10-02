@@ -107,7 +107,7 @@ export interface TransportCreationPlan {
   payloadHash: string;                 // payload 的 SHA-256 指纹（审计比对用）
   payload?: TransportCreationPayload;  // 执行载荷；进入终态后立即清除
   stages: TransportCreationStage[];    // 阶段轨迹
-  confirmationMode?: 'elicitation';    // 确认方式：仅支持 MCP form elicitation
+  confirmationMode?: 'elicitation' | 'auto-config';    // 确认方式：仅支持 MCP form elicitation
   result?: TransportCreationResultSummary; // 有界结果摘要
   primaryError?: TransportCreationError;   // 首个错误
 }
@@ -151,7 +151,7 @@ export interface TransportCreationPlanView {
   target: TransportCreationTarget;
   payloadHash: string;
   stages: TransportCreationStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   result?: TransportCreationResultSummary;
   primaryError?: TransportCreationError;
 }

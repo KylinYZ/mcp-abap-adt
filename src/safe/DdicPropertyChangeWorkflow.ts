@@ -114,7 +114,11 @@ export class DdicPropertyChangeWorkflow {
     return { status: 'preview', plan: this.plans.view(plan.operationPlanId, advancedContext(this.policy)), confirmationRequired: true };
   }
 
-  async apply(operationPlanId: string): Promise<Record<string, unknown>> {
+  async apply(
+    operationPlanId: string,
+    /** 确认层如实传入的确认方式：native elicitation / 部署级 auto-config；缺省 elicitation 保持旧行为 */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): Promise<Record<string, unknown>> {
     const context = advancedContext(this.policy);
     const previewed = this.plans.getForContext(operationPlanId, context);
     if (!isDdicKind(previewed.operationKind)) {
@@ -123,7 +127,7 @@ export class DdicPropertyChangeWorkflow {
     assertAdvancedMutationAllowed(this.policy, previewed.target.objectName);
     const plan = this.plans.beginApply(operationPlanId, context);
     return guardAdvancedApply(plan, this.plans, this.audit, this.policy, async () => {
-      plan.confirmationMode = 'elicitation';
+      plan.confirmationMode = confirmationMode;
       const payload = requireDdicPayload(plan);
       await appendStage(plan, { stage: 'CONFIRM', success: true }, stage => this.plans.recordStage(operationPlanId, stage), this.audit, this.policy);
 

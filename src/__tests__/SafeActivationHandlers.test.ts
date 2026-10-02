@@ -110,7 +110,7 @@ describe('SafeActivationHandlers', () => {
 
     const result = await handlers.handle('applyObjectActivation', { activationPlanId: 'activation-1' });
 
-    expect(applyConfirmed).toHaveBeenCalledWith('activation-1');
+    expect(applyConfirmed).toHaveBeenCalledWith('activation-1', 'elicitation');
     expect(result).toMatchObject({ status: 'success' });
   });
 

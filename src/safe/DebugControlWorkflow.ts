@@ -26,6 +26,11 @@ export interface DebugAuditSink {
 export interface ApplyDebugOperationInput {
   debugOperationPlanId: string;
   confirmedByUser: boolean;
+  /**
+   * 确认方式（由确认层如实传入）：native 确认为 elicitation，
+   * 部署级 auto 确认为 auto-config；缺省按 elicitation 兜底保持旧行为。
+   */
+  confirmationMode?: 'elicitation' | 'auto-config';
 }
 
 export class DebugControlWorkflow {
@@ -76,7 +81,8 @@ export class DebugControlWorkflow {
     const previewed = this.plans.get(String(input.debugOperationPlanId || ''));
     const targetUser = this.policy.assertDebugControlAllowed(previewed.targetUser);
     const plan = this.plans.beginApply(previewed.debugOperationPlanId, this.planContext(targetUser));
-    plan.confirmationMode = 'elicitation';
+    // 确认方式如实记录：确认层 auto 短路时传 auto-config，与审计日志保持一致
+    plan.confirmationMode = input.confirmationMode ?? 'elicitation';
 
     let result: unknown;
     try {

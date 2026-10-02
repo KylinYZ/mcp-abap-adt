@@ -312,7 +312,7 @@ describe('SafeTransportCreationHandlers cleanup trio', () => {
   it('runs cleanup apply only after a native elicitation accept with the delete_transport decision', async () => {
     const { handlers, applyCleanupConfirmed } = setupHandlers();
     const result = await handlers.handle('applyTransportCleanup', { transportCleanupPlanId: 'tcx-1' });
-    expect(applyCleanupConfirmed).toHaveBeenCalledWith('tcx-1');
+    expect(applyCleanupConfirmed).toHaveBeenCalledWith('tcx-1', 'elicitation');
     expect(result).toMatchObject({ status: 'success' });
   });
 

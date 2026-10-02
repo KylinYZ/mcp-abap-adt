@@ -34,7 +34,6 @@ export class DebugConfirmation {
     debugOperationPlanId: string,
     expectedKind: 'VARIABLE' | 'OPERATION'
   ): Promise<Record<string, unknown>> {
-    this.assertFormSupported();
     const plan = this.workflow.status(debugOperationPlanId);
     this.assertConfirmable(plan);
     const isVariable = plan.operation.kind === 'SET_VARIABLE';
@@ -46,11 +45,14 @@ export class DebugConfirmation {
       );
     }
 
-    // 部署配置预授权：plan 状态与 kind 校验通过后跳过人工表单确认（native 模式校验顺序不变）
+    // 部署配置预授权：plan 状态与 kind 校验通过后跳过人工表单确认（native 模式校验顺序不变）。
+    // 必须先于 assertFormSupported 检查——auto 模式部署下客户端无需具备
+    // elicitation 能力（与 AbapCreationConfirmation/TransportCreationConfirmation 的短路顺序保持同构）。
     if (this.options.autoApprove?.()) {
       const input = { debugOperationPlanId, confirmedByUser: true, confirmationMode: 'auto-config' as const };
       return this.options.applyConfirmed ? this.options.applyConfirmed(input) : this.workflow.applyOperation(input);
     }
+    this.assertFormSupported();
 
     const result = await this.elicit(this.operationForm(plan), confirmationTimeoutMs(plan));
     if (result.action !== 'accept' || result.content?.decision !== 'apply') {
@@ -65,14 +67,14 @@ export class DebugConfirmation {
   }
 
   async confirmAndAuthorize(targetUser: string, debuggeeId: string): Promise<Record<string, unknown>> {
-    this.assertFormSupported();
     const attach = this.workflow.currentAttach(targetUser, debuggeeId);
-    // 部署配置预授权：attach 校验通过后跳过人工表单确认
+    // 部署配置预授权：attach 校验通过后跳过人工表单确认（与 confirmAndApply 同构，先于 form 能力检查）
     if (this.options.autoApprove?.()) {
       return this.options.authorizeConfirmed
         ? this.options.authorizeConfirmed(targetUser, debuggeeId)
         : this.workflow.authorizeConfirmed(targetUser, debuggeeId);
     }
+    this.assertFormSupported();
     const result = await this.elicit({
       mode: 'form',
       message: `授权 DEV 调试控制 · 用户 ${targetUser} · debuggee ${debuggeeId} · 进程 ${attach.processId}`,

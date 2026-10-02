@@ -141,6 +141,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
           lv_re     TYPE string,           " 正则校验结果
           lv_number TYPE p,                " P 转换探针（借隐式转换校验）
           lv_int    TYPE i,                " I 转换探针
+          lv_int8   TYPE int8,             " int8 探针（'8' 类别用 i 探针会假溢出）
           lv_float  TYPE f,                " F 转换探针
           lv_msg    TYPE string.           " 错误消息组装
 
@@ -163,7 +164,7 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
 
           WHEN 'N'.
             " NUMC：必须全数字且不超过位长（防 Excel 把前导零吃掉后的脏值混入）
-            lv_re = '^[0-9]{1,' && iv_max_len && '}'.  " 正则不用模板拼接（避开 {{ 字面转义，新内核解析歧义）
+            lv_re = '^[0-9]{1,' && iv_max_len && '}$'.  " $ 锚定结尾防前缀穿透（如 '12a4' 匹配 '12'）；不用模板拼接（避开 {{ 字面转义，新内核解析歧义）。E3 回归点
             IF iv_max_len <= 0 OR find( val = iv_text regex = lv_re ) < 0.
               zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是 { iv_max_len } 位以内的纯数字（NUMC）；若该值曾在 Excel 中编辑过，可能已被转成数字格式丢失前导零| ).
             ENDIF.
@@ -196,8 +197,10 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             IF sy-subrc <> 0.
               zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是合法十进制数（P 类，{ iv_decimals } 位小数）| ).
             ENDIF.
+            " 探针：非法/溢出在此统一抛出（p0 中转仅做校验，不落地——
+            " p0 会舍入小数，直接落地会丢 DECIMALS；E3 单元测试回归点）
             lv_number = iv_text.
-            cg_value = lv_number.
+            cg_value = iv_text.
 
           WHEN 'F'.
             " FLTP：接受普通十进制与科学计数两种文本形态
@@ -211,8 +214,14 @@ CLASS zcl_tabdata_type_conv IMPLEMENTATION.
             IF sy-subrc <> 0.
               zcx_tabdata_error=>raise( |{ iv_context }值 "{ iv_text }" 不是整数；若来自 Excel，请将该列设为"文本"格式后重新填写| ).
             ENDIF.
-            lv_int = iv_text.
-            cg_value = lv_int.
+            IF iv_kind = '8'.
+              " int8 探针：i 探针对超出 int4 范围的值会假溢出（E3 单元测试回归点）
+              lv_int8 = iv_text.
+              cg_value = lv_int8.
+            ELSE.
+              lv_int = iv_text.
+              cg_value = lv_int.
+            ENDIF.
 
           WHEN 'x' OR 'y'.
             " RAW：hex 解码（本工具导出约定）

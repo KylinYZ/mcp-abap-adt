@@ -56,7 +56,11 @@ export class RapOperationWorkflow {
     throw new SafeAbapError('VALIDATION_FAILED', 'VALIDATE', 'RAP operation kind must be RAP_GENERATE or RAP_PUBLISH_SERVICE.');
   }
 
-  async apply(operationPlanId: string): Promise<Record<string, unknown>> {
+  async apply(
+    operationPlanId: string,
+    /** 确认层如实传入的确认方式：native elicitation / 部署级 auto-config；缺省 elicitation 保持旧行为 */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): Promise<Record<string, unknown>> {
     const context = advancedContext(this.policy);
     const previewed = this.plans.getForContext(operationPlanId, context);
     if (previewed.operationKind !== 'RAP_GENERATE' && previewed.operationKind !== 'RAP_PUBLISH_SERVICE') {
@@ -65,7 +69,7 @@ export class RapOperationWorkflow {
     assertAdvancedMutationAllowed(this.policy, previewed.target.objectName);
     const plan = this.plans.beginApply(operationPlanId, context);
     return guardAdvancedApply(plan, this.plans, this.audit, this.policy, async () => {
-      plan.confirmationMode = 'elicitation';
+      plan.confirmationMode = confirmationMode;
       await appendStage(plan, { stage: 'CONFIRM', success: true }, stage => this.plans.recordStage(operationPlanId, stage), this.audit, this.policy);
       return plan.operationKind === 'RAP_GENERATE' ? this.applyGenerate(plan) : this.applyPublish(plan);
     });

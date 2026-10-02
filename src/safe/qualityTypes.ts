@@ -59,7 +59,7 @@ export interface QualityCheckPlan {
   stateHash: string;
   payload?: QualityCheckPayload;
   stages: QualityCheckStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   result?: QualityCheckResultSummary;
   primaryError?: QualityCheckError;
 }
@@ -93,7 +93,7 @@ export interface QualityCheckPlanView {
   timeoutSeconds: number;
   stateHash: string;
   stages: QualityCheckStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   result?: QualityCheckResultSummary;
   primaryError?: QualityCheckError;
 }

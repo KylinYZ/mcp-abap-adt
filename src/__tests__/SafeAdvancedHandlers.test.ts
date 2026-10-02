@@ -102,7 +102,7 @@ describe('SafeAdvancedHandlers', () => {
     expect(applyConfirmed).not.toHaveBeenCalled();
     accept({ action: 'accept', content: { decision: 'apply' } });
     await expect(pending).resolves.toEqual({ status: 'success' });
-    expect(applyConfirmed).toHaveBeenCalledWith('plan-1');
+    expect(applyConfirmed).toHaveBeenCalledWith('plan-1', 'elicitation');
   });
 
   it.each([
@@ -121,6 +121,6 @@ describe('SafeAdvancedHandlers', () => {
       applyConfirmed
     });
     await handlers.handle(toolName, { operationPlanId: 'plan-1' });
-    expect(applyConfirmed).toHaveBeenCalledWith('plan-1');
+    expect(applyConfirmed).toHaveBeenCalledWith('plan-1', 'elicitation');
   });
 });

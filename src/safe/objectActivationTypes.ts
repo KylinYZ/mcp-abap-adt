@@ -107,7 +107,7 @@ export interface ObjectActivationPlan {
   payloadHash: string;        // 对 payload 的 SHA-256 指纹，用于识别 plan 内容
   payload?: ObjectActivationPayload; // 执行载荷；进入终态后立即清除
   stages: ObjectActivationStage[];   // 阶段轨迹
-  confirmationMode?: 'elicitation';  // 确认方式：仅支持 MCP form elicitation
+  confirmationMode?: 'elicitation' | 'auto-config';  // 确认方式：仅支持 MCP form elicitation
   result?: ObjectActivationResultSummary; // 有界结果摘要
   primaryError?: ObjectActivationError;   // 首个错误
 }
@@ -133,7 +133,7 @@ export interface ObjectActivationPlanView {
   objects: InactiveObjectCandidate[];
   payloadHash: string;
   stages: ObjectActivationStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   result?: ObjectActivationResultSummary;
   primaryError?: ObjectActivationError;
 }

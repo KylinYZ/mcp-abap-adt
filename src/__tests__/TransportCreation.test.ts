@@ -333,7 +333,7 @@ describe('SafeTransportCreationHandlers', () => {
 
     const result = await handlers.handle('applyTransportCreation', { transportCreationPlanId: 'tc-1' });
 
-    expect(applyConfirmed).toHaveBeenCalledWith('tc-1');
+    expect(applyConfirmed).toHaveBeenCalledWith('tc-1', 'elicitation');
     expect(result).toMatchObject({ status: 'success' });
   });
 

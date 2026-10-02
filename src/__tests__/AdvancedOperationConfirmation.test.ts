@@ -37,7 +37,7 @@ describe('AdvancedOperationConfirmation', () => {
     });
 
     await expect(confirmation.confirmAndApply('plan-1', 'DDIC')).resolves.toEqual({ status: 'success' });
-    expect(applyConfirmed).toHaveBeenCalledWith('plan-1');
+    expect(applyConfirmed).toHaveBeenCalledWith('plan-1', 'elicitation');
     expect(elicitInput).toHaveBeenCalledWith(expect.objectContaining({
       mode: 'form',
       message: expect.stringContaining('DEVK900001')

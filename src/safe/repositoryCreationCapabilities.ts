@@ -250,12 +250,20 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
             properties: {
               name: { type: 'string', minLength: 1, maxLength: 30 },
               key: { type: 'boolean', optional: true },
-              type: { type: 'string', description: 'Allowed ABAP built-in type or data element', minLength: 1, maxLength: 128 },
-              length: { type: 'number', minimum: 1, maximum: 5000, optional: true },
-              decimals: { type: 'number', minimum: 0, maximum: 31, optional: true },
+              type: {
+                type: 'string',
+                description: 'Built-in type (CLNT/LANG/CUKY/UNIT/DATS/TIMS/ACCP/FLTP/INT1/INT2/INT4/INT8/DECFLOAT16/DECFLOAT34/UTCLONG are fixed-length: omit length; CHAR/NUMC/RAW/SSTRING/STRING take length; DEC/CURR/QUAN take length+decimals) or an existing data element name',
+                minLength: 1, maxLength: 128
+              },
+              length: { type: 'number', minimum: 1, maximum: 5000, optional: true, description: 'Only for CHAR/NUMC/RAW/SSTRING/STRING/DEC/CURR/QUAN; omit for fixed-length types' },
+              decimals: { type: 'number', minimum: 0, maximum: 31, optional: true, description: 'Only for DEC/CURR/QUAN' },
               notNull: { type: 'boolean', optional: true },
               description: { type: 'string', maxLength: 120, optional: true },
-              referenceField: { type: 'string', description: 'Required for CURR and QUAN fields', maxLength: 30, optional: true }
+              referenceField: {
+                type: 'string',
+                description: 'Required for CURR (reference a CUKY/WAERS field) and QUAN (reference a UNIT/MEINS field); the referenced field is reordered before it automatically; not allowed for DEC — use CURR/QUAN',
+                maxLength: 30, optional: true
+              }
             },
             required: ['name', 'type']
           }

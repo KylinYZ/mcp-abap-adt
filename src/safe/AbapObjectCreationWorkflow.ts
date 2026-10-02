@@ -146,10 +146,28 @@ export class AbapObjectCreationWorkflow {
               plan.transportRequest
             );
           } catch (error) {
+            // A3 交接修复：写源失败通常伴随服务端语法校验拒绝（如 "UP" is not allowed here），
+            // 但该错误文本不含行号。补一次与变更链同源的 syntax check，把结构化明细
+            // （line/offset/severity/text）随错误透出，agent 可直接按行修复而非盲目重建。
+            let syntaxMessages: SyntaxCheckResult[] | undefined;
+            try {
+              const syntax = await this.client.syntaxCheck(
+                created.actualSourceUrl as string,
+                created.actualObjectUrl,
+                created.source as string,
+                undefined,
+                'inactive'
+              );
+              const errors = syntax.filter(message => isErrorSeverity(message.severity));
+              if (errors.length > 0) syntaxMessages = errors;
+            } catch {
+              // 语法检查本身失败不掩盖原始写源错误
+            }
             throw new SafeAbapError(
               'SOURCE_WRITE_FAILED',
               'write',
-              `Failed to write source for ${created.objectName}: ${errorMessage(error)}`
+              `Failed to write source for ${created.objectName}: ${errorMessage(error)}`,
+              syntaxMessages ? { syntaxMessages } : undefined
             );
           }
           await this.recordStage(plan, `SOURCE_WRITTEN:${created.objectName}`, true, undefined, true, created);
@@ -511,6 +529,21 @@ export class AbapObjectCreationWorkflow {
       const result = await this.client.activate(object.objectName, object.actualObjectUrl, undefined, true);
       if (!result.success) {
         const details = activationFailureDetails(result, object);
+        // A3 交接修复：激活失败常见根因是语法错误，但激活结果消息只有 shortText 无行号；
+        // 补一次结构化语法检查（line/offset/severity/text），agent 可按行修复而非删除重建。
+        try {
+          const syntax = await this.client.syntaxCheck(
+            object.actualSourceUrl as string,
+            object.actualObjectUrl,
+            object.source as string,
+            undefined,
+            'inactive'
+          );
+          const errors = syntax.filter(message => isErrorSeverity(message.severity));
+          if (errors.length > 0) details.syntaxMessages = errors;
+        } catch {
+          // 语法检查本身失败不掩盖原始激活错误
+        }
         throw new SafeAbapError(
           'ACTIVATION_FAILED',
           'activate',

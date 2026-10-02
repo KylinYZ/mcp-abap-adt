@@ -265,7 +265,7 @@ CLASS lcl_runner IMPLEMENTATION.
     ENDIF.
     IF p_allow = abap_true AND p_reason IS NOT INITIAL.
       add_result( iv_category = '审计' iv_item = '放行标准表'
-                  iv_value = p_table iv_note = p_reason ).
+                  iv_value = CONV string( p_table ) iv_note = p_reason ).
     ENDIF.
 
   ENDMETHOD.
@@ -344,11 +344,12 @@ CLASS lcl_runner IMPLEMENTATION.
     ENDIF.
 
     " 6) upsert 写入（模式映射）
-    DATA(lv_mode) = COND c( WHEN p_uonlyi = abap_true
-                            THEN zcl_tabdata_table_access=>gc_mode_insert
-                            WHEN p_uonlyu = abap_true
-                            THEN zcl_tabdata_table_access=>gc_mode_update
-                            ELSE zcl_tabdata_table_access=>gc_mode_upsert ).
+    DATA lv_mode TYPE c LENGTH 1.
+    lv_mode = COND #( WHEN p_uonlyi = abap_true
+                      THEN zcl_tabdata_table_access=>gc_mode_insert
+                      WHEN p_uonlyu = abap_true
+                      THEN zcl_tabdata_table_access=>gc_mode_update
+                      ELSE zcl_tabdata_table_access=>gc_mode_upsert ).
 
     DATA(ls_up) = zcl_tabdata_table_access=>upsert(
         iv_table = CONV tabname( p_table )
@@ -362,7 +363,7 @@ CLASS lcl_runner IMPLEMENTATION.
     add_result( iv_category = '统计' iv_item = '跳过' iv_value = CONV string( ls_up-skipped ) ).
     IF p_allow = abap_true AND p_reason IS NOT INITIAL.
       add_result( iv_category = '审计' iv_item = '放行标准表'
-                  iv_value = p_table iv_note = p_reason ).
+                  iv_value = CONV string( p_table ) iv_note = p_reason ).
     ENDIF.
 
   ENDMETHOD.
@@ -401,7 +402,7 @@ CLASS lcl_runner IMPLEMENTATION.
     add_result( iv_category = '统计' iv_item = '备份文件' iv_value = lv_path ).
     IF p_allow = abap_true AND p_reason IS NOT INITIAL.
       add_result( iv_category = '审计' iv_item = '放行标准表'
-                  iv_value = p_table iv_note = p_reason ).
+                  iv_value = CONV string( p_table ) iv_note = p_reason ).
     ENDIF.
 
   ENDMETHOD.
@@ -465,7 +466,8 @@ CLASS lcl_runner IMPLEMENTATION.
     add_result( iv_category = '统计' iv_item = '恢复前快照' iv_value = lv_snap_path ).
 
     " 5) 最终确认弹窗（差异摘要已展示，用户显式确认才动表）
-    DATA(lv_answer) = CONV c( space ).  " '1'=YES '2'=NO 'A'=CANCEL
+    DATA lv_answer TYPE c LENGTH 1.  " '1'=YES '2'=NO 'A'=CANCEL（c 泛型不能 CONV/COND 构造，须声明具体类型）
+    lv_answer = space.
     CALL FUNCTION 'POPUP_TO_CONFIRM'
       EXPORTING
         title_bar              = '确认恢复'
@@ -489,7 +491,7 @@ CLASS lcl_runner IMPLEMENTATION.
                 iv_value = CONV string( lv_inserted ) ).
     IF p_allow = abap_true AND p_reason IS NOT INITIAL.
       add_result( iv_category = '审计' iv_item = '放行标准表'
-                  iv_value = p_table iv_note = p_reason ).
+                  iv_value = CONV string( p_table ) iv_note = p_reason ).
     ENDIF.
 
   ENDMETHOD.

@@ -22,6 +22,8 @@ const object: ResolvedCreationObject = {
 
 function harness(options: {
   syntaxError?: boolean;
+  /** 模拟 setObjectSource 被服务端语法校验拒绝（SAP 消息无行号，触发 A3 补充检查）。 */
+  writeThrows?: boolean;
   syntaxWarning?: boolean;
   uncertainCreate?: boolean;
   resolveCreatedFails?: boolean;
@@ -97,7 +99,11 @@ function harness(options: {
       runQuery: jest.fn(async (sql: string) => ({ values: options.sqlRows!(sql) }))
     } : {}),
     getObjectSource: jest.fn(async () => { calls.push('getSource'); return source; }),
-    setObjectSource: jest.fn(async (_url, value) => { calls.push('write'); source = value; }),
+    setObjectSource: jest.fn(async (_url, value) => {
+      calls.push('write');
+      if (options.writeThrows) throw new Error('"UP" is not allowed here');
+      source = value;
+    }),
     syntaxCheck: jest.fn(async () => {
       calls.push('syntax');
       if (options.syntaxError) return [{ severity: 'E', line: 1, text: 'bad source' }];
@@ -196,6 +202,23 @@ describe('AbapObjectCreationWorkflow', () => {
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({ code: 'SYNTAX_CHECK_FAILED', details: { plan: { status: 'COMPENSATED' } } });
     expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'lock', 'delete']);
+    expect(test.exists()).toBe(false);
+  });
+
+  it('surfaces structured syntax messages when the source write is rejected (A3)', async () => {
+    // 写源失败时 SAP 消息无行号；workflow 应补一次同源 syntax check，
+    // 并把含 line/offset/severity 的 syntaxMessages 附在错误 details 中透出。
+    const test = harness({ writeThrows: true, syntaxError: true });
+    await test.workflow.preview(previewInput);
+
+    await expect(test.workflow.apply({
+      creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
+    })).rejects.toMatchObject({
+      code: 'SOURCE_WRITE_FAILED',
+      details: { syntaxMessages: [{ severity: 'E', line: 1, text: 'bad source' }] }
+    });
+    // 写源失败后跳过主语法检查，直接进入补充检查与补偿删除
+    expect(test.client.syntaxCheck).toHaveBeenCalled();
     expect(test.exists()).toBe(false);
   });
 

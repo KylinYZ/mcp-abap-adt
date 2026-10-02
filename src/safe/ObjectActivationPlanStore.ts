@@ -92,14 +92,19 @@ export class ObjectActivationPlanStore {
    * - EXPIRED 明确报 PLAN_EXPIRED；
    * - 其他非 PREVIEWED 状态报 PLAN_ALREADY_CONSUMED（含重复 apply）。
    */
-  beginRun(activationPlanId: string, context: ObjectActivationContext): ObjectActivationPlan {
+  beginRun(
+    activationPlanId: string,
+    context: ObjectActivationContext,
+    /** 确认方式由确认层如实传入：native 确认为 elicitation（默认），部署级 auto 确认为 auto-config */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): ObjectActivationPlan {
     const plan = this.getForContext(activationPlanId, context);
     if (plan.status === 'EXPIRED') throw new SafeAbapError('PLAN_EXPIRED', 'activation-plan', 'Object activation plan has expired.');
     if (plan.status !== 'PREVIEWED') {
       throw new SafeAbapError('PLAN_ALREADY_CONSUMED', 'activation-plan', `Object activation plan is already ${plan.status.toLowerCase()}.`);
     }
     plan.status = 'RUNNING';
-    plan.confirmationMode = 'elicitation';
+    plan.confirmationMode = confirmationMode;
     return plan;
   }
 

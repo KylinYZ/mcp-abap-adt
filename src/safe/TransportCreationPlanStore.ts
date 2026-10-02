@@ -95,7 +95,12 @@ export class TransportCreationPlanStore {
    * - EXPIRED 明确报 PLAN_EXPIRED；
    * - 其他非 PREVIEWED 状态报 PLAN_ALREADY_CONSUMED（含重复 apply）。
    */
-  beginRun(transportCreationPlanId: string, context: TransportCreationContext): TransportCreationPlan {
+  beginRun(
+    transportCreationPlanId: string,
+    context: TransportCreationContext,
+    /** 确认方式由确认层如实传入：native 确认为 elicitation（默认），部署级 auto 确认为 auto-config */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): TransportCreationPlan {
     const plan = this.getForContext(transportCreationPlanId, context);
     if (plan.status === 'EXPIRED') {
       throw new SafeAbapError('PLAN_EXPIRED', 'transport-creation-plan', 'Transport creation plan has expired.');
@@ -108,7 +113,7 @@ export class TransportCreationPlanStore {
       );
     }
     plan.status = 'RUNNING';
-    plan.confirmationMode = 'elicitation';
+    plan.confirmationMode = confirmationMode;
     return plan;
   }
 

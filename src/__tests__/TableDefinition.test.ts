@@ -32,7 +32,6 @@ describe('controlled database table DDL', () => {
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'CLIENT', type: 'CHAR', length: 1 }] }, 'Duplicate'],
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2 }] }, 'requires referenceField'],
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2, referenceField: 'CURRENCY' }] }, 'does not exist'],
-    [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2, referenceField: 'CURRENCY' }, { name: 'CURRENCY', type: 'WAERS' }] }, 'must appear before'],
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'TEXT', type: 'CHAR', length: 5 }, { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2, referenceField: 'TEXT' }] }, 'incompatible'],
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'BAD', type: 'CHAR', length: 0 }] }, 'between 1 and 1333'],
     [{ name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, { name: 'BAD', type: 'CURR', length: 10, decimals: 10, referenceField: 'CLIENT' }] }, 'smaller than']
@@ -54,5 +53,115 @@ describe('controlled database table DDL', () => {
     const ddl = buildDatabaseTableDdl({ name: 'ZBUILTIN', description: 'Built-ins', fields })
     for (const type of fixed) expect(ddl).toContain(`abap.${type.toLowerCase()}`)
     expect(ddl).toContain('abap.dec(15,3)')
+  })
+
+  // ---------------------------------------------------------------------------
+  // A5 交接修复回归：真机部署 ZTABDATA 双系统实战踩中的四类 DDIC 创建协议缺陷
+  // ---------------------------------------------------------------------------
+
+  it('maps STRING to abap.string (no length) and abap.sstring(n) (with length)', () => {
+    const ddl = buildDatabaseTableDdl({
+      name: 'ZSTRINGT',
+      description: 'String fields',
+      fields: [
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'LONGTEXT', type: 'STRING' },
+        { name: 'NAME', type: 'SSTRING', length: 80 }
+      ]
+    })
+    // 此前裸 `string` 被当数据元素，SAP 激活报"数据类型 不存在"
+    expect(ddl).toContain('longtext : abap.string;')
+    expect(ddl).toContain('name : abap.sstring(80);')
+    expect(ddl).not.toMatch(/longtext : string;/)
+  })
+
+  it.each([
+    [{ name: 'CREATED', type: 'DATS', decimals: 0 }],
+    [{ name: 'CLIENT', key: true, type: 'CLNT', length: 3 }],
+    [{ name: 'LONGTEXT', type: 'STRING', decimals: 0 }]
+  ] as const)('rejects dimension parameters on types that do not take them %#', field => {
+    const input = field.type === 'STRING'
+      ? { name: 'ZTEST', description: 'Test', fields: [{ name: 'CLIENT', key: true, type: 'CLNT' }, field as any] }
+      : { name: 'ZTEST', description: 'Test', fields: [field as any] }
+    expect(() => buildDatabaseTableDdl(input as any)).toThrow()
+  })
+
+  it('rejects fixed-length types carrying length with an actionable message', () => {
+    expect(() => buildDatabaseTableDdl({
+      name: 'ZTEST',
+      description: 'Test',
+      fields: [{ name: 'CLIENT', key: true, type: 'CLNT', length: 3 }]
+    })).toThrow('fixed-length type: omit length and decimals entirely')
+  })
+
+  it('tells DEC+referenceField callers to use CURR or QUAN', () => {
+    expect(() => buildDatabaseTableDdl({
+      name: 'ZTEST',
+      description: 'Test',
+      fields: [
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'CURRENCY', type: 'CUKY' },
+        { name: 'AMOUNT', type: 'DEC', length: 15, decimals: 2, referenceField: 'CURRENCY' }
+      ]
+    })).toThrow('must use type CURR or QUAN instead of DEC')
+  })
+
+  it('reorders a referenced field declared after its CURR consumer (A5: automatic dependency order)', () => {
+    // 真机踩坑：referenceField 必须先于引用字段，顺序错报 "must appear before"——现在自动重排
+    const ddl = buildDatabaseTableDdl({
+      name: 'ZREORDR',
+      description: 'Reorder',
+      fields: [
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2, referenceField: 'CURRENCY' },
+        { name: 'CURRENCY', type: 'CUKY' }
+      ]
+    })
+    const currencyLine = ddl.indexOf('currency : abap.cuky;')
+    const amountLine = ddl.indexOf('amount : abap.curr(15,2);')
+    expect(currencyLine).toBeGreaterThan(-1)
+    expect(amountLine).toBeGreaterThan(-1)
+    // 引用字段被自动移动到引用者之前
+    expect(currencyLine).toBeLessThan(amountLine)
+    expect(ddl).toContain("@Semantics.amount.currencyCode : 'zreordr.currency'")
+  })
+
+  it('keeps the key prefix contiguous while reordering', () => {
+    // key 字段重排后必须仍构成连续前缀：key 组整体在前
+    const ddl = buildDatabaseTableDdl({
+      name: 'ZKEYPRE',
+      description: 'Key prefix',
+      fields: [
+        { name: 'AMOUNT', type: 'CURR', length: 15, decimals: 2, referenceField: 'CURRENCY' },
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'KEYCURR', key: true, type: 'CURR', length: 12, decimals: 2, referenceField: 'WAERSC' },
+        { name: 'CURRENCY', type: 'CUKY' },
+        { name: 'WAERSC', key: true, type: 'CUKY' }
+      ]
+    })
+    // key 字段（client/keycurr/waersc）全部出现在非 key 字段（amount/currency）之前
+    const keyEnd = Math.max(
+      ddl.indexOf('key client : abap.clnt'),
+      ddl.indexOf('key keycurr : abap.curr(12,2)'),
+      ddl.indexOf('key waersc : abap.cuky')
+    )
+    const nonKeyStart = Math.min(
+      ddl.indexOf('amount : abap.curr(15,2)'),
+      ddl.indexOf('currency : abap.cuky;')
+    )
+    expect(keyEnd).toBeLessThan(nonKeyStart)
+  })
+
+  it('still refuses a key CURR referencing a non-key field (key prefix cannot be broken)', () => {
+    // key 的 CURR 引用非 key 的 CUKY 无法通过重排满足（key 必须在前缀）——保留明确报错
+    expect(() => buildDatabaseTableDdl({
+      name: 'ZTEST',
+      description: 'Test',
+      fields: [
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'KEYCURR', key: true, type: 'CURR', length: 12, decimals: 2, referenceField: 'CURRENCY' },
+        { name: 'CURRENCY', type: 'CUKY' }
+      ]
+    })).toThrow('must appear before')
   })
 })

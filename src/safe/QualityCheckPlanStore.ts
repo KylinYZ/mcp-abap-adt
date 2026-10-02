@@ -75,14 +75,19 @@ export class QualityCheckPlanStore {
     return plan;
   }
 
-  beginRun(qualityPlanId: string, context: QualityCheckContext): QualityCheckPlan {
+  beginRun(
+    qualityPlanId: string,
+    context: QualityCheckContext,
+    /** 确认方式由确认层如实传入：native 确认为 elicitation（默认），部署级 auto 确认为 auto-config */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): QualityCheckPlan {
     const plan = this.getForContext(qualityPlanId, context);
     if (plan.status === 'EXPIRED') throw new SafeAbapError('PLAN_EXPIRED', 'quality-plan', 'Quality check plan has expired.');
     if (plan.status !== 'PREVIEWED') {
       throw new SafeAbapError('PLAN_ALREADY_CONSUMED', 'quality-plan', `Quality check plan is already ${plan.status.toLowerCase()}.`);
     }
     plan.status = 'RUNNING';
-    plan.confirmationMode = 'elicitation';
+    plan.confirmationMode = confirmationMode;
     return plan;
   }
 

@@ -95,7 +95,7 @@ export interface TransportCleanupPlan {
   payloadHash: string;              // payload 的 SHA-256 指纹（审计比对用）
   payload?: TransportCleanupPayload; // 执行载荷；进入终态后立即清除
   stages: TransportCleanupStage[];  // 阶段轨迹
-  confirmationMode?: 'elicitation'; // 确认方式：仅支持 MCP form elicitation
+  confirmationMode?: 'elicitation' | 'auto-config'; // 确认方式：仅支持 MCP form elicitation
   result?: TransportCleanupResultSummary; // 有界结果摘要
   primaryError?: TransportCleanupError;   // 首个错误
 }
@@ -137,7 +137,7 @@ export interface TransportCleanupPlanView {
   target: TransportCleanupTarget;
   payloadHash: string;
   stages: TransportCleanupStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   result?: TransportCleanupResultSummary;
   primaryError?: TransportCleanupError;
 }

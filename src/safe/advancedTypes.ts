@@ -153,7 +153,7 @@ export interface AdvancedOperationPlan {
   payload?: AdvancedOperationPayload;
   rollbackSupported: boolean;
   stages: AdvancedOperationStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   resultSummary?: string;
   primaryError?: AdvancedOperationError;
 }
@@ -185,7 +185,7 @@ export interface AdvancedOperationPlanView {
   payloadFingerprint: AdvancedPayloadFingerprint;
   rollbackSupported: boolean;
   stages: AdvancedOperationStage[];
-  confirmationMode?: 'elicitation';
+  confirmationMode?: 'elicitation' | 'auto-config';
   resultSummary?: string;
   primaryError?: AdvancedOperationError;
 }

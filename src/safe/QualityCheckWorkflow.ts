@@ -102,7 +102,11 @@ export class QualityCheckWorkflow {
     return this.plans.view(qualityPlanId, qualityContext(this.policy));
   }
 
-  async run(qualityPlanId: string): Promise<Record<string, unknown>> {
+  async run(
+    qualityPlanId: string,
+    /** 确认层如实传入的确认方式：native elicitation / 部署级 auto-config；缺省 elicitation 保持旧行为 */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): Promise<Record<string, unknown>> {
     const context = qualityContext(this.policy);
     const previewed = this.plans.getForContext(qualityPlanId, context);
     if (previewed.status !== 'PREVIEWED') {
@@ -124,7 +128,8 @@ export class QualityCheckWorkflow {
       ));
     }
     this.plans.recordStage(qualityPlanId, { stage: 'DRIFT_CHECK', success: true });
-    const plan = this.plans.beginRun(qualityPlanId, context);
+    // 进入 RUNNING：同一 plan 从此不可再次 apply；确认方式由确认层如实传入
+    const plan = this.plans.beginRun(qualityPlanId, context, confirmationMode);
     try {
       await this.audit.append(qualityAuditEvent(plan, this.policy, 'QUALITY_RUN_CONFIRMED', true));
     } catch (error) {

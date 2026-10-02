@@ -144,7 +144,11 @@ export class TransportCleanupWorkflow {
    * 只接受 server 生成 plan 的 id；重复 apply、未知 plan、过期 plan、
    * 跨上下文 plan 一律拒绝。删除异常或请求仍可读时置 UNKNOWN_OUTCOME 停止。
    */
-  async apply(transportCleanupPlanId: string): Promise<Record<string, unknown>> {
+  async apply(
+    transportCleanupPlanId: string,
+    /** 确认层如实传入的确认方式：native elicitation / 部署级 auto-config；缺省 elicitation 保持旧行为 */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): Promise<Record<string, unknown>> {
     const context = cleanupContext(this.policy);
     const previewed = this.plans.getForContext(transportCleanupPlanId, context);
     // 过期 plan 单独报 PLAN_EXPIRED：与"已被消费"区分，提示调用方必须重新 preview
@@ -164,7 +168,8 @@ export class TransportCleanupWorkflow {
     }
 
     // 进入 RUNNING：同一 plan 从此不可再次 apply
-    const plan = this.plans.beginRun(transportCleanupPlanId, context);
+    // 进入 RUNNING：同一 plan 从此不可再次 apply；确认方式由确认层如实传入
+    const plan = this.plans.beginRun(transportCleanupPlanId, context, confirmationMode);
     try {
       await this.audit.append(cleanupAuditEvent(plan, this.policy, 'TRANSPORT_CLEANUP_CONFIRMED', true));
     } catch (error) {

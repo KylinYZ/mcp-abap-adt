@@ -95,7 +95,12 @@ export class TransportCleanupPlanStore {
    * - EXPIRED 明确报 PLAN_EXPIRED；
    * - 其他非 PREVIEWED 状态报 PLAN_ALREADY_CONSUMED（含重复 apply）。
    */
-  beginRun(transportCleanupPlanId: string, context: TransportCleanupContext): TransportCleanupPlan {
+  beginRun(
+    transportCleanupPlanId: string,
+    context: TransportCleanupContext,
+    /** 确认方式由确认层如实传入：native 确认为 elicitation（默认），部署级 auto 确认为 auto-config */
+    confirmationMode: 'elicitation' | 'auto-config' = 'elicitation'
+  ): TransportCleanupPlan {
     const plan = this.getForContext(transportCleanupPlanId, context);
     if (plan.status === 'EXPIRED') {
       throw new SafeAbapError('PLAN_EXPIRED', 'transport-cleanup-plan', 'Transport cleanup plan has expired.');
@@ -108,7 +113,7 @@ export class TransportCleanupPlanStore {
       );
     }
     plan.status = 'RUNNING';
-    plan.confirmationMode = 'elicitation';
+    plan.confirmationMode = confirmationMode;
     return plan;
   }
 

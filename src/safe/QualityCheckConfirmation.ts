@@ -20,7 +20,8 @@ export interface QualityCheckConfirmationOptions {
    * 返回 true 时跳过人工表单确认直接执行。工具调用方永远无法通过参数触发此路径。
    */
   autoApprove?: () => boolean;
-  runConfirmed: (qualityPlanId: string) => Promise<Record<string, unknown>>;
+  /** 确认通过后的单次执行回调（由 executionGate 包裹）；confirmationMode 由确认层如实传入 */
+  runConfirmed: (qualityPlanId: string, confirmationMode?: 'elicitation' | 'auto-config') => Promise<Record<string, unknown>>;
   now?: () => number;
 }
 
@@ -33,18 +34,20 @@ export class QualityCheckConfirmation {
   ) {}
 
   async confirmAndRun(qualityPlanId: string): Promise<Record<string, unknown>> {
+    const plan = this.statusReader.status(qualityPlanId);
+    assertConfirmable(plan);
+    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）。
+    // 必须先于 supportsFormElicitation 检查——auto 模式部署下客户端无需具备
+    // elicitation 能力（与 AbapCreationConfirmation/TransportCreationConfirmation 的短路顺序保持同构）。
+    if (this.options.autoApprove?.()) {
+      return this.options.runConfirmed(qualityPlanId, 'auto-config');
+    }
     if (!this.options.supportsFormElicitation()) {
       throw new SafeAbapError(
         'CONFIRMATION_UNSUPPORTED',
         'confirmation',
         'Quality checks require MCP form elicitation; text confirmation fallback is not supported.'
       );
-    }
-    const plan = this.statusReader.status(qualityPlanId);
-    assertConfirmable(plan);
-    // 部署配置预授权：plan 状态校验通过后跳过人工表单确认（native 模式校验顺序不变）
-    if (this.options.autoApprove?.()) {
-      return this.options.runConfirmed(qualityPlanId);
     }
     const elicited = await this.elicit(
       confirmationForm(plan),
@@ -53,7 +56,7 @@ export class QualityCheckConfirmation {
     if (elicited.action !== 'accept' || elicited.content?.decision !== 'run') {
       return { status: 'confirmation_declined', qualityPlanId, confirmationMode: 'elicitation' };
     }
-    return this.options.runConfirmed(qualityPlanId);
+    return this.options.runConfirmed(qualityPlanId, 'elicitation');
   }
 
   private async elicit(params: ElicitRequestFormParams, timeoutMs: number): Promise<ElicitResult> {
