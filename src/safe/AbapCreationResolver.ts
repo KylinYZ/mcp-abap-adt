@@ -119,13 +119,70 @@ export class AbapCreationResolver {
       return results.filter(result => matchesObject(result, objectType, objectName));
     } catch (error) {
       if (error instanceof SafeAbapError) throw error;
+      // A7 降级：ADT quick search 通道不可用时（真机实证：该 DEV quicksearch 端点
+      // 会间歇性 400 且不自愈），改用 TADIR 只读 SQL 判定对象是否存在——TADIR 是
+      // 仓库对象登记的权威表，对"缺席判定"与 quick search 等价（有行=已登记）。
+      // FUNCTION_GROUP_INCLUDE 是组内 include 无独立 R3TR 登记键，不适用降级。
+      const tadirObject = TADIR_OBJECT_BY_TYPE[objectType];
+      if (!tadirObject || typeof this.client.runQuery !== 'function') {
+        throw new SafeAbapError(
+          'OBJECT_RESOLUTION_FAILED',
+          'resolve',
+          `Failed to search for ${objectType} ${objectName}: ${errorMessage(error)}`
+        );
+      }
+      return this.exactMatchesByTadir(tadirObject, objectType, objectName, error);
+    }
+  }
+
+  /** quick search 不可用时的 TADIR 只读降级：R3TR 精确键查询，命中即视为对象已存在。 */
+  private async exactMatchesByTadir(
+    tadirObject: string,
+    objectType: CreationObjectType | 'PACKAGE',
+    objectName: string,
+    cause: unknown
+  ): Promise<SearchResult[]> {
+    try {
+      // objectName 已被 normalizeObjectName 白名单校验（大写字母/数字/下划线），无注入面
+      const result = await this.client.runQuery!(
+        `SELECT obj_name, object FROM tadir WHERE pgmid = 'R3TR' AND obj_name = '${objectName}' AND object = '${tadirObject}'`,
+        10
+      );
+      const rows = result?.values ?? [];
+      return rows
+        .filter(row => String(row.OBJ_NAME || '').toUpperCase() === objectName.toUpperCase())
+        .map(row => ({
+          // 构造 matchesObject 兼容的 quick search 条目形态（adtcore:type 用链路同款前缀）
+          'adtcore:name': String(row.OBJ_NAME || '').toUpperCase(),
+          'adtcore:type': TADIR_ADT_TYPE[tadirObject] || tadirObject,
+          'adtcore:uri': ''
+        }));
+    } catch (queryError) {
+      // 两条通道都失败：如实失败（不得把未知当缺席——创建会覆盖已存在对象）
       throw new SafeAbapError(
         'OBJECT_RESOLUTION_FAILED',
         'resolve',
-        `Failed to search for ${objectType} ${objectName}: ${errorMessage(error)}`
+        `Quick search failed (${errorMessage(cause)}) and the TADIR fallback also failed `
+        + `(${errorMessage(queryError)}); existence of ${objectType} ${objectName} cannot be determined.`
       );
     }
   }
+}
+
+/** 创建类型 → TADIR R3TR OBJECT 键。 */
+const TADIR_OBJECT_BY_TYPE: Record<string, string> = {
+  PROGRAM: 'PROG',
+  FUNCTION_GROUP: 'FUGR',
+  FUNCTION_MODULE: 'FUNC',
+  PACKAGE: 'DEVC'
+}
+
+/** TADIR OBJECT → matchesObject 可识别的 adtcore:type 前缀。 */
+const TADIR_ADT_TYPE: Record<string, string> = {
+  PROG: 'PROG/P',
+  FUGR: 'FUGR/F',
+  FUNC: 'FUGR/FF',
+  DEVC: 'DEVC/K'
 }
 
 function normalizeGraph(inputs: CreationObjectInput[], policy: SafetyPolicy): ResolvedCreationObject[] {

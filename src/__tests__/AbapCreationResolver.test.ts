@@ -33,6 +33,51 @@ function client(): jest.Mocked<CreationAdtClient> {
 }
 
 describe('AbapCreationResolver', () => {
+  it('falls back to TADIR SQL when quick search fails (A7 degradation)', async () => {
+    // quick search 端点间歇 400（真机实证）；降级用 TADIR 只读 SQL 判定缺席
+    const adt = client();
+    adt.searchObject = jest.fn(async (_query: string) => { throw new Error('Request failed with status code 400'); });
+    adt.runQuery = jest.fn(async (sql: string) => {
+      expect(sql).toContain("pgmid = 'R3TR'");
+      // resolve 先查父包（DEVC Z001）再查目标对象（PROG ZNEW），均按 TADIR 精确键
+      return sql.includes("object = 'DEVC'")
+        ? { values: [{ OBJ_NAME: 'Z001', OBJECT: 'DEVC' }] }
+        : { values: [] };
+    });
+    const resolver = new AbapCreationResolver(adt, policy);
+    await expect(resolver.resolve([{
+      objectType: 'PROGRAM', objectName: 'ZNEW', description: 'New', packageName: 'Z001', source: 'REPORT znew.'
+    }])).resolves.toEqual([expect.objectContaining({ objectType: 'PROGRAM' })]);
+    expect(adt.runQuery).toHaveBeenCalled();
+  });
+
+  it('reports OBJECT_ALREADY_EXISTS via the TADIR fallback when the object is registered', async () => {
+    const adt = client();
+    adt.searchObject = jest.fn(async (_query: string) => { throw new Error('Request failed with status code 400'); });
+    adt.runQuery = jest.fn(async () => ({ values: [{ OBJ_NAME: 'ZEXISTS', OBJECT: 'PROG' }] }));
+    const resolver = new AbapCreationResolver(adt, policy);
+    await expect(resolver.assertTargetsAbsent([{
+      objectType: 'PROGRAM', objectName: 'ZEXISTS', description: 'x', adtType: 'PROG/P',
+      packageName: 'Z001', parentName: 'Z001', parentPath: '/sap/bc/adt/packages/z001',
+      objectUrl: '', sourceUrl: undefined, source: 'REPORT zexists.', sourceHash: 'h'
+    } as never])).rejects.toMatchObject({ code: 'OBJECT_ALREADY_EXISTS' });
+  });
+
+  it('fails honestly when both quick search and the TADIR fallback fail', async () => {
+    const adt = client();
+    adt.searchObject = jest.fn(async (_query: string) => { throw new Error('Request failed with status code 400'); });
+    adt.runQuery = jest.fn(async () => { throw new Error('datapreview budget exhausted'); });
+    const resolver = new AbapCreationResolver(adt, policy);
+    await expect(resolver.assertTargetsAbsent([{
+      objectType: 'PROGRAM', objectName: 'ZANY', description: 'x', adtType: 'PROG/P',
+      packageName: 'Z001', parentName: 'Z001', parentPath: '/sap/bc/adt/packages/z001',
+      objectUrl: '', sourceUrl: undefined, source: 'REPORT zany.', sourceHash: 'h'
+    } as never])).rejects.toMatchObject({
+      code: 'OBJECT_RESOLUTION_FAILED',
+      message: expect.stringContaining('TADIR fallback also failed')
+    });
+  });
+
   it('resolves a new program without accepting ADT URLs from the caller', async () => {
     const resolver = new AbapCreationResolver(client(), policy);
     await expect(resolver.resolve([{
