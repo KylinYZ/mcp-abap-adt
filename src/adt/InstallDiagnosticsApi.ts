@@ -165,14 +165,21 @@ async function probeActivation(
     return { verified: false, activeCount: 0, notActive: objects.map(o => ({ name: o.name, type: o.type, state: 'UNKNOWN' as const })) }
   }
 
-  activation.verified = anyQuerySucceeded
+  // 核验完成判定：激活表有查询（有可核验的 ABAP 仓库对象），或清单里全是
+  // 无激活状态的 ICF 对象（SAPC/SICF——真机实测 F2 场景，TADIR 只回这两类）
+  activation.verified = anyQuerySucceeded || (classNames.length === 0 && progNames.length === 0)
   for (const object of objects) {
     if (activeNames.has(object.name.toUpperCase())) {
       activation.activeCount += 1
-    } else if (!anyQuerySucceeded || otherNames.some(other => other.name === object.name)) {
-      activation.notActive.push({ name: object.name, type: object.type, state: 'UNKNOWN' })
     } else {
-      activation.notActive.push({ name: object.name, type: object.type, state: 'INACTIVE' })
+      // 未命中 active：SQL 核验失败/类型无通道记 UNKNOWN，确有非激活版本记 INACTIVE
+      const isInactivKnown = anyQuerySucceeded
+        && ((object.type === 'CLAS' || object.type === 'INTF' || object.type === 'PROG' || object.type === 'FUGR'))
+      activation.notActive.push({
+        name: object.name,
+        type: object.type,
+        state: isInactivKnown ? 'INACTIVE' : 'UNKNOWN'
+      })
     }
   }
   return activation
