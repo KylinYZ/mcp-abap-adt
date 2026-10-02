@@ -125,7 +125,11 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 模式的锁句柄必须与写调用同 server 会话，缺锁工具则原子写不可用。
   'setTextElements',
   'lock',
-  'unLock'
+  'unLock',
+  // 受控程序文本池写入链（F1 完整方案）：preview/apply/status 三件套
+  'previewTextPoolChange',
+  'applyTextPoolChange',
+  'getTextPoolChangeStatus'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

@@ -555,3 +555,14 @@
 - 门禁全绿：180 suites / 1933 tests、build、coverage、parity、git diff --check。profile 计数（workbench=165）与 STRICT_TOOL_FIELDS（既有覆盖）同步。
 - 矩阵：report.text-elements 维持 MCP_SUPERSET，restrictionReason 更新（F1 最小方案落地+协议 415 取证；完整方案受控工具对为后续）。证据：docs/evidence/f1-textpool-focused-real-dev-verified.md。
 - 下一轮建议：F1 完整方案（previewTextPoolChange/applyTextPoolChange 受控工具对）或 F2（checkInstallPrerequisites 深化为 ZADT_VSP 可用性诊断）——均为所有者交接文档排定的可落地任务。
+
+## 2026-09-30 闲时轮二：受控程序文本池写入链（F1 完整方案）真机验证——SMOKE OK
+
+- 选型：F2（InstallDiagnosticsApi 深化）已被另一会话实现（工作树未提交 +306 行），F1 完整方案（受控工具对）未被占——按交接文档 F1 承接落地。
+- 实现：TextPoolWorkflow（复刻 MessageTextWorkflow 安全模型：immutable plan + 原生确认 + stateful 锁链单次执行 + readback + UNKNOWN_OUTCOME 终止 + 同值短路）+ TextPoolHandlers 三件套（previewTextPoolChange/applyTextPoolChange/getTextPoolChangeStatus）。执行协议沿用 F1 固化的 text/plain 真机口径；对象锁由 server 会话持有（真机实证跨会话句柄被拒）。校验按 category 分规则（symbols 3 位+@MaxLength/selections 参数名≤30/headings 枚举），重复 id 拒绝。
+- 分类注册全链：CONTROLLED_TEXT_POOL_TOOL_NAMES（READ_ONLY/ADVANCED_MUTATION/WRITE_CHAIN/DEV 门/workbench 门/CLASSIFIED 断言五处）；serverGuardrails 执行门豁免（apply/status 同受控消息文本链豁免语义）；requestLimits 白名单。
+- 真机（sap-demo）：直连 ADT 写链自造数据——创建自有验证程序 ZWTPOL0714（引用 TEXT-001/002）+ 激活 → preview 冻结（old=0 new=2）→ apply 锁链执行 readback 核验 → status=SUCCEEDED → 同清单再跑 sameValue=true（不锁不写）→ 直连删除 + 缺席零残留。SMOKE OK。
+- 边界记录：受控清理链对直连创建靶对象不适用（无锁条目登记，TRANSPORT_INVALID）——收尾用直连删除 + 缺席（与 usage-examples 轮同先例）。ZTABDATA_TOOL 17 条选择文本实战写入（D1 验收场景）留所有者确认后执行。
+- 门禁全绿：180 suites / 1965 tests（+mock/门控用例）、build、coverage、parity、git diff --check。
+- 矩阵：report.text-elements 维持 MCP_SUPERSET，restrictionReason 更新（受控三件套真机验证补全）。证据：docs/evidence/textpool-controlled-real-dev-verified.md。
+- 下一轮建议：F2（InstallDiagnosticsApi 深化）已由另一会话完成实现（工作树未提交），待其提交后复核即可；analysis.history/knowledge-queries 剩余为图引擎/集群解析器工程轮。工作区含多轮未提交成果，建议所有者审查后统一提交。

@@ -1782,7 +1782,7 @@
     "systemRoles": [
      "DEV"
     ],
-    "restrictionReason": "受控依据：DDIC 数据元素标签受控链（SET_DATA_ELEMENT_PROPERTIES）+ focused/developer 入口的程序文本池原子写。F1 最小方案（交接文档 2026-09-30）落地（2026-09-30 真机验证，npm run test:f1-textpool-real-dev）：原子 setTextElements 及配套 lock/unLock 纳入 focused/developer（development-workbench）入口——DEV 专属（角色门控滤除 QAS/PRD）、raw 族执行槽、legacy 只读门 F1 开口（setTextElements/lock/unLock 白名单）；'caller manages locking' 模式的锁句柄须与写调用同 server 会话。协议修复（真机 415 取证）：文本池 /source/{category} 端点只认 text/plain——adt.textelements.v1 专用媒体类型 PUT/GET 均被 415 拒绝（'Supported Media Types: text/plain'），GET/PUT 已对称修正并读回断言一致。完整方案（previewTextPoolChange/applyTextPoolChange 受控工具对）仍为后续任务。",
+    "restrictionReason": "MCP_SUPERSET 依据：DDIC 数据元素标签受控链（SET_DATA_ELEMENT_PROPERTIES）+ focused/developer 入口的程序文本池原子写（F1 最小方案）+ 受控程序文本池写入链（F1 完整方案，2026-09-30 真机验证，docs/evidence/textpool-controlled-real-dev-verified.md，npm run test:textpool-controlled-real-dev）：previewTextPoolChange/applyTextPoolChange/getTextPoolChangeStatus 三件套（immutable plan + 原生确认 + server 会话锁单次执行 + readback + UNKNOWN_OUTCOME 终止 + 同值短路），协议沿用 text/plain 真机口径（415 取证），@MaxLength 协议不变；整池替换语义与 SE32 保存行为一致。ZTABDATA_TOOL 17 条选择文本实战写入留所有者确认后执行。",
     "liftCondition": ""
    },
    "priority": "P2",

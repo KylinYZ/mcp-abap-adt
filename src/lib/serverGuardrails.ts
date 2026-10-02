@@ -54,6 +54,11 @@ export function usesSapExecutionGate(toolName: string): boolean {
     // getTransportCleanupStatus 是纯本地 plan 读取，同豁免。
     && toolName !== 'applyTransportCleanup'
     && toolName !== 'getTransportCleanupStatus'
+    // 受控程序文本池写入（F1 完整方案）：apply 在原生确认层内部自持
+    // executionGate（lock→PUT→unlock→readback），外层先占唯一槽位会自我死锁
+    // ——与受控激活/克隆/传输链同豁免；status 是纯本地 plan 读取，同豁免。
+    && toolName !== 'applyTextPoolChange'
+    && toolName !== 'getTextPoolChangeStatus'
     && toolName !== 'healthcheck';
 }
 

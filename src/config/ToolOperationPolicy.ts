@@ -46,7 +46,19 @@ export const CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES = new Set([
 export const CONTROLLED_MESSAGE_TEXT_TOOL_NAMES = new Set([
   'previewMessageTextChange',
   'applyMessageTextChange',
-  'getMessageTextChangeStatus'
+  'getMessageTextChangeStatus',
+  'getTextPoolChangeStatus'
+]);
+
+/**
+ * 受控程序文本池写入链（F1 完整方案：report.text-elements 受控化收尾）。
+ * → preview（写链只读前段，挂写槽同面）；apply（确认型写执行）；status（本地读取）。
+ * 仅 DEV 角色 + development/development-workbench。
+ */
+export const CONTROLLED_TEXT_POOL_TOOL_NAMES = new Set([
+  'previewTextPoolChange',
+  'applyTextPoolChange',
+  'getTextPoolChangeStatus'
 ]);
 
 export const CONTROLLED_CLONE_TOOL_NAMES = new Set([
@@ -108,7 +120,8 @@ const LOCAL_TOOL_NAMES = new Set([
   'getRepositoryObjectCreationStatus', 'getRepositoryObjectCleanupStatus',
   'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus',
   'getTransportCreationStatus', 'getTransportCleanupStatus',
-  'getMessageTextChangeStatus'
+  'getMessageTextChangeStatus',
+  'getTextPoolChangeStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -168,6 +181,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'previewDescriptionChange',
   // 受控消息文本 preview（i18n.write 的 write_message_texts）：只读读现文本+冻结 plan
   'previewMessageTextChange',
+  // 受控程序文本池 preview（F1 完整方案）：只读读现文本池+冻结 plan
+  'previewTextPoolChange',
   // 受控对象克隆 preview（crud.clone-object 一站式）：只读预检（源码快照+
   // 本地声明改名），不触碰写路径
   'previewCloneObject',
@@ -255,6 +270,9 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   // 受控消息文本 apply（i18n.write 的 write_message_texts）：repository 写入，
   // stateful 锁链单次执行
   'applyMessageTextChange',
+  // 受控程序文本池 apply（F1 完整方案）：repository 写入（text/plain 源形态），
+  // stateful 锁链单次执行
+  'applyTextPoolChange',
   // 受控对象克隆 apply（crud.clone-object 一站式）：委托受控创建链的 repository
   // 写入，单确认单执行
   'applyCloneObject',
@@ -306,6 +324,7 @@ export const CONTROLLED_WRITE_CHAIN_READONLY_TOOLS = new Set<string>([
   ...CONTROLLED_ADVANCED_MUTATION_TOOL_NAMES,
   ...CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES,
   ...CONTROLLED_MESSAGE_TEXT_TOOL_NAMES,
+  ...CONTROLLED_TEXT_POOL_TOOL_NAMES,
   ...CONTROLLED_CLONE_TOOL_NAMES,
   ...CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES,
   ...CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES,
@@ -330,6 +349,7 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_CLONE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_RENAME_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_MESSAGE_TEXT_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  if (CONTROLLED_TEXT_POOL_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输创建链：任何一环都不应在 QAS/PRD/未知角色下面世（仅创建、DEV 专属）
   if (CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输清理链（空请求边界）：同上，删除动作整体 DEV 专属
@@ -431,6 +451,15 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled message text write requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控程序文本池写入链（F1 完整方案）：仅 DEV + development/development-workbench。
+  if (CONTROLLED_TEXT_POOL_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled text pool write requires DEV development or development-workbench profile.'
     );
   }
   // 受控传输创建链（cts.create-request 专属动作）：仅 DEV +

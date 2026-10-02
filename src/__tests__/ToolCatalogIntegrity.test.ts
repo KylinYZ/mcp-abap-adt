@@ -30,10 +30,10 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 195],
+    ['development', 198],
     ['diagnostic-readonly', 146],
     ['legacy-full', 209],
-    ['development-workbench', 165],
+    ['development-workbench', 168],
     ['business-readonly', 18],
     // operations-readonly 54：53 + getUsageExamples（analysis.usage_examples，
     // 与 vsp-capability-parity-matrix 的 operations-readonly 声明同步收录）
