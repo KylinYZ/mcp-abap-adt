@@ -554,7 +554,7 @@ CLASS lcl_runner IMPLEMENTATION.
         WHEN 'TABLE'.    ev_table = CONV tabname( lv_val ).
         WHEN 'CLIENT'.   ev_client = lv_val.
         WHEN 'SYSTEM'.   ev_system = lv_val.
-        WHEN 'ROWS'.     ev_rows = CONV i ( lv_val ).
+        WHEN 'ROWS'.     ev_rows = CONV i(lv_val ).
         WHEN 'FIELD'.
           " 字段目录行：6 段竖线分隔
           SPLIT lv_val AT '|' INTO TABLE DATA(lt_seg).
@@ -564,8 +564,8 @@ CLASS lcl_runner IMPLEMENTATION.
           APPEND VALUE zcl_tabdata_type_conv=>ty_field(
                 name     = CONV fieldname( lt_seg[ 1 ] )
                 kind     = CONV abap_typekind( lt_seg[ 2 ] )
-                length   = CONV i ( lt_seg[ 3 ] )
-                decimals = CONV i ( lt_seg[ 4 ] )
+                length   = CONV i(lt_seg[ 3 ] )
+                decimals = CONV i(lt_seg[ 4 ] )
                 key      = COND #( WHEN lt_seg[ 5 ] = 'X' THEN abap_true ELSE abap_false )
                 hex      = COND #( WHEN lt_seg[ 6 ] = 'X' THEN abap_true ELSE abap_false ) )
             TO et_meta_fields.
@@ -770,12 +770,12 @@ CLASS lcl_runner IMPLEMENTATION.
   " ===================================================================
   METHOD build_meta_rows.
 
-    APPEND VALUE ty_row( ( 'TABLE' ) ( CONV string( iv_table ) ) ) TO rt_rows.
-    APPEND VALUE ty_row( ( 'CLIENT' ) ( CONV string( sy-mandt ) ) ) TO rt_rows.
-    APPEND VALUE ty_row( ( 'SYSTEM' ) ( CONV string( sy-sysid ) ) ) TO rt_rows.
-    APPEND VALUE ty_row( ( 'USER' ) ( CONV string( sy-uname ) ) ) TO rt_rows.
-    APPEND VALUE ty_row( ( 'TIMESTAMP' ) ( |{ sy-datum }{ sy-uzeit }| ) ) TO rt_rows.
-    APPEND VALUE ty_row( ( 'ROWS' ) ( CONV string( iv_rows ) ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'TABLE' ) ) ( CONV string( iv_table ) ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'CLIENT' ) ) ( CONV string( sy-mandt ) ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'SYSTEM' ) ) ( CONV string( sy-sysid ) ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'USER' ) ) ( CONV string( sy-uname ) ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'TIMESTAMP' ) ) ( |{ sy-datum }{ sy-uzeit }| ) ) TO rt_rows.
+    APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'ROWS' ) ) ( CONV string( iv_rows ) ) ) TO rt_rows.
 
     " 字段目录行：NAME|KIND|LEN|DEC|KEY|HEX（K/H 用 X/空）
     " 注：string template 内不能写字面竖线，故用普通字符串拼接
@@ -788,7 +788,7 @@ CLASS lcl_runner IMPLEMENTATION.
                      && COND string( WHEN <fs_f>-key = abap_true THEN 'X' ELSE '' ) && '|'
                      && COND string( WHEN <fs_f>-hex = abap_true THEN 'X' ELSE '' ).
 
-      APPEND VALUE ty_row( ( 'FIELD' ) ( lv_detail ) ) TO rt_rows.
+      APPEND VALUE zcl_tabdata_type_conv=>ty_row( ( CONV string( 'FIELD' ) ) ( lv_detail ) ) TO rt_rows.
 
     ENDLOOP.
 
@@ -907,8 +907,9 @@ START-OF-SELECTION.
       " 失败也展示已收集的统计/审计行，便于定位
       WRITE: /.
       WRITE: / '过程记录：'.
-      LOOP AT lo_runner->gt_result ASSIGNING FIELD-SYMBOL(<fs_r>).
-        WRITE: / <fs_r>-category, <fs_r>-item, <fs_r>-value, <fs_r>-note.
+      LOOP AT lo_runner->gt_result INTO DATA(ls_r).
+        " READ-ONLY 属性外部访问只允许读：ASSIGNING 会被编译器判为写访问
+        WRITE: / ls_r-category, ls_r-item, ls_r-value, ls_r-note.
       ENDLOOP.
       RETURN.
 
@@ -924,11 +925,12 @@ START-OF-SELECTION.
   " ---- 成功结果输出（SALV 网格） ----
   IF lo_runner->gt_result IS NOT INITIAL.
 
+    DATA(lt_result_out) = lo_runner->gt_result.  " READ-ONLY 属性只能读：先拷出再交给 CHANGING 参数
     cl_salv_table=>factory(
       IMPORTING
         r_salv_table = DATA(lo_alv)
       CHANGING
-        t_table      = lo_runner->gt_result ).
+        t_table      = lt_result_out ).
 
     " 结果列宽自适应 + 标题
     lo_alv->get_columns( )->set_optimize( abap_true ).
