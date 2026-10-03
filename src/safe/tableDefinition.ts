@@ -24,7 +24,9 @@ export interface DdicStructureDefinitionInput {
 }
 
 const FIXED_TYPES = new Map<string, string>([
-  ['CLNT', 'clnt'], ['LANG', 'lang'], ['CUKY', 'cuky'], ['UNIT', 'unit'],
+  // 注意：CUKY/UNIT 不在此表——真机实证裸 abap.cuky/abap.unit 激活失败，
+  // normalizeField 已改为生成标准数据元素 waers/meins（见分支注释）。
+  ['CLNT', 'clnt'], ['LANG', 'lang'],
   ['DATS', 'dats'], ['TIMS', 'tims'], ['ACCP', 'accp'], ['FLTP', 'fltp'],
   ['INT1', 'int1'], ['INT2', 'int2'], ['INT4', 'int4'], ['INT8', 'int8'],
   ['DECFLOAT16', 'decfloat16'], ['DECFLOAT34', 'decfloat34'], ['UTCLONG', 'utclong']
@@ -129,12 +131,22 @@ function normalizeField(field: DatabaseTableFieldInput, index: number): Normaliz
   const lengthType = LENGTH_TYPES.get(rawType)
   let ddlType: string
   let isDataElement = false
-  if (rawType === STRING_TYPE) {
-    // A5：变长内置类型——无 length 用 abap.string，带 length 用 abap.sstring(n)（真机验证可行）
+  if (rawType === 'CUKY' || rawType === 'UNIT') {
+    // A5 真机复验发现（Basis 816）：裸 `abap.cuky`/`abap.unit` DDIC 激活报
+    // "位置的数量 < 数据类型最小数量"——从未在该系统验证过；此前成功的
+    // ZTABDATA_DEMO 用的是标准数据元素 waers/meins。生成时改用已验证形态，
+    // typeKind 保留 CUKY/UNIT 以维持 CURR/QUAN 引用字段兼容性校验语义。
+    rejectDimensions(field, rawType)
+    ddlType = rawType === 'CUKY' ? 'waers' : 'meins'
+    isDataElement = true
+  } else if (rawType === STRING_TYPE) {
+    // A5 真机两次实证（Basis 816）：透明表中裸 `abap.string` 不可用——激活后源码被
+    // SAP 规范化（token 计数漂移），verify-source 必失败；ZTABDATA_DEMO 用
+    // abap.sstring(255) 全链通过。无 length 时按已验证形态 sstring(255) 生成。
     if (field.decimals !== undefined) throw validation(`${rawType} does not accept decimals.`)
-    ddlType = field.length !== undefined
-      ? `abap.sstring(${integerInRange(field.length, 1, LENGTH_TYPES.get('SSTRING')!.maximum, `${rawType} length`)})`
-      : 'abap.string'
+    ddlType = `abap.sstring(${field.length !== undefined
+      ? integerInRange(field.length, 1, LENGTH_TYPES.get('SSTRING')!.maximum, `${rawType} length`)
+      : 255})`
   } else if (fixed) {
     rejectDimensions(field, rawType)
     ddlType = `abap.${fixed}`

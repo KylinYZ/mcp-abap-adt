@@ -252,7 +252,7 @@ export const INITIAL_REPOSITORY_CREATION_CAPABILITIES: RepositoryCreationCapabil
               key: { type: 'boolean', optional: true },
               type: {
                 type: 'string',
-                description: 'Built-in type (CLNT/LANG/CUKY/UNIT/DATS/TIMS/ACCP/FLTP/INT1/INT2/INT4/INT8/DECFLOAT16/DECFLOAT34/UTCLONG are fixed-length: omit length; CHAR/NUMC/RAW/SSTRING/STRING take length; DEC/CURR/QUAN take length+decimals) or an existing data element name',
+                description: 'Built-in type (CLNT/LANG/DATS/TIMS/ACCP/FLTP/INT1/INT2/INT4/INT8/DECFLOAT16/DECFLOAT34/UTCLONG are fixed-length: omit length; CHAR/NUMC/RAW/SSTRING take length; DEC/CURR/QUAN take length+decimals; STRING defaults to sstring(255); CUKY/UNIT generate standard data elements waers/meins) or an existing data element name',
                 minLength: 1, maxLength: 128
               },
               length: { type: 'number', minimum: 1, maximum: 5000, optional: true, description: 'Only for CHAR/NUMC/RAW/SSTRING/STRING/DEC/CURR/QUAN; omit for fixed-length types' },

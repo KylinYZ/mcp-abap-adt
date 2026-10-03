@@ -171,5 +171,8 @@ ENDTRY.
 
 - PROGRAM 首行必须是大写 `REPORT ZPROG.`，对象名大写、前置，且前面不得有注释块（创建门校验大小写敏感）。
 - `METHODS ... RETURNING` 的类型不得是内联泛型表（见规则 10）。
-- 固定长 DDIC 类型（CLNT/DATS/TIMS/INT1/INT4/FLTP 等）不接受 length/decimals；STRING 无 length 生成 `abap.string`、带 length 生成 `abap.sstring(n)`；CURR/QUAN 必须显式用 CURR/QUAN 类型而非 DEC+referenceField；referenceField 的声明顺序由服务端自动重排，无需手工保证（见 `src/safe/tableDefinition.ts`）。
+- 固定长 DDIC 类型（CLNT/DATS/TIMS/INT1/INT4/FLTP 等）不接受 length/decimals；STRING 无 length 生成 `abap.sstring(255)`、带 length 生成 `abap.sstring(n)`；CURR/QUAN 必须显式用 CURR/QUAN 类型而非 DEC+referenceField；referenceField 的声明顺序由服务端自动重排，无需手工保证（见 `src/safe/tableDefinition.ts`）。
+- **CUKY/UNIT 裸内置类型在透明表 DDL 中不可用**（Basis 816 真机实证：`abap.unit` 激活报"位置的数量 < 数据类型最小数量"）——服务端生成标准数据元素 `waers`/`meins`，调用方仍写 `type: CUKY/UNIT`。
+- **透明表 STRING 字段用 `abap.sstring(255)`**（真机两次实证：裸 `abap.string` 激活失败/激活后源码规范化致 verify-source 失败；sstring(255) 是 ZTABDATA_DEMO 已验证形态）。
 - 文本池载荷每个文本符号必须带独立 `@MaxLength` 指令行（缺省 132，SE32 上限），缺失会触发 DS512"文本元素包含错误"。
+- EUDB 编辑锁陷阱：创建失败补偿删除对象后，写源会话遗留的编辑锁**不会随删除清除**（阻塞同用户其他会话约 30-60 分钟）——保留壳策略（A2）下修复而非重建可完全规避。

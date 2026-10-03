@@ -40,7 +40,8 @@ describe('controlled database table DDL', () => {
   })
 
   it('supports the bounded fixed and parameterized built-in families', () => {
-    const fixed = ['LANG', 'CUKY', 'UNIT', 'DATS', 'TIMS', 'ACCP', 'FLTP', 'INT1', 'INT2', 'INT4', 'INT8', 'DECFLOAT16', 'DECFLOAT34', 'UTCLONG']
+    // CUKY/UNIT 不在此列——真机实证裸 abap.cuky/abap.unit 激活失败，映射为数据元素（见下个用例）
+    const fixed = ['LANG', 'DATS', 'TIMS', 'ACCP', 'FLTP', 'INT1', 'INT2', 'INT4', 'INT8', 'DECFLOAT16', 'DECFLOAT34', 'UTCLONG']
     const fields = [
       { name: 'CLIENT', key: true, type: 'CLNT' },
       ...fixed.map((type, index) => ({ name: `F${index}`, type })),
@@ -53,13 +54,38 @@ describe('controlled database table DDL', () => {
     const ddl = buildDatabaseTableDdl({ name: 'ZBUILTIN', description: 'Built-ins', fields })
     for (const type of fixed) expect(ddl).toContain(`abap.${type.toLowerCase()}`)
     expect(ddl).toContain('abap.dec(15,3)')
+    expect(ddl).not.toContain('abap.cuky')
+    expect(ddl).not.toContain('abap.unit')
+  })
+
+  it('maps CUKY/UNIT to the proven waers/meins data elements (A5 real-machine finding)', () => {
+    // Basis 816 实证：裸 abap.unit 激活报 "位置的数量 < 数据类型最小数量 (UNIT)"；
+    // 此前成功的 ZTABDATA_DEMO 用 waers/meins 数据元素——生成时改用已验证形态。
+    const ddl = buildDatabaseTableDdl({
+      name: 'ZCUKYUNT',
+      description: 'Cuky unit mapping',
+      fields: [
+        { name: 'CLIENT', key: true, type: 'CLNT' },
+        { name: 'CURRENCY', type: 'CUKY' },
+        { name: 'AMOUNT', type: 'CURR', length: 13, decimals: 2, referenceField: 'CURRENCY' },
+        { name: 'UNITQ', type: 'UNIT' },
+        { name: 'QTY', type: 'QUAN', length: 13, decimals: 3, referenceField: 'UNITQ' }
+      ]
+    })
+    expect(ddl).toContain('currency : waers;')
+    expect(ddl).toContain('unitq : meins;')
+    expect(ddl).not.toContain('abap.cuky')
+    expect(ddl).not.toContain('abap.unit')
+    // CURR/QUAN 的语义注解与引用校验不受影响
+    expect(ddl).toContain("@Semantics.amount.currencyCode : 'zcukyunt.currency'")
+    expect(ddl).toContain("@Semantics.quantity.unitOfMeasure : 'zcukyunt.unitq'")
   })
 
   // ---------------------------------------------------------------------------
   // A5 交接修复回归：真机部署 ZTABDATA 双系统实战踩中的四类 DDIC 创建协议缺陷
   // ---------------------------------------------------------------------------
 
-  it('maps STRING to abap.string (no length) and abap.sstring(n) (with length)', () => {
+  it('maps STRING (no length) to the verified abap.sstring(255) and sstring(n) (with length)', () => {
     const ddl = buildDatabaseTableDdl({
       name: 'ZSTRINGT',
       description: 'String fields',
@@ -69,10 +95,11 @@ describe('controlled database table DDL', () => {
         { name: 'NAME', type: 'SSTRING', length: 80 }
       ]
     })
-    // 此前裸 `string` 被当数据元素，SAP 激活报"数据类型 不存在"
-    expect(ddl).toContain('longtext : abap.string;')
+    // 真机两次实证：透明表裸 abap.string 激活失败/激活后源码规范化致 verify 失败；
+    // ZTABDATA_DEMO 用 abap.sstring(255) 全链通过——无 length 按 255 生成。
+    expect(ddl).toContain('longtext : abap.sstring(255);')
     expect(ddl).toContain('name : abap.sstring(80);')
-    expect(ddl).not.toMatch(/longtext : string;/)
+    expect(ddl).not.toMatch(/longtext : (string|abap\.string);/)
   })
 
   it.each([
@@ -117,7 +144,7 @@ describe('controlled database table DDL', () => {
         { name: 'CURRENCY', type: 'CUKY' }
       ]
     })
-    const currencyLine = ddl.indexOf('currency : abap.cuky;')
+    const currencyLine = ddl.indexOf('currency : waers;')
     const amountLine = ddl.indexOf('amount : abap.curr(15,2);')
     expect(currencyLine).toBeGreaterThan(-1)
     expect(amountLine).toBeGreaterThan(-1)
@@ -143,11 +170,11 @@ describe('controlled database table DDL', () => {
     const keyEnd = Math.max(
       ddl.indexOf('key client : abap.clnt'),
       ddl.indexOf('key keycurr : abap.curr(12,2)'),
-      ddl.indexOf('key waersc : abap.cuky')
+      ddl.indexOf('key waersc : waers')
     )
     const nonKeyStart = Math.min(
       ddl.indexOf('amount : abap.curr(15,2)'),
-      ddl.indexOf('currency : abap.cuky;')
+      ddl.indexOf('currency : waers;')
     )
     expect(keyEnd).toBeLessThan(nonKeyStart)
   })
