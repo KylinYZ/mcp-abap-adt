@@ -135,7 +135,14 @@ export class AbapCreationResolver {
     }
   }
 
-  /** quick search 不可用时的 TADIR 只读降级：R3TR 精确键查询，命中即视为对象已存在。 */
+  /**
+   * quick search 不可用时的只读 SQL 降级：命中即视为对象已存在。
+   * 真机实证：datapreview 的 WHERE 对多条件 AND 组合报 400——全部用单条件查询，
+   * 精确匹配在客户端完成（objectName 已被 normalizeObjectName 白名单校验，无注入面）。
+   * PROGRAM 直接查 REPOSRC（源码级存在）——TADIR 孤儿条目（删除后登记残留）不算存在，
+   * 避免把可重建的对象误判为已存在；其余类型 TADIR 单条件 + 客户端过滤
+   * （孤儿会保守误判为存在=拒绝创建，是安全侧错误，GUI 清孤儿后可重试）。
+   */
   private async exactMatchesByTadir(
     tadirObject: string,
     objectType: CreationObjectType | 'PACKAGE',
@@ -143,14 +150,28 @@ export class AbapCreationResolver {
     cause: unknown
   ): Promise<SearchResult[]> {
     try {
-      // objectName 已被 normalizeObjectName 白名单校验（大写字母/数字/下划线），无注入面
+      if (objectType === 'PROGRAM') {
+        const rows = (await this.client.runQuery!(
+          `SELECT progname FROM reposrc WHERE progname = '${objectName}'`,
+          10
+        )).values ?? [];
+        return rows
+          .filter(row => String(row.PROGNAME || '').toUpperCase() === objectName.toUpperCase())
+          .map(row => ({
+            'adtcore:name': String(row.PROGNAME || '').toUpperCase(),
+            'adtcore:type': TADIR_ADT_TYPE[tadirObject] || tadirObject,
+            'adtcore:uri': ''
+          }));
+      }
       const result = await this.client.runQuery!(
-        `SELECT obj_name, object FROM tadir WHERE pgmid = 'R3TR' AND obj_name = '${objectName}' AND object = '${tadirObject}'`,
+        `SELECT obj_name, object, pgmid FROM tadir WHERE obj_name = '${objectName}'`,
         10
       );
       const rows = result?.values ?? [];
       return rows
-        .filter(row => String(row.OBJ_NAME || '').toUpperCase() === objectName.toUpperCase())
+        .filter(row => String(row.PGMID || '').toUpperCase() === 'R3TR'
+          && String(row.OBJECT || '').toUpperCase() === tadirObject
+          && String(row.OBJ_NAME || '').toUpperCase() === objectName.toUpperCase())
         .map(row => ({
           // 构造 matchesObject 兼容的 quick search 条目形态（adtcore:type 用链路同款前缀）
           'adtcore:name': String(row.OBJ_NAME || '').toUpperCase(),

@@ -38,11 +38,11 @@ describe('AbapCreationResolver', () => {
     const adt = client();
     adt.searchObject = jest.fn(async (_query: string) => { throw new Error('Request failed with status code 400'); });
     adt.runQuery = jest.fn(async (sql: string) => {
-      expect(sql).toContain("pgmid = 'R3TR'");
-      // resolve 先查父包（DEVC Z001）再查目标对象（PROG ZNEW），均按 TADIR 精确键
-      return sql.includes("object = 'DEVC'")
-        ? { values: [{ OBJ_NAME: 'Z001', OBJECT: 'DEVC' }] }
-        : { values: [] };
+      expect(sql).not.toMatch(/AND.*AND/);  // datapreview 真机限制：WHERE 不得多条件 AND
+      // resolve 先查父包（TADIR obj_name=Z001，客户端过滤 DEVC）再查目标（REPOSRC ZNEW）
+      return sql.includes('FROM reposrc')
+        ? { values: [] }
+        : { values: [{ OBJ_NAME: 'Z001', OBJECT: 'DEVC', PGMID: 'R3TR' }] };
     });
     const resolver = new AbapCreationResolver(adt, policy);
     await expect(resolver.resolve([{
@@ -51,10 +51,11 @@ describe('AbapCreationResolver', () => {
     expect(adt.runQuery).toHaveBeenCalled();
   });
 
-  it('reports OBJECT_ALREADY_EXISTS via the TADIR fallback when the object is registered', async () => {
+  it('reports OBJECT_ALREADY_EXISTS via the REPOSRC fallback when the program exists', async () => {
     const adt = client();
     adt.searchObject = jest.fn(async (_query: string) => { throw new Error('Request failed with status code 400'); });
-    adt.runQuery = jest.fn(async () => ({ values: [{ OBJ_NAME: 'ZEXISTS', OBJECT: 'PROG' }] }));
+    // PROGRAM 走 REPOSRC 源码级判定（TADIR 孤儿不算存在）
+    adt.runQuery = jest.fn(async () => ({ values: [{ PROGNAME: 'ZEXISTS' }] }));
     const resolver = new AbapCreationResolver(adt, policy);
     await expect(resolver.assertTargetsAbsent([{
       objectType: 'PROGRAM', objectName: 'ZEXISTS', description: 'x', adtType: 'PROG/P',
