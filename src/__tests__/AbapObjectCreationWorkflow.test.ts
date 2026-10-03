@@ -194,15 +194,23 @@ describe('AbapObjectCreationWorkflow', () => {
     });
   });
 
-  it('deletes a proven object when authoritative syntax validation fails', async () => {
+  it('retains a proven shell when authoritative syntax validation fails (A2)', async () => {
     const test = harness({ syntaxError: true });
     await test.workflow.preview(previewInput);
 
+    // A2：语法失败不再补偿删除（删除会留 EUDB 孤儿锁并迫使重建）——保留壳并引导变更链修复
     await expect(test.workflow.apply({
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
-    })).rejects.toMatchObject({ code: 'SYNTAX_CHECK_FAILED', details: { plan: { status: 'COMPENSATED' } } });
-    expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock', 'lock', 'delete']);
-    expect(test.exists()).toBe(false);
+    })).rejects.toMatchObject({
+      code: 'SYNTAX_CHECK_FAILED',
+      details: {
+        retainedShells: [{ objectType: 'PROGRAM', objectName: 'ZNEW' }],
+        repairHint: expect.stringContaining('previewAbapChange'),
+        plan: { status: 'FAILED' }
+      }
+    });
+    expect(test.calls).toEqual(['create', 'lock', 'write', 'syntax', 'unlock']);
+    expect(test.exists()).toBe(true);
   });
 
   it('surfaces structured syntax messages when the source write is rejected (A3)', async () => {
@@ -215,11 +223,14 @@ describe('AbapObjectCreationWorkflow', () => {
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
       code: 'SOURCE_WRITE_FAILED',
-      details: { syntaxMessages: [{ severity: 'E', line: 1, text: 'bad source' }] }
+      details: {
+        syntaxMessages: [{ severity: 'E', line: 1, text: 'bad source' }],
+        retainedShells: [{ objectType: 'PROGRAM', objectName: 'ZNEW' }]
+      }
     });
-    // 写源失败后跳过主语法检查，直接进入补充检查与补偿删除
+    // 写源失败后跳过主语法检查，直接进入补充检查；A2 下壳保留（不补偿删除）
     expect(test.client.syntaxCheck).toHaveBeenCalled();
-    expect(test.exists()).toBe(false);
+    expect(test.exists()).toBe(true);
   });
 
   it('never deletes an object found after an uncertain create response', async () => {
@@ -263,6 +274,7 @@ describe('AbapObjectCreationWorkflow', () => {
     const test = harness({ activationReturnsInactive: true });
     await test.workflow.preview(previewInput);
 
+    // A2：激活失败保留壳（状态 FAILED 而非 COMPENSATED），脱敏语义不变
     await expect(test.workflow.apply({
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
@@ -275,14 +287,16 @@ describe('AbapObjectCreationWorkflow', () => {
           name: object.objectName,
           parentUri: object.parentPath
         }],
-        plan: { status: 'COMPENSATED' }
+        retainedShells: [{ objectType: 'PROGRAM', objectName: 'ZNEW' }],
+        plan: { status: 'FAILED' }
       }
     });
     const serialized = JSON.stringify(test.workflow.status('creation-1'));
     expect(serialized).not.toContain('SECRET_USER');
     expect(serialized).not.toContain('REPORT znew');
     expect(serialized).not.toContain('lock-1');
-    expect(test.auditEvents.at(-1)).toMatchObject({ activationInactiveCount: 1 });
+    expect(test.auditEvents.some(event => event.activationInactiveCount === 1)).toBe(true);
+    expect(test.exists()).toBe(true);
   });
 
   it('continues without retrying when an activation exception is followed by an active version', async () => {
@@ -296,21 +310,27 @@ describe('AbapObjectCreationWorkflow', () => {
     expect(test.client.deleteObject).not.toHaveBeenCalled();
   });
 
-  it('compensates when an activation exception is followed by a proven inactive version', async () => {
+  it('retains the shell when an activation exception is followed by a proven inactive version (A2)', async () => {
     const test = harness({ activationThrows: true, inactiveAfterActivationError: true });
     await test.workflow.preview(previewInput);
 
+    // A2：激活失败保留壳（源码已在壳上），引导变更链修复而非删除重建
     await expect(test.workflow.apply({
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
       code: 'ACTIVATION_FAILED',
-      details: { activationOutcome: 'INACTIVE_CONFIRMED', plan: { status: 'COMPENSATED' } }
+      details: {
+        activationOutcome: 'INACTIVE_CONFIRMED',
+        retainedShells: [{ objectType: 'PROGRAM', objectName: 'ZNEW' }],
+        plan: { status: 'FAILED' }
+      }
     });
     expect(test.client.activate).toHaveBeenCalledTimes(1);
-    expect(test.client.deleteObject).toHaveBeenCalledTimes(1);
+    expect(test.client.deleteObject).not.toHaveBeenCalled();
+    expect(test.exists()).toBe(true);
   });
 
-  it('forbids compensation when activation outcome cannot be determined', async () => {
+  it('retains the shell when activation outcome cannot be determined (A2: never delete on UNKNOWN)', async () => {
     const test = harness({ activationThrows: true });
     await test.workflow.preview(previewInput);
 
@@ -318,11 +338,16 @@ describe('AbapObjectCreationWorkflow', () => {
       creationPlanId: 'creation-1', confirmedByUser: true, confirmationMode: 'elicitation'
     })).rejects.toMatchObject({
       code: 'ACTIVATION_FAILED',
-      details: { activationOutcome: 'UNKNOWN', plan: { status: 'COMPENSATION_FAILED' } }
+      details: {
+        activationOutcome: 'UNKNOWN',
+        retainedShells: [{ objectType: 'PROGRAM', objectName: 'ZNEW' }],
+        plan: { status: 'FAILED' }
+      }
     });
     expect(test.client.activate).toHaveBeenCalledTimes(1);
     expect(test.client.deleteObject).not.toHaveBeenCalled();
     expect(test.auditEvents.at(-1)).toMatchObject({ activationOutcome: 'UNKNOWN' });
+    expect(test.exists()).toBe(true);
   });
 
   it('creates a function-group include with the full L include name and verifies workingArea source only', async () => {

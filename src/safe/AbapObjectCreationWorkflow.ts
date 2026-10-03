@@ -11,7 +11,7 @@ import type {
   PreviewCreationInput,
   ResolvedCreationObject
 } from './creationTypes.js';
-import { SafeAbapError, errorMessage } from './errors.js';
+import { SafeAbapError, errorMessage, SafeErrorCode } from './errors.js';
 import { SafetyPolicy } from './SafetyPolicy.js';
 import { compareFunctionModuleSources, compareSources, safeSourceMismatchSummary } from './sourceTools.js';
 import type { TransportAttempt, TransportObjectEntry, TransportRegistrationOutcome, TransportValidationSummary } from './TransportRegistration.js';
@@ -271,12 +271,32 @@ export class AbapObjectCreationWorkflow {
         }
       }
 
+      // A2 保留壳策略：语法/写源/激活失败时保留已创建的壳对象（DEV 角色），
+      // 引导 agent 用变更链按行修复而非删除重建。补偿删除会留下 EUDB 编辑锁孤儿
+      // （EU510，阻塞同用户后续会话 30-60 分钟）并制造 TADIR 孤儿，真机实证 8 轮创建
+      // 有 5 轮被自锁——"失败→重试"循环的系统性互锁，保留壳让锁随修复成功自然消亡。
+      let retainedShells: Array<{ objectType: string; objectName: string }> | undefined;
+      if (this.shouldRetainShell(primary.code)) {
+        retainedShells = await this.retainShellForRepair(plan);
+        this.plans.setStatus(plan.creationPlanId, 'FAILED');
+        await this.recordStage(plan, 'CREATION_COMPLETED_WITH_ERROR', false, primary.message, false);
+        throw new SafeAbapError(primary.code, primary.stage, primary.message, {
+          ...primary.details,
+          retainedShells,
+          repairHint: 'The shell object(s) above were retained on the SAP system (not compensated). '
+            + 'Fix the source with previewAbapChange against the retained object (syntaxMessages in this '
+            + 'error carry line numbers), then activate — do NOT recreate: a new creation plan would be '
+            + 'rejected with OBJECT_ALREADY_EXISTS by design.',
+          plan: this.plans.view(plan.creationPlanId)
+        });
+      }
+
       const compensation = await this.compensate(plan);
       if (compensation === 'none') this.plans.setStatus(plan.creationPlanId, 'FAILED');
       if (compensation === 'success') this.plans.setStatus(plan.creationPlanId, 'COMPENSATED');
       if (compensation === 'failed') this.plans.setStatus(plan.creationPlanId, 'COMPENSATION_FAILED');
       await this.recordStage(plan, 'CREATION_COMPLETED_WITH_ERROR', false, primary.message, false);
-      throw new SafeAbapError(primary.code, primary.stage, primary.message, {
+      throw new SafeAbapError(primary.code, primary.stage, withEudbLockHint(primary, primary.message), {
         ...primary.details,
         plan: this.plans.view(plan.creationPlanId)
       });
@@ -642,8 +662,6 @@ export class AbapObjectCreationWorkflow {
         failed = true;
         continue;
       }
-      // 归属证明未通过（UNPROVEN/UNKNOWN）的对象禁止自动删除：登记未知意味着
-      // 对象可能落在别的请求里，删除必须由人工在 SE10/ADT 确认归属后执行。
       if (object.transportRegistration === 'UNPROVEN' || object.transportRegistration === 'UNKNOWN') {
         object.compensationSucceeded = false;
         failed = true;
@@ -681,6 +699,37 @@ export class AbapObjectCreationWorkflow {
 
     plan.compensationSucceeded = !failed;
     return failed ? 'failed' : 'success';
+  }
+
+  /**
+   * A2 保留壳判定（交接清单 A2 正解）：仅 DEV 角色下，写源/语法/激活失败时保留壳对象。
+   * 真机实证（ZTABDATA 战役 8 轮 apply，5 轮写源成功后被自锁）：补偿删除会留下 EUDB
+   * 编辑锁孤儿（EU510，阻塞同用户其他会话 30-60 分钟）并制造 TADIR 孤儿；保留壳让
+   * agent 用变更链按 A3 行号明细修复，成功路径自然清锁，重建次数从 N 次降为 1 次。
+   */
+  private shouldRetainShell(code: SafeErrorCode): boolean {
+    return this.policy.systemRole === 'DEV'
+      && (code === 'SOURCE_WRITE_FAILED' || code === 'SYNTAX_CHECK_FAILED' || code === 'ACTIVATION_FAILED');
+  }
+
+  /** 保留已创建壳对象（不删除）并登记修复引导 stage；返回壳清单随错误响应透出。 */
+  private async retainShellForRepair(
+    plan: CreationPlan
+  ): Promise<Array<{ objectType: string; objectName: string }>> {
+    const shells: Array<{ objectType: string; objectName: string }> = [];
+    for (const object of plan.createdObjects) {
+      shells.push({ objectType: object.objectType, objectName: object.objectName });
+      await this.recordStage(
+        plan,
+        `SHELL_RETAINED_FOR_REPAIR:${object.objectName}`,
+        true,
+        'shell kept on the SAP system (not compensated); repair its source with previewAbapChange '
+          + '(syntaxMessages carry line numbers) and re-activate instead of recreating',
+        false,
+        object
+      );
+    }
+    return shells;
   }
 
   private async recordStage(
@@ -797,6 +846,23 @@ function assertSyntaxSuccess(messages: SyntaxCheckResult[], objectName: string):
 
 function isErrorSeverity(value: string): boolean {
   return ['E', 'A', 'X', 'ERROR', 'ABORT', 'EXIT'].includes(String(value || '').trim().toUpperCase());
+}
+
+/**
+ * A2 加固：EUDB 编辑锁提示。补偿删除对象后，写源 SAP 会话上遗留的 EU510 编辑锁
+ * **不会随删除清除**——同用户其他会话（含下一次创建）会被"使用者 X 当前编辑 Y"
+ * 拒绝约 30-60 分钟，且该锁对持有者本人不可见、无只读探测通道（真机实证）。
+ * 在错误消息中把这一点说透，避免 agent/人把它误判为"有人在编辑器里开着文件"。
+ */
+function withEudbLockHint(
+  primary: { code: SafeErrorCode; stage: string; message: string },
+  message: string
+): string {
+  if (!/current(ly)? edit|is being edited|当前编辑/.test(message)) return message;
+  return `${message} — this EUDB edit lock usually comes from a previous failed creation attempt `
+    + '(compensation removes the object but NOT its edit lock). Clear it via SM04 (terminate the user '
+    + 'sessions), wait ~30-60 min for session idle timeout, or repair the retained shell with '
+    + 'previewAbapChange instead of recreating.';
 }
 
 function transportNumbers(info: TransportInfo): Set<string> {
