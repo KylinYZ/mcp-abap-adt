@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 4 | 13 | 3 | 0 | 5 | 0 | 25 |
+| P1 | 4 | 14 | 2 | 0 | 5 | 0 | 25 |
 | P2 | 5 | 11 | 2 | 2 | 5 | 0 | 25 |
-| 合计 | 13 | 41 | 5 | 2 | 10 | 0 | 71 |
+| 合计 | 13 | 42 | 4 | 2 | 10 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**54/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**55/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -125,7 +125,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `debug.session` | 调试会话生命周期：监听、附加、分离、单步、调用栈、变量查看 | SAP(action=debug, target="LISTEN\|ATTACH\|DETACH\|STEP\|GET_STACK\|GET_VARIABLES") + focused Debugger* | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`authorizeDebugSession`、`executeDebugCommand`、`getDebugOperationStatus`、`revokeDebugSession` | development, development-workbench | DEV |
 | `debug.breakpoints` | 外部断点的设置、查询与删除 | SAP(action=debug, target="SET_BREAKPOINT\|GET_BREAKPOINTS\|DELETE_BREAKPOINT") + focused Set/Get/DeleteBreakpoint | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`debuggerListeners` | development, development-workbench | DEV |
-| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | PARTIAL | P1 | `checkAmdpDebugger` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | EQUIVALENT | P1 | `checkAmdpDebugger`、`previewDebugOperation`、`applyDebugOperation`、`getDebugOperationStatus` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `debug.amdp-helper` | AMDP 调试（ZADT_VSP helper WebSocket 路径） | SAP(action=debug, target="AMDP_START\|AMDP_RESUME\|AMDP_STOP\|AMDP_STEP\|AMDP_GET_VARIABLES\|AMDP_SET_BREAKPOINT\|AMDP_GET_BREAKPOINTS") | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 
 ### report

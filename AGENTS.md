@@ -12,7 +12,7 @@
 - 远程仓库：`KylinYZ/mcp-abap-adt`；上游：`mario-andreschak/mcp-abap-abap-adt-api`。
 - 当前源码 profile 目录：`safe=7`、`development=195`、`diagnostic-readonly=146`、`legacy-full=209`、`development-workbench=165`、`business-readonly=18`、`operations-readonly=49`。
 - 仓库对象创建目录固定 31 类：`REAL_DEV_VERIFIED=28`、`CONTROLLED_IMPLEMENTED=1`、`AUTOMATION_VERIFIED=2`；成熟度以 `docs/evidence/repository-creation-maturity-evidence.json` 为准。
-- 自动化基线：180 个 Jest suites、1933 个 tests（2026-09-30）。VSP 能力对齐：54/71（MCP_SUPERSET=13）；analysis.history 的 loads、transport-crossref 结构边、where_used_config、usage_examples 与 knowledge-queries 的 fm_test_data 目录层均已真机验证；F1 程序文本池原子写（setTextElements+lock/unLock）已入 focused/developer 入口并真机验证。当前进度见 `docs/evidence/where-used-config-real-dev-verified.md`、`docs/evidence/usage-examples-real-dev-verified.md` 与 `docs/evidence/f1-textpool-focused-real-dev-verified.md`。
+- 自动化基线：182 个 Jest suites、1998 个 tests（2026-10-03）。VSP 能力对齐：55/71（MCP_SUPERSET=13、EQUIVALENT=42）；A8 AMDP 原生调试受控工作流四操作（AMDP_START/SYNC_BREAKPOINTS/AWAIT_STOP/TERMINATE，进 previewDebugOperation/applyDebugOperation，mainId 内部登记）已真机验证（含 SAP 断点裁决 VALID 通路与空队列长挂楔住语义），`debug.amdp-adt` 由 PARTIAL 晋级 EQUIVALENT；F1 程序文本池原子写已入 focused/developer 入口并真机验证。当前进度见 `docs/evidence/amdp-debugger-workflow-real-dev-verified.md` 与 `docs/evidence/f1-textpool-focused-real-dev-verified.md`。
 - 真实 SAP smoke 默认使用 `sap-demo.env`（所有者 2026-09-22 指示；sap-dev 上 S4HK900009 已不可用）。
 - 运行时要求：Node.js >=22.14.0（`.nvmrc` 为 22；Node 18/20 已 EOL，自 0.7.0 起不再支持——为 RFC 基座 open-rfc 的支持合同对齐）。
 
