@@ -1,4 +1,7 @@
 import type {
+  AmdpAwaitStopResult,
+  AmdpBreakpointInput,
+  AmdpDebugSession,
   DebugAttach,
   DebugBreakpoint,
   DebugBreakpointError,
@@ -19,7 +22,12 @@ export type DebugOperationKind =
   | 'SAVE_SETTINGS'
   | 'JUMP_TO_LINE'
   | 'TERMINATE_DEBUGGEE'
-  | 'SET_VARIABLE';
+  | 'SET_VARIABLE'
+  // AMDP 原生调试四操作（矩阵行 debug.amdp-adt；对齐 VSP 的 AMDP_ADT_* 面）
+  | 'AMDP_START'
+  | 'AMDP_SYNC_BREAKPOINTS'
+  | 'AMDP_AWAIT_STOP'
+  | 'AMDP_TERMINATE';
 
 export type DebugOperationStatus = 'PREVIEWED' | 'APPLYING' | 'APPLIED' | 'FAILED' | 'UNKNOWN' | 'EXPIRED';
 export type DebugAuthorizationStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
@@ -75,7 +83,41 @@ export type DebugOperation =
       newValue: string;
       stack: DebugStackSnapshot;
       parents: string[];
-    };
+    }
+  // ---------- AMDP 原生调试四操作 ----------
+  // 协议要点：调试句柄（mainId）存于 ABAP 会话内存，四操作必须在同一 stateful
+  // 会话上执行；mainId 由工作流内部持有，不接受调用方传入任意句柄。
+  // 协议来源与陷阱清单见 src/adt/api/amdpDebugger.ts 头注。
+  /** 启动 AMDP（HANA SQLScript）调试会话；stopExisting=true 清理同用户遗留会话。 */
+  | { kind: 'AMDP_START'; targetUser: string; stopExisting?: boolean }
+  /**
+   * 全量替换会话断点集（对齐 VSP AMDP_ADT_BREAKPOINT）。断点以 class+line 描述，
+   * URI 由协议层推导（/sap/bc/adt/oo/classes/<lower>/source/main#start=<line>）；
+   * clientId 为内部常量，不暴露为调用方参数。SAP 的断点裁决在 awaitStop 的
+   * 判定事件里回报（VALID=已接受≠已命中）。
+   */
+  | {
+      kind: 'AMDP_SYNC_BREAKPOINTS';
+      targetUser: string;
+      breakpoints: AmdpBreakpointSpec[];
+      syncMode?: 'FULL' | 'PROGRAM';
+    }
+  /**
+   * 排空 AMDP 响应队列直到停止事件或预算耗尽（对齐 VSP AMDP_ADT_AWAIT）。
+   * 队列空/预算耗尽是"还没等到"的观察结果而非硬失败，可再次轮询；
+   * 每次事件都是快速 GET，不构成服务端长挂起。
+   */
+  | { kind: 'AMDP_AWAIT_STOP'; targetUser: string; maxEvents?: number }
+  /** 结束 AMDP 调试会话（对齐 VSP AMDP_ADT_STOP）；只能终止本工作流 start 的会话。 */
+  | { kind: 'AMDP_TERMINATE'; targetUser: string; hardStop?: boolean };
+
+/** AMDP 断点输入（受控面）：类名 + 源码行号。 */
+export interface AmdpBreakpointSpec {
+  /** AMDP 方法所在类名。 */
+  class: string;
+  /** AMDP 方法体内的 ADT 源码行号（正整数）。 */
+  line: number;
+}
 
 export interface DebugStackSnapshot {
   stackPosition: number;
@@ -217,4 +259,13 @@ export interface SafeDebugClient {
   debuggerStep(stepType: 'stepInto' | 'stepOver' | 'stepReturn' | 'stepContinue' | 'terminateDebuggee'): Promise<DebugStep>;
   debuggerGoToStack(urlOrPosition: number | string): Promise<void>;
   debuggerSetVariableValue(variableName: string, value: string): Promise<string>;
+  // ---------- AMDP 原生调试（协议层委托；必须同一 stateful 会话） ----------
+  amdpDebuggerStart(options: { user: string; stopExisting?: boolean }): Promise<AmdpDebugSession>;
+  amdpDebuggerSyncBreakpoints(
+    mainId: string,
+    breakpoints: AmdpBreakpointInput[],
+    syncMode?: 'FULL' | 'PROGRAM'
+  ): Promise<void>;
+  amdpDebuggerAwaitStop(mainId: string, maxEvents?: number): Promise<AmdpAwaitStopResult>;
+  amdpDebuggerTerminate(mainId: string, hardStop?: boolean): Promise<void>;
 }

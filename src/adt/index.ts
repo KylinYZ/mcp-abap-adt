@@ -273,3 +273,5 @@ export * from "./api/sapObjectTypeCreation"
 export * from "./api/sapObjectNodeTypeCreation"
 export * from "./api/changeDocumentObjectCreation"
 export * from "./api/tableTypeCreation"
+// AMDP 原生调试协议层（矩阵行 debug.amdp-adt 受控工作流的类型与函数入口）
+export * from "./api/amdpDebugger"

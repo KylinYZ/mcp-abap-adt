@@ -1,4 +1,13 @@
-import type { DebugAttach, DebugBreakpoint, DebugStack, DebugStep, DebugVariable } from '../adt/index.js';
+import type {
+  AmdpAwaitStopResult,
+  AmdpBreakpointInput,
+  AmdpDebugSession,
+  DebugAttach,
+  DebugBreakpoint,
+  DebugStack,
+  DebugStep,
+  DebugVariable
+} from '../adt/index.js';
 import { createHash, randomBytes } from 'crypto';
 import type { AuditEvent } from './AuditLogger.js';
 import { DebugOperationPlanStore } from './DebugOperationPlanStore.js';
@@ -35,6 +44,13 @@ export interface ApplyDebugOperationInput {
 
 export class DebugControlWorkflow {
   private readonly attachContexts = new Map<string, DebugAttachContext>();
+  /**
+   * AMDP 调试会话登记（按规范化 targetUser 键控）。
+   * mainId 存于 ABAP 会话内存（class-data），服务端状态跟随写域 stateful 主会话；
+   * 这里只登记"本工作流自己 start 的会话"——SYNC/AWAIT/TERMINATE 只认这里的
+   * mainId，不接受调用方传入任意句柄（对齐项目安全边界）。
+   */
+  private readonly amdpSessions = new Map<string, AmdpDebugSession>();
 
   constructor(
     private readonly client: SafeDebugClient,
@@ -340,6 +356,46 @@ export class DebugControlWorkflow {
         return this.executeHighRiskStep(operation.targetUser, operation.authorizationId, 'terminateDebuggee');
       case 'SET_VARIABLE':
         return this.applyVariableChange(operation);
+      // ---------- AMDP 原生调试四操作（矩阵行 debug.amdp-adt） ----------
+      // 全部走写槽 stateful 主会话：ADT 资源把调试句柄存在 ABAP class-data
+      // 会话内存，同会话是正确性前提；apply 恒经 executionGate 串行，无并发。
+      case 'AMDP_START': {
+        const session = await this.client.amdpDebuggerStart({
+          user: operation.targetUser,
+          stopExisting: operation.stopExisting
+        });
+        // 登记后同用户后续 SYNC/AWAIT/TERMINATE 才可用；stopExisting 语义下
+        // 重新 start 会替换旧登记（服务端旧会话已被 stopExisting 清理）。
+        this.amdpSessions.set(operation.targetUser, session);
+        return session;
+      }
+      case 'AMDP_SYNC_BREAKPOINTS': {
+        const session = this.requireAmdpSession(operation.targetUser);
+        const breakpoints: AmdpBreakpointInput[] = operation.breakpoints.map(spec => ({
+          class: spec.class,
+          line: spec.line
+        }));
+        await this.client.amdpDebuggerSyncBreakpoints(session.mainId, breakpoints, operation.syncMode);
+        // 裁决不在这里：SAP 在下一个 awaitStop 的 ON_TOGGLE_BREAKPOINTS 里回报。
+        return { synced: breakpoints.length, syncMode: operation.syncMode ?? 'FULL' };
+      }
+      case 'AMDP_AWAIT_STOP': {
+        const session = this.requireAmdpSession(operation.targetUser);
+        const awaitResult: AmdpAwaitStopResult = await this.client.amdpDebuggerAwaitStop(
+          session.mainId,
+          operation.maxEvents
+        );
+        // await 是观察操作：队列空/预算耗尽返回 stopped=false 的成功观察结果
+        //（apply 侧 plan 置 APPLIED），agent 可据此再次轮询；硬故障走异常路径。
+        return awaitResult;
+      }
+      case 'AMDP_TERMINATE': {
+        const session = this.requireAmdpSession(operation.targetUser);
+        await this.client.amdpDebuggerTerminate(session.mainId, operation.hardStop);
+        // 只能终止自己 start 的会话：终态即注销登记，句柄不可复用。
+        this.amdpSessions.delete(operation.targetUser);
+        return { terminated: true, hardStop: operation.hardStop ?? true };
+      }
     }
   }
 
@@ -404,6 +460,19 @@ export class DebugControlWorkflow {
       throw new SafeAbapError('DEBUG_CONTEXT_MISSING', 'debug-context', 'No matching safe attach context exists for this SAP user and debuggee.');
     }
     return context;
+  }
+
+  /**
+   * 取本工作流为该用户登记的 AMDP 会话；未 start 即拒止。
+   * 安全语义：SYNC/AWAIT/TERMINATE 一律使用内部登记的 mainId——不接受调用方
+   * 传入任意调试句柄；TERMINATE 因此天然只能终止自己 start 的会话。
+   */
+  private requireAmdpSession(targetUser: string): AmdpDebugSession {
+    const session = this.amdpSessions.get(targetUser);
+    if (!session) {
+      throw new SafeAbapError('AMDP_SESSION_REQUIRED', 'debug-amdp', 'No AMDP debug session was started for this user; run AMDP_START first.');
+    }
+    return session;
   }
 
   private revokeIfDebuggeeChanged(targetUser: string, authorizationId: string, result?: DebugStep): boolean {
@@ -540,9 +609,70 @@ function parseDebugOperation(value: unknown): DebugOperation {
       };
     case 'SET_VARIABLE':
       throw new SafeAbapError('POLICY_DENIED', 'debug-preview', 'Use previewDebugVariableChange for variable modifications.');
+    // ---------- AMDP 原生调试四操作 ----------
+    case 'AMDP_START':
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        stopExisting: optionalBoolean(input.stopExisting, 'operation.stopExisting')
+      };
+    case 'AMDP_SYNC_BREAKPOINTS':
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        breakpoints: parseAmdpBreakpoints(input.breakpoints),
+        syncMode: parseAmdpSyncMode(input.syncMode)
+      };
+    case 'AMDP_AWAIT_STOP':
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        maxEvents: optionalAmdpMaxEvents(input.maxEvents)
+      };
+    case 'AMDP_TERMINATE':
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        hardStop: optionalBoolean(input.hardStop, 'operation.hardStop')
+      };
     default:
       throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', `Unsupported debug operation kind ${kind}.`);
   }
+}
+
+/** AMDP 断点输入校验：class 非空、line 为正整数；clientId 是内部常量不收调用方值。 */
+function parseAmdpBreakpoints(value: unknown): Array<{ class: string; line: number }> {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', 'breakpoints must contain at least one {class, line} entry.');
+  }
+  return value.map((item, index) => {
+    const record = asRecord(item, `breakpoints[${index}]`);
+    const className = requiredString(record.class, `breakpoints[${index}].class`);
+    const line = record.line;
+    if (typeof line !== 'number' || !Number.isInteger(line) || line <= 0) {
+      throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', `breakpoints[${index}].line must be a positive integer.`);
+    }
+    return { class: className, line };
+  });
+}
+
+/** AMDP 同步模式校验：资源类只认 FULL/PROGRAM（其他报 INVALID SYNCMODE）。 */
+function parseAmdpSyncMode(value: unknown): 'FULL' | 'PROGRAM' | undefined {
+  if (value === undefined) return undefined;
+  const normalized = requiredString(value, 'operation.syncMode').toUpperCase();
+  if (normalized !== 'FULL' && normalized !== 'PROGRAM') {
+    throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', 'syncMode must be FULL or PROGRAM.');
+  }
+  return normalized;
+}
+
+/** await 预算校验：每次事件是一次快速 GET，上限 50 防御性收敛。 */
+function optionalAmdpMaxEvents(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0 || value > 50) {
+    throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', 'maxEvents must be an integer between 1 and 50.');
+  }
+  return value;
 }
 
 function parseListener(input: Record<string, unknown>) {
@@ -597,6 +727,11 @@ function operationDescription(operation: DebugOperation): { summary: string; ris
     case 'JUMP_TO_LINE': return { summary: `Jump debuggee ${operation.debuggeeId} to ${operation.url}`, risk: 'Changes program control flow and may skip business logic.' };
     case 'TERMINATE_DEBUGGEE': return { summary: `Terminate debuggee ${operation.debuggeeId}`, risk: 'Stops the debuggee and may interrupt the current transaction.' };
     case 'SET_VARIABLE': return { summary: `Modify variable ${operation.variableName}`, risk: 'Changes live runtime data.' };
+    // ---------- AMDP 原生调试四操作 ----------
+    case 'AMDP_START': return { summary: `Start AMDP (HANA) debug session for ${operation.targetUser}`, risk: 'Starts an ABAP↔HANA debug bridge; replaces any existing AMDP session for the user when stopExisting is set.' };
+    case 'AMDP_SYNC_BREAKPOINTS': return { summary: `Sync ${operation.breakpoints.length} AMDP breakpoint(s)`, risk: 'Replaces the AMDP debug session breakpoint set.' };
+    case 'AMDP_AWAIT_STOP': return { summary: `Await AMDP debug stop (up to ${operation.maxEvents ?? 12} answers)`, risk: 'Polls the AMDP debug queue; resumes past acknowledgements without continuing the debuggee.' };
+    case 'AMDP_TERMINATE': return { summary: `Terminate AMDP debug session for ${operation.targetUser}`, risk: 'Ends the AMDP debug session (hard stop does not wait for the debuggee).' };
   }
 }
 

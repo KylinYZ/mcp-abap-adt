@@ -9,6 +9,10 @@
   "adtCompatibiliyGraph",
   "adtCoreDiscovery",
   "adtDiscovery",
+  "amdpDebuggerAwaitStop",
+  "amdpDebuggerStart",
+  "amdpDebuggerSyncBreakpoints",
+  "amdpDebuggerTerminate",
   "annotationDefinitions",
   "atcChangeContact",
   "atcCheckVariant",
@@ -200,6 +204,6 @@
   "writeControlledLogicalExternalSchemaContent",
   "writeControlledNumberRangeObjectContent",
   "writeControlledTableSettings",
-  "writeControlledTableSource"
-  ,"writeControlledTableType"
+  "writeControlledTableSource",
+  "writeControlledTableType"
 ]

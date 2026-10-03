@@ -20,6 +20,14 @@ import {
   adtDiscovery,
   AdtDiscoveryResult,
   AdtLock,
+  // AMDP 原生调试协议层（矩阵行 debug.amdp-adt 受控工作流的客户端委托基础）
+  amdpDebuggerAwaitStop,
+  amdpDebuggerStart,
+  amdpDebuggerSyncBreakpoints,
+  amdpDebuggerTerminate,
+  AmdpAwaitStopResult,
+  AmdpBreakpointInput,
+  AmdpDebugSession,
   annotationDefinitions,
   bindingDetails,
   BindingServiceResult,
@@ -2065,5 +2073,36 @@ export class ADTClient {
     srvbName: string
   ): Promise<RapGeneratorValidationResult> {
     return rapGenPublishService(this.h, srvbName)
+  }
+
+  // ---------- AMDP 原生调试（受控链 SafeDebugClient 扩展的客户端实现） ----------
+  // 全部委托 src/adt/api/amdpDebugger.ts；必须运行在同一 stateful 会话上
+  // （ADT 资源把调试句柄存在 ABAP class-data 会话内存里，换会话即空）。
+
+  /** 启动 AMDP 调试会话：mainId 取自 Location 头，HANA_SESSION_ID 证明桥接已建立。 */
+  public amdpDebuggerStart(options: {
+    user: string
+    stopExisting?: boolean
+  }): Promise<AmdpDebugSession> {
+    return amdpDebuggerStart(this.h, options)
+  }
+
+  /** 全量替换会话断点集（FULL 模式）；断点裁决在后续 awaitStop 的判定事件里回报。 */
+  public amdpDebuggerSyncBreakpoints(
+    mainId: string,
+    breakpoints: AmdpBreakpointInput[],
+    syncMode: 'FULL' | 'PROGRAM' = 'FULL'
+  ): Promise<void> {
+    return amdpDebuggerSyncBreakpoints(this.h, mainId, breakpoints, syncMode)
+  }
+
+  /** 排空响应队列直到停止事件或预算耗尽；stop 事件自带位置/变量/调用栈。 */
+  public amdpDebuggerAwaitStop(mainId: string, maxEvents = 12): Promise<AmdpAwaitStopResult> {
+    return amdpDebuggerAwaitStop(this.h, mainId, maxEvents)
+  }
+
+  /** 结束 AMDP 调试会话（hardStop 默认 true，不等待 debuggee）。 */
+  public amdpDebuggerTerminate(mainId: string, hardStop = true): Promise<void> {
+    return amdpDebuggerTerminate(this.h, mainId, hardStop)
   }
 }

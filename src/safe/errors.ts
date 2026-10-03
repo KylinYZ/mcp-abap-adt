@@ -31,6 +31,7 @@ export type SafeErrorCode =
   | 'AUTHORIZATION_EXPIRED'
   | 'DEBUG_CONTEXT_MISSING'
   | 'DEBUG_STATE_DRIFT'
+  | 'AMDP_SESSION_REQUIRED'
   | 'REMOTE_RESULT_UNKNOWN'
   | 'SESSION_EXPLICITLY_LOGGED_OUT'
   | 'LOCK_FAILED'
@@ -119,6 +120,8 @@ function nextStepFor(code: SafeErrorCode): string {
       return 'Attach to the intended DEV debuggee and request a new debug session authorization.';
     case 'DEBUG_CONTEXT_MISSING':
       return 'Attach to the intended DEV debuggee before requesting session authorization or control.';
+    case 'AMDP_SESSION_REQUIRED':
+      return 'Run AMDP_START first; AMDP sync/await/terminate only operate on the session this workflow started.';
     case 'DEBUG_STATE_DRIFT':
       return 'Read the current debug stack and variables, then create a new operation preview.';
     case 'REMOTE_RESULT_UNKNOWN':
