@@ -43,6 +43,10 @@ describe('DebugControlWorkflow AMDP 四操作', () => {
         stop: { debuggeeId: 'dg-1', procedure: 'ZCL_X=>GET', uri: '/sap/bc/adt/oo/classes/zcl_x/source/main#start=41', line: 41 }
       }),
       amdpDebuggerTerminate: jest.fn().mockResolvedValue(undefined),
+      amdpDebuggerStep: jest.fn().mockResolvedValue(undefined),
+      amdpDebuggerReadVariable: jest.fn().mockResolvedValue([
+        { name: 'IV_MAX', type: 'INT', value: '3', length: 1, originalLength: 1, isNull: false }
+      ]),
       ...amdpOverrides
     };
     const policy = new SafetyPolicy({
@@ -176,6 +180,48 @@ describe('DebugControlWorkflow AMDP 四操作', () => {
     const plan = preview.plan as { summary: string; risk: string };
     expect(plan.summary).toMatch(/AMDP \(HANA\) debug session/);
     expect(plan.risk).toMatch(/ABAP↔HANA debug bridge/);
+  });
+
+  it('AMDP_STEP/READ_VARIABLE 未命中即拒止；命中登记后放行且 terminate 清登记', async () => {
+    const { workflow, client } = setup();
+    await previewAndApply(workflow, { kind: 'AMDP_START', targetUser: 'DEVUSER' });
+
+    // 未命中（无 debuggee 登记）：STEP/READ 都拒止且不发协议请求
+    const stepPreview = await workflow.previewOperation({
+      operation: { kind: 'AMDP_STEP', targetUser: 'DEVUSER', stepType: 'over' }
+    });
+    const stepPlan = stepPreview.plan as { debugOperationPlanId: string };
+    await expect(workflow.applyOperation({ debugOperationPlanId: stepPlan.debugOperationPlanId, confirmedByUser: true }))
+      .rejects.toMatchObject({ code: 'AMDP_SESSION_REQUIRED' });
+    expect(client.amdpDebuggerStep).not.toHaveBeenCalled();
+
+    // await 命中 → 登记 debuggee → STEP/READ 放行
+    await previewAndApply(workflow, { kind: 'AMDP_AWAIT_STOP', targetUser: 'DEVUSER' });
+    await previewAndApply(workflow, { kind: 'AMDP_STEP', targetUser: 'DEVUSER', stepType: 'over', maxEvents: 3 });
+    expect(client.amdpDebuggerStep).toHaveBeenCalledWith('SESS-1', 'dg-1', 'over');
+    expect(client.amdpDebuggerAwaitStop).toHaveBeenLastCalledWith('SESS-1', 3);
+    await previewAndApply(workflow, { kind: 'AMDP_READ_VARIABLE', targetUser: 'DEVUSER', variableName: 'iv_max' });
+    expect(client.amdpDebuggerReadVariable).toHaveBeenCalledWith('SESS-1', 'dg-1', 'iv_max', undefined);
+
+    // terminate 后 debuggee 登记一并清除：STEP 再拒止
+    await previewAndApply(workflow, { kind: 'AMDP_TERMINATE', targetUser: 'DEVUSER' });
+    const staleStep = await workflow.previewOperation({
+      operation: { kind: 'AMDP_STEP', targetUser: 'DEVUSER', stepType: 'continue' }
+    });
+    const staleStepPlan = staleStep.plan as { debugOperationPlanId: string };
+    await expect(workflow.applyOperation({ debugOperationPlanId: staleStepPlan.debugOperationPlanId, confirmedByUser: true }))
+      .rejects.toMatchObject({ code: 'AMDP_SESSION_REQUIRED' });
+    expect(client.amdpDebuggerStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('STEP/READ preview 输入校验：stepType 枚举与 variableName 必填', async () => {
+    const { workflow } = setup();
+    await expect(workflow.previewOperation({
+      operation: { kind: 'AMDP_STEP', targetUser: 'DEVUSER', stepType: 'into' }
+    })).rejects.toMatchObject({ code: 'VERIFY_FAILED' });
+    await expect(workflow.previewOperation({
+      operation: { kind: 'AMDP_READ_VARIABLE', targetUser: 'DEVUSER' }
+    })).rejects.toMatchObject({ code: 'VERIFY_FAILED' });
   });
 
   it('非 development profile 拒止 AMDP 操作（与既有调试面同门槛）', async () => {

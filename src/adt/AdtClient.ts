@@ -22,12 +22,15 @@ import {
   AdtLock,
   // AMDP 原生调试协议层（矩阵行 debug.amdp-adt 受控工作流的客户端委托基础）
   amdpDebuggerAwaitStop,
+  amdpDebuggerReadVariable,
   amdpDebuggerStart,
+  amdpDebuggerStep,
   amdpDebuggerSyncBreakpoints,
   amdpDebuggerTerminate,
   AmdpAwaitStopResult,
   AmdpBreakpointInput,
   AmdpDebugSession,
+  AmdpScalar,
   annotationDefinitions,
   bindingDetails,
   BindingServiceResult,
@@ -2104,5 +2107,24 @@ export class ADTClient {
   /** 结束 AMDP 调试会话（hardStop 默认 true，不等待 debuggee）。 */
   public amdpDebuggerTerminate(mainId: string, hardStop = true): Promise<void> {
     return amdpDebuggerTerminate(this.h, mainId, hardStop)
+  }
+
+  /** 步进已停止 debuggee（over/continue）；新位置经响应队列，由调用方 awaitStop 取明细。 */
+  public amdpDebuggerStep(
+    mainId: string,
+    debuggeeId: string,
+    kind: 'over' | 'continue'
+  ): Promise<void> {
+    return amdpDebuggerStep(this.h, mainId, debuggeeId, kind)
+  }
+
+  /** 读取已停止 debuggee 的一个标量变量值（异步命令：requestId 排空等应答）。 */
+  public amdpDebuggerReadVariable(
+    mainId: string,
+    debuggeeId: string,
+    name: string,
+    maxEvents = 12
+  ): Promise<AmdpScalar[]> {
+    return amdpDebuggerReadVariable(this.h, mainId, debuggeeId, name, maxEvents)
   }
 }

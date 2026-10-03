@@ -383,6 +383,144 @@ export async function amdpDebuggerTerminate(
     });
 }
 
+/**
+ * step：移动已停止的 debuggee 一步。资源只认 over/continue 两种——SQLScript
+ * 没有 "into"（语句下面没有可进入的东西，VSP 真机注释）。
+ * step 本身的响应是空 body：它是命令，新停止位置经响应队列到达——调用方
+ * （受控链 AMDP_STEP）随后用 awaitStop 取 ON_BREAK 明细，不在本函数等待。
+ */
+export async function amdpDebuggerStep(
+    h: AdtHTTP,
+    mainId: string,
+    debuggeeId: string,
+    kind: 'over' | 'continue'
+): Promise<void> {
+    requireMainId(mainId);
+    const debuggee = requireDebuggeeId(debuggeeId);
+    if (kind !== 'over' && kind !== 'continue') {
+        throw new Error(`AMDP steps are over or continue; ${kind} is neither`);
+    }
+    const uri = `/sap/bc/adt/amdp/debugger/main/${encodeURIComponent(mainId)}` +
+        `/debuggees/${encodeURIComponent(debuggee)}?step=${kind}`;
+    await h.request(uri, {
+        method: 'POST',
+        timeout: AMDP_HTTP_TIMEOUT_MS,
+        headers: { Accept: '*/*' }
+    });
+}
+
+/** 变量读取窗口：一次读取索取的值长度。足够覆盖标量，误读代价一次请求（对齐 VSP 8192）。 */
+export const AMDP_VARIABLE_WINDOW = 8192;
+
+/**
+ * readVariable：读取已停止 debuggee 的一个变量值并等待结果。
+ * 协议三层（VSP 真机取证）：
+ *   1. GET variables/{name}?offset=0&length=8192——offset/length 看似可选实为必填
+ *      （缺了 400 "Parameter offset could not be found"）；响应 body 为空，
+ *      Location 头给出 requestId（异步命令受理回执）。
+ *   2. 循环 resume 排空队列，直到某条 mainResponse 携带该 requestId——
+ *      其他请求的应答与前置 ack 一律跳过，不能把队列下一项当变量值。
+ *   3. 该包 value>scalarValues>scalarValue 即变量值（chardata 文本）。
+ */
+export async function amdpDebuggerReadVariable(
+    h: AdtHTTP,
+    mainId: string,
+    debuggeeId: string,
+    name: string,
+    maxEvents = 12
+): Promise<AmdpScalar[]> {
+    requireMainId(mainId);
+    const debuggee = requireDebuggeeId(debuggeeId);
+    const variableName = name.trim().toUpperCase();
+    if (!variableName) throw new Error('amdp read variable: variable name is required');
+    const askUri = `/sap/bc/adt/amdp/debugger/main/${encodeURIComponent(mainId)}` +
+        `/debuggees/${encodeURIComponent(debuggee)}` +
+        `/variables/${encodeURIComponent(variableName)}?offset=0&length=${AMDP_VARIABLE_WINDOW}`;
+    const asked = await h.request(askUri, {
+        method: 'GET',
+        timeout: AMDP_HTTP_TIMEOUT_MS,
+        headers: { Accept: '*/*' }
+    });
+    const requestId = responseHeader(asked.headers, 'location').trim();
+    if (!requestId) {
+        throw new Error(`reading ${variableName} was accepted without a request id, so there is nothing to wait for`);
+    }
+    const budget = Number.isInteger(maxEvents) && maxEvents > 0 ? Math.min(maxEvents, 50) : 12;
+    for (let i = 0; i < budget; i++) {
+        const resume = await amdpDebuggerResume(h, mainId);
+        if (resume.events.some(event => event.requestId === requestId)) {
+            return parseScalarValues(resume.body, requestId);
+        }
+    }
+    throw new Error(`no answer to request ${requestId} within ${budget} events`);
+}
+
+/** 变量值标量：value 是本次窗口索取的部分，originalLength 说明全值长度（截断可判定）。 */
+export interface AmdpScalar {
+    name: string;
+    type: string;
+    /** 本次窗口内的值文本（chardata；isNull 时为空）。 */
+    value: string;
+    length: number;
+    originalLength: number;
+    isNull: boolean;
+}
+
+/** 值是否被窗口截断：originalLength > length 即还有下文。 */
+export function isScalarTruncated(scalar: AmdpScalar): boolean {
+    return scalar.originalLength > scalar.length;
+}
+
+/** 解析 GET_SCALAR_VALUES 应答包：value>scalarValues>scalarValue（chardata 为值文本）。 */
+export function parseScalarValues(body: string, requestId?: string): AmdpScalar[] {
+    if (!body) return [];
+    const parsed = fullParse(body, {
+        removeNSPrefix: true,
+        isArray: name => name === 'mainResponse',
+        parseAttributeValue: false
+    });
+    const out: AmdpScalar[] = [];
+    for (const response of responseChildren(parsed, 'mainResponse')) {
+        // 指定 requestId 时只取该请求的应答包，不把队列其他项当变量值
+        if (requestId && optionalAttr(response, 'requestId') !== requestId) continue;
+        const scalars = response?.value?.scalarValues?.scalarValue;
+        for (const scalar of asArray(scalars)) {
+            const length = numberOfAttr(scalar, 'length') ?? 0;
+            const originalLength = numberOfAttr(scalar, 'originalLength') ?? length;
+            out.push({
+                name: String(scalar?.['@_name'] ?? ''),
+                type: String(scalar?.['@_type'] ?? ''),
+                value: scalarText(scalar),
+                length,
+                originalLength,
+                isNull: isTrueAttr(scalar, 'isNullValue')
+            });
+        }
+    }
+    return out;
+}
+
+/** scalarValue 的文本内容：chardata 与 #text 两种形态（fast-xml-parser 差异）兜底。 */
+function scalarText(scalar: Record<string, any>): string {
+    const text = scalar?.['#text'];
+    return text === undefined || text === null ? '' : String(text);
+}
+
+// ---------- 内部工具 ----------
+
+function requireMainId(mainId: string): void {
+    if (!mainId || !mainId.trim()) {
+        throw new Error('no AMDP debug session on this connection; start one first');
+    }
+}
+
+/** debuggeeId 必填：step/变量读取都作用在一个已停止的具体 debuggee 上。 */
+function requireDebuggeeId(debuggeeId: string): string {
+    const trimmed = String(debuggeeId || '').trim();
+    if (!trimmed) throw new Error('no debuggee: nothing has stopped yet');
+    return trimmed;
+}
+
 /** 解析一次 resume 的 body：事件序列（供 awaitStop 消费）。 */
 export function parseMainResponses(body: string): AmdpResumeEvent[] {
     if (!body) return [];
@@ -476,12 +614,6 @@ export function parseCallStack(body: string): AmdpFrame[] {
 }
 
 // ---------- 内部工具 ----------
-
-function requireMainId(mainId: string): void {
-    if (!mainId || !mainId.trim()) {
-        throw new Error('no AMDP debug session on this connection; start one first');
-    }
-}
 
 /** fast-xml-parser 的重复元素可能成数组（isArray 指定）也可能单元素：统一成数组。 */
 function asArray<T>(value: T | T[] | undefined): T[] {

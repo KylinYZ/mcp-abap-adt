@@ -8,13 +8,17 @@
 import type { AdtHTTP } from '../../AdtHTTP';
 import {
   amdpDebuggerAwaitStop,
+  amdpDebuggerReadVariable,
   amdpDebuggerResume,
   amdpDebuggerStart,
+  amdpDebuggerStep,
   amdpDebuggerSyncBreakpoints,
   amdpDebuggerTerminate,
+  isScalarTruncated,
   mainIdFromLocation,
   parseCallStack,
   parseMainResponses,
+  parseScalarValues,
   parseStopPosition,
   parseToggleVerdict,
   parseVariablesAtStop
@@ -60,6 +64,21 @@ const ACK_QUEUE_BODY = `<?xml version="1.0" encoding="UTF-8"?>
           <amdpdbg:breakpoint state="VALID"/>
         </amdpdbg:breakpoints>
       </amdpdbg:onToggleBreakpoints>
+    </amdpdbg:value>
+  </amdpdbg:mainResponse>
+</amdpdbg:mainResponses>`;
+
+/** GET_SCALAR_VALUES 应答包：requestId 匹配 + 值文本 + 截断 + NULL 三形态。 */
+const SCALAR_VALUES_BODY = `<?xml version="1.0" encoding="UTF-8"?>
+<amdpdbg:mainResponses xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger">
+  <amdpdbg:mainResponse kind="SYNC_BREAKPOINTS"/>
+  <amdpdbg:mainResponse requestId="REQ-1" kind="GET_SCALAR_VALUES">
+    <amdpdbg:value>
+      <amdpdbg:scalarValues>
+        <amdpdbg:scalarValue name="IV_MAX" type="INT" isNullValue="false" length="1" originalLength="1">3</amdpdbg:scalarValue>
+        <amdpdbg:scalarValue name="LT_TEXT" type="NVARCHAR" isNullValue="false" length="5" originalLength="12">HELLO</amdpdbg:scalarValue>
+        <amdpdbg:scalarValue name="X_NULL" type="NVARCHAR" isNullValue="true" length="0" originalLength="0"/>
+      </amdpdbg:scalarValues>
     </amdpdbg:value>
   </amdpdbg:mainResponse>
 </amdpdbg:mainResponses>`;
@@ -261,6 +280,53 @@ describe('amdpDebugger 协议层', () => {
       await amdpDebuggerAwaitStop(h, 'SESS-1', 0);
       await amdpDebuggerAwaitStop(h, 'SESS-1', 999);
       expect(calls).toHaveLength(2); // 每次调用各只发一个 GET（首包即异常/收敛）
+    });
+  });
+
+  describe('amdpDebuggerStep', () => {
+    it('POST debuggees/{id}?step=over|continue；非法步进拒止（SQLScript 无 into）', async () => {
+      const { h, calls } = fakeHttp([{ status: 200 }, { status: 200 }]);
+      await amdpDebuggerStep(h, 'SESS-1', 'dg-1', 'over');
+      await amdpDebuggerStep(h, 'SESS-1', 'dg-2', 'continue');
+      expect(calls[0].url).toBe('/sap/bc/adt/amdp/debugger/main/SESS-1/debuggees/dg-1?step=over');
+      expect(calls[1].url).toBe('/sap/bc/adt/amdp/debugger/main/SESS-1/debuggees/dg-2?step=continue');
+      const { h: h2 } = fakeHttp([]);
+      await expect(amdpDebuggerStep(h2, 'S', 'dg', 'into' as never)).rejects.toThrow(/over or continue/);
+      await expect(amdpDebuggerStep(h2, 'S', '', 'over')).rejects.toThrow(/no debuggee/);
+    });
+  });
+
+  describe('amdpDebuggerReadVariable', () => {
+    it('GET variables/{name}?offset=0&length=8192 → Location 头 requestId → 排空队列匹配后解析标量', async () => {
+      const { h, calls } = fakeHttp([
+        { status: 200, headers: { location: 'REQ-1' } },   // 读受理：Location 给 requestId，body 空
+        { body: ACK_QUEUE_BODY },                            // 前置 ack（应被跳过）
+        { body: SCALAR_VALUES_BODY }                         // requestId 应答包
+      ]);
+      const scalars = await amdpDebuggerReadVariable(h, 'SESS-1', 'dg-1', 'iv_max');
+      expect(calls[0].url).toBe('/sap/bc/adt/amdp/debugger/main/SESS-1/debuggees/dg-1/variables/IV_MAX?offset=0&length=8192');
+      expect(scalars).toHaveLength(3);
+      expect(scalars[0]).toMatchObject({ name: 'IV_MAX', type: 'INT', value: '3', isNull: false });
+      expect(scalars[1]).toMatchObject({ name: 'LT_TEXT', value: 'HELLO', length: 5, originalLength: 12 });
+      expect(isScalarTruncated(scalars[1])).toBe(true);
+      expect(isScalarTruncated(scalars[0])).toBe(false);
+      expect(scalars[2]).toMatchObject({ name: 'X_NULL', isNull: true, value: '' });
+    });
+
+    it('无 Location 头（受理无回执）与预算内无应答各自报错', async () => {
+      const { h } = fakeHttp([{ status: 200 }]);
+      await expect(amdpDebuggerReadVariable(h, 'S', 'dg', 'X')).rejects.toThrow(/without a request id/);
+      const { h: h2 } = fakeHttp([
+        { status: 200, headers: { location: 'REQ-9' } },
+        { body: ACK_QUEUE_BODY },
+        { body: ACK_QUEUE_BODY }
+      ]);
+      await expect(amdpDebuggerReadVariable(h2, 'S', 'dg', 'X', 2)).rejects.toThrow(/no answer to request/);
+    });
+
+    it('parseScalarValues：不带 requestId 时解析全部应答包；空 body 返回空', () => {
+      expect(parseScalarValues(SCALAR_VALUES_BODY)).toHaveLength(3);
+      expect(parseScalarValues('')).toEqual([]);
     });
   });
 

@@ -47,7 +47,7 @@ export class SafeDebugHandlers {
 
   getTools(): SafeDebugToolDefinition[] {
     return [
-      tool('previewDebugOperation', 'Freeze one DEV listener, breakpoint, Attach, settings, jump-to-line, terminate, or AMDP debug operation (AMDP_START/SYNC_BREAKPOINTS/AWAIT_STOP/TERMINATE) for native confirmation.', operationSchema(), true, false, false, 'read-only tenant', false),
+      tool('previewDebugOperation', 'Freeze one DEV listener, breakpoint, Attach, settings, jump-to-line, terminate, or AMDP debug operation (AMDP_START/SYNC_BREAKPOINTS/AWAIT_STOP/TERMINATE/STEP/READ_VARIABLE) for native confirmation.', operationSchema(), true, false, false, 'read-only tenant', false),
       tool('applyDebugOperation', 'Open native confirmation and apply one frozen DEV debug operation. Text confirmation is never accepted.', idSchema('debugOperationPlanId'), false, true, false, 'mutating tenant', true),
       tool('getDebugOperationStatus', 'Read local status for one debug operation plan.', idSchema('debugOperationPlanId'), true, false, true, 'local-only', false),
       tool('authorizeDebugSession', 'Open native confirmation for a 15-minute authorization bound to the current safe Attach context.', {
@@ -182,7 +182,7 @@ function operationSchema(): ToolDefinition['inputSchema'] {
         type: 'object',
         description: 'One frozen operation. SET_VARIABLE is forbidden here. AMDP kinds ride the write-domain stateful session: AMDP_START opens the ABAP↔HANA debug bridge (stopExisting clears a stale session for the user); AMDP_SYNC_BREAKPOINTS replaces the session breakpoint set ({class,line} entries; verdict arrives via AMDP_AWAIT_STOP); AMDP_AWAIT_STOP polls the response queue past acknowledgements until a stop or budget exhaustion; AMDP_TERMINATE ends the session started by AMDP_START (mainId is held internally, never caller-supplied).',
         properties: {
-          kind: { type: 'string', description: 'CREATE_LISTENER, DELETE_LISTENER, SET_BREAKPOINTS, DELETE_BREAKPOINT, ATTACH, SAVE_SETTINGS, JUMP_TO_LINE, TERMINATE_DEBUGGEE, AMDP_START, AMDP_SYNC_BREAKPOINTS, AMDP_AWAIT_STOP, or AMDP_TERMINATE' },
+          kind: { type: 'string', description: 'CREATE_LISTENER, DELETE_LISTENER, SET_BREAKPOINTS, DELETE_BREAKPOINT, ATTACH, SAVE_SETTINGS, JUMP_TO_LINE, TERMINATE_DEBUGGEE, AMDP_START, AMDP_SYNC_BREAKPOINTS, AMDP_AWAIT_STOP, AMDP_TERMINATE, AMDP_STEP, or AMDP_READ_VARIABLE' },
           targetUser: { type: 'string' },
           debuggingMode: { type: 'string' },
           terminalId: { type: 'string' },
@@ -196,8 +196,10 @@ function operationSchema(): ToolDefinition['inputSchema'] {
           settings: { type: 'object' },
           stopExisting: { type: 'boolean', description: 'AMDP_START: stop an existing AMDP session for the user first (default true)' },
           syncMode: { type: 'string', description: 'AMDP_SYNC_BREAKPOINTS: FULL (replace all, default) or PROGRAM' },
-          maxEvents: { type: 'number', description: 'AMDP_AWAIT_STOP: response-queue answer budget per apply (default 12, max 50)' },
-          hardStop: { type: 'boolean', description: 'AMDP_TERMINATE: do not wait for the debuggee (default true)' }
+          maxEvents: { type: 'number', description: 'AMDP_AWAIT_STOP/AMDP_STEP/AMDP_READ_VARIABLE: response-queue answer budget per apply (default 12, max 50)' },
+          hardStop: { type: 'boolean', description: 'AMDP_TERMINATE: do not wait for the debuggee (default true)' },
+          stepType: { type: 'string', description: 'AMDP_STEP: over (statement step) or continue (release to next hit)' },
+          variableName: { type: 'string', description: 'AMDP_READ_VARIABLE: scalar variable name of the stopped debuggee' }
         },
         required: ['kind', 'targetUser']
       }

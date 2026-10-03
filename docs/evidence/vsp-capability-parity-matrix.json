@@ -1623,14 +1623,10 @@
         ],
         "profiles": [
           "development",
-          "development-workbench",
-          "diagnostic-readonly",
-          "legacy-full"
+          "development-workbench"
         ],
         "systemRoles": [
-          "DEV",
-          "QAS",
-          "PRD"
+          "DEV"
         ],
         "restrictionReason": "四操作受控链已真机验证（2026-10-03，docs/evidence/amdp-debugger-workflow-real-dev-verified.md）：AMDP_START（mainId 自 Location 头、HANA_SESSION_ID 证明 ABAP↔HANA 桥接）、AMDP_SYNC_BREAKPOINTS（bpsync.v1+xml FULL）、AMDP_AWAIT_STOP（SAP 断点裁决 VALID 通路 + 空队列长挂楔住语义收敛）、AMDP_TERMINATE；mainId 由工作流内部登记不接受调用方句柄。v1 不含 AMDP_STEP/变量分页读取（后续 wave）与表变量数据预览（VSP 自证未打通）。断点命中路径（ON_BREAK 停止事件需 debuggee 并发触发）协议形状已由单测覆盖、真机未触发。",
         "liftCondition": ""

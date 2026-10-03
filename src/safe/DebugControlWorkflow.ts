@@ -2,6 +2,7 @@ import type {
   AmdpAwaitStopResult,
   AmdpBreakpointInput,
   AmdpDebugSession,
+  AmdpScalar,
   DebugAttach,
   DebugBreakpoint,
   DebugStack,
@@ -51,6 +52,12 @@ export class DebugControlWorkflow {
    * mainId，不接受调用方传入任意句柄（对齐项目安全边界）。
    */
   private readonly amdpSessions = new Map<string, AmdpDebugSession>();
+  /**
+   * AMDP 当前停止的 debuggee 登记（targetUser → debuggeeId）：await 命中时写入，
+   * STEP/READ_VARIABLE 只作用于这里登记的 debuggee——不接受调用方传入任意
+   * debuggee 句柄（安全边界与 amdpSessions 一致）；terminate/重新 start 时清除。
+   */
+  private readonly amdpDebuggees = new Map<string, string>();
 
   constructor(
     private readonly client: SafeDebugClient,
@@ -385,6 +392,10 @@ export class DebugControlWorkflow {
           session.mainId,
           operation.maxEvents
         );
+        // 命中即登记 debuggee：后续 STEP/READ_VARIABLE 只作用于它（不接受调用方句柄）。
+        if (awaitResult.stopped && awaitResult.stop?.debuggeeId) {
+          this.amdpDebuggees.set(operation.targetUser, awaitResult.stop.debuggeeId);
+        }
         // await 是观察操作：队列空/预算耗尽返回 stopped=false 的成功观察结果
         //（apply 侧 plan 置 APPLIED），agent 可据此再次轮询；硬故障走异常路径。
         return awaitResult;
@@ -394,7 +405,32 @@ export class DebugControlWorkflow {
         await this.client.amdpDebuggerTerminate(session.mainId, operation.hardStop);
         // 只能终止自己 start 的会话：终态即注销登记，句柄不可复用。
         this.amdpSessions.delete(operation.targetUser);
+        this.amdpDebuggees.delete(operation.targetUser);
         return { terminated: true, hardStop: operation.hardStop ?? true };
+      }
+      // AMDP_STEP：步进已停止的 debuggee（over/continue），随附 awaitStop 取新停止明细。
+      // step 命令本身响应空 body——新位置经响应队列，与 VSP 的 StepAndWait 语义一致。
+      case 'AMDP_STEP': {
+        const session = this.requireAmdpSession(operation.targetUser);
+        const debuggeeId = this.requireAmdpDebuggee(operation.targetUser);
+        await this.client.amdpDebuggerStep(session.mainId, debuggeeId, operation.stepType);
+        const awaitResult = await this.client.amdpDebuggerAwaitStop(session.mainId, operation.maxEvents ?? 6);
+        if (awaitResult.stopped && awaitResult.stop?.debuggeeId) {
+          this.amdpDebuggees.set(operation.targetUser, awaitResult.stop.debuggeeId);
+        }
+        return { stepType: operation.stepType, ...awaitResult };
+      }
+      // AMDP_READ_VARIABLE：读取已停止 debuggee 的一个标量变量值。
+      case 'AMDP_READ_VARIABLE': {
+        const session = this.requireAmdpSession(operation.targetUser);
+        const debuggeeId = this.requireAmdpDebuggee(operation.targetUser);
+        const scalars: AmdpScalar[] = await this.client.amdpDebuggerReadVariable(
+          session.mainId,
+          debuggeeId,
+          operation.variableName,
+          operation.maxEvents
+        );
+        return { variableName: operation.variableName.toUpperCase(), scalars };
       }
     }
   }
@@ -467,6 +503,18 @@ export class DebugControlWorkflow {
    * 安全语义：SYNC/AWAIT/TERMINATE 一律使用内部登记的 mainId——不接受调用方
    * 传入任意调试句柄；TERMINATE 因此天然只能终止自己 start 的会话。
    */
+  /**
+   * 取该用户当前停止的 debuggee（最近一次 await 命中登记）；未命中即拒止。
+   * STEP/变量读取必须有具体停止点——没有命中就没有作用对象，也无需调用方传句柄。
+   */
+  private requireAmdpDebuggee(targetUser: string): string {
+    const debuggeeId = this.amdpDebuggees.get(targetUser);
+    if (!debuggeeId) {
+      throw new SafeAbapError('AMDP_SESSION_REQUIRED', 'debug-amdp', 'No AMDP debuggee has stopped for this user; run AMDP_AWAIT_STOP until stopped=true first.');
+    }
+    return debuggeeId;
+  }
+
   private requireAmdpSession(targetUser: string): AmdpDebugSession {
     const session = this.amdpSessions.get(targetUser);
     if (!session) {
@@ -635,6 +683,25 @@ function parseDebugOperation(value: unknown): DebugOperation {
         targetUser: requiredString(input.targetUser, 'operation.targetUser'),
         hardStop: optionalBoolean(input.hardStop, 'operation.hardStop')
       };
+    case 'AMDP_STEP': {
+      const stepType = requiredString(input.stepType, 'operation.stepType').toLowerCase();
+      if (stepType !== 'over' && stepType !== 'continue') {
+        throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', 'stepType must be over or continue.');
+      }
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        stepType,
+        maxEvents: optionalAmdpMaxEvents(input.maxEvents)
+      };
+    }
+    case 'AMDP_READ_VARIABLE':
+      return {
+        kind,
+        targetUser: requiredString(input.targetUser, 'operation.targetUser'),
+        variableName: requiredString(input.variableName, 'operation.variableName'),
+        maxEvents: optionalAmdpMaxEvents(input.maxEvents)
+      };
     default:
       throw new SafeAbapError('VERIFY_FAILED', 'debug-preview', `Unsupported debug operation kind ${kind}.`);
   }
@@ -732,6 +799,8 @@ function operationDescription(operation: DebugOperation): { summary: string; ris
     case 'AMDP_SYNC_BREAKPOINTS': return { summary: `Sync ${operation.breakpoints.length} AMDP breakpoint(s)`, risk: 'Replaces the AMDP debug session breakpoint set.' };
     case 'AMDP_AWAIT_STOP': return { summary: `Await AMDP debug stop (up to ${operation.maxEvents ?? 12} answers)`, risk: 'Polls the AMDP debug queue; resumes past acknowledgements without continuing the debuggee.' };
     case 'AMDP_TERMINATE': return { summary: `Terminate AMDP debug session for ${operation.targetUser}`, risk: 'Ends the AMDP debug session (hard stop does not wait for the debuggee).' };
+    case 'AMDP_STEP': return { summary: `Step the stopped AMDP debuggee (${operation.stepType})`, risk: `Moves the stopped SQLScript debuggee (${operation.stepType}); continue releases it to the next hit.` };
+    case 'AMDP_READ_VARIABLE': return { summary: `Read AMDP variable ${operation.variableName}`, risk: 'Reads one scalar variable of the stopped SQLScript debuggee (observation only).' };
   }
 }
 

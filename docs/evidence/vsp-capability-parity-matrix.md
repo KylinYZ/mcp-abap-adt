@@ -125,7 +125,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `debug.session` | 调试会话生命周期：监听、附加、分离、单步、调用栈、变量查看 | SAP(action=debug, target="LISTEN\|ATTACH\|DETACH\|STEP\|GET_STACK\|GET_VARIABLES") + focused Debugger* | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`authorizeDebugSession`、`executeDebugCommand`、`getDebugOperationStatus`、`revokeDebugSession` | development, development-workbench | DEV |
 | `debug.breakpoints` | 外部断点的设置、查询与删除 | SAP(action=debug, target="SET_BREAKPOINT\|GET_BREAKPOINTS\|DELETE_BREAKPOINT") + focused Set/Get/DeleteBreakpoint | MCP_SUPERSET | P1 | `previewDebugOperation`、`applyDebugOperation`、`debuggerListeners` | development, development-workbench | DEV |
-| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | EQUIVALENT | P1 | `checkAmdpDebugger`、`previewDebugOperation`、`applyDebugOperation`、`getDebugOperationStatus` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
+| `debug.amdp-adt` | AMDP（HANA）存储过程调试（ADT 原路径） | SAP(action=debug, target="AMDP_ADT_START\|AMDP_ADT_BREAKPOINT\|AMDP_ADT_AWAIT\|AMDP_ADT_STOP") | EQUIVALENT | P1 | `checkAmdpDebugger`、`previewDebugOperation`、`applyDebugOperation`、`getDebugOperationStatus` | development, development-workbench | DEV |
 | `debug.amdp-helper` | AMDP 调试（ZADT_VSP helper WebSocket 路径） | SAP(action=debug, target="AMDP_START\|AMDP_RESUME\|AMDP_STOP\|AMDP_STEP\|AMDP_GET_VARIABLES\|AMDP_SET_BREAKPOINT\|AMDP_GET_BREAKPOINTS") | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
 
 ### report

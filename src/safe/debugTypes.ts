@@ -2,6 +2,7 @@ import type {
   AmdpAwaitStopResult,
   AmdpBreakpointInput,
   AmdpDebugSession,
+  AmdpScalar,
   DebugAttach,
   DebugBreakpoint,
   DebugBreakpointError,
@@ -23,11 +24,13 @@ export type DebugOperationKind =
   | 'JUMP_TO_LINE'
   | 'TERMINATE_DEBUGGEE'
   | 'SET_VARIABLE'
-  // AMDP 原生调试四操作（矩阵行 debug.amdp-adt；对齐 VSP 的 AMDP_ADT_* 面）
+  // AMDP 原生调试操作（矩阵行 debug.amdp-adt；对齐并超出 VSP 的 AMDP_ADT_* 面）
   | 'AMDP_START'
   | 'AMDP_SYNC_BREAKPOINTS'
   | 'AMDP_AWAIT_STOP'
-  | 'AMDP_TERMINATE';
+  | 'AMDP_TERMINATE'
+  | 'AMDP_STEP'
+  | 'AMDP_READ_VARIABLE';
 
 export type DebugOperationStatus = 'PREVIEWED' | 'APPLYING' | 'APPLIED' | 'FAILED' | 'UNKNOWN' | 'EXPIRED';
 export type DebugAuthorizationStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
@@ -109,7 +112,20 @@ export type DebugOperation =
    */
   | { kind: 'AMDP_AWAIT_STOP'; targetUser: string; maxEvents?: number }
   /** 结束 AMDP 调试会话（对齐 VSP AMDP_ADT_STOP）；只能终止本工作流 start 的会话。 */
-  | { kind: 'AMDP_TERMINATE'; targetUser: string; hardStop?: boolean };
+  | { kind: 'AMDP_TERMINATE'; targetUser: string; hardStop?: boolean }
+  /**
+   * 步进已停止的 debuggee（over=语句步进；continue=放行到下一命中——SQLScript
+   * 没有 into）。debuggeeId 由工作流从最近一次 await 命中内部登记，不接受
+   * 调用方传入；步进后新停止位置经响应队列到达，apply 内随附 awaitStop 取明细。
+   */
+  | { kind: 'AMDP_STEP'; targetUser: string; stepType: 'over' | 'continue'; maxEvents?: number }
+  /**
+   * 读取已停止 debuggee 的一个标量变量值（GET_SCALAR_VALUES 异步命令：
+   * Location 头 requestId → 排空响应队列等该应答）。窗口 8192 字符，
+   * originalLength>length 表示截断。仅标量——表变量经 stop 事件的
+   * tableHandle 只读元信息，值级读取无受控通路（VSP 亦未打通）。
+   */
+  | { kind: 'AMDP_READ_VARIABLE'; targetUser: string; variableName: string; maxEvents?: number };
 
 /** AMDP 断点输入（受控面）：类名 + 源码行号。 */
 export interface AmdpBreakpointSpec {
@@ -268,4 +284,11 @@ export interface SafeDebugClient {
   ): Promise<void>;
   amdpDebuggerAwaitStop(mainId: string, maxEvents?: number): Promise<AmdpAwaitStopResult>;
   amdpDebuggerTerminate(mainId: string, hardStop?: boolean): Promise<void>;
+  amdpDebuggerStep(mainId: string, debuggeeId: string, kind: 'over' | 'continue'): Promise<void>;
+  amdpDebuggerReadVariable(
+    mainId: string,
+    debuggeeId: string,
+    name: string,
+    maxEvents?: number
+  ): Promise<AmdpScalar[]>;
 }
