@@ -133,6 +133,11 @@ export interface AmdpAwaitStopResult {
     note?: string;
 }
 
+/** AMDP 各操作的 HTTP 超时上界：对齐 MCP 客户端 30s 进程杀线（ZCode），留出确认链开销。 */
+const AMDP_HTTP_TIMEOUT_MS = 20_000;
+/** resume 专用：空队列时服务端可能长挂，客户端必须先收敛。 */
+const AMDP_RESUME_TIMEOUT_MS = 8_000;
+
 /** XML 属性转义：对象名/URI 来自参数与远端响应，进入 XML 属性前必须转义。 */
 function xmlAttr(value: string): string {
     return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -175,8 +180,17 @@ export async function amdpDebuggerStart(
     if (stopExisting) qs.stopExisting = 'true';
     const response = await h.request('/sap/bc/adt/amdp/debugger/main', {
         method: 'POST',
+        timeout: AMDP_HTTP_TIMEOUT_MS,
         qs,
-        headers: { Accept: 'application/xml' }
+        // body 空串不可省：axios 对无 body 的 POST 会剥离显式 Content-Type
+        // （transformRequest 行为），而该资源 415 白名单只认 startmain 类型
+        body: '',
+        headers: {
+            Accept: '*/*',
+            // 真机 415 取证（sap-demo，2026-10-03）：start POST 必须带 startmain 专属
+            // Content-Type——资源内容类型白名单只认这一种，普通 application/xml 被 415 拒
+            'Content-Type': 'application/vnd.sap.adt.amdp.dbg.startmain.v1+xml'
+        }
     });
     const mainId = mainIdFromLocation(responseHeader(response.headers, 'location'));
     if (!mainId) {
@@ -234,8 +248,9 @@ export async function amdpDebuggerSyncBreakpoints(
     const body = breakpointSyncDocument(syncMode, items);
     await h.request(`/sap/bc/adt/amdp/debugger/main/${encodeURIComponent(mainId)}/breakpoints`, {
         method: 'POST',
+        timeout: AMDP_HTTP_TIMEOUT_MS,
         headers: {
-            Accept: 'application/xml',
+            Accept: '*/*',
             'Content-Type': 'application/vnd.sap.adt.amdp.dbg.bpsync.v1+xml'
         },
         body
@@ -272,7 +287,10 @@ export async function amdpDebuggerResume(h: AdtHTTP, mainId: string): Promise<Am
     requireMainId(mainId);
     const response = await h.request(`/sap/bc/adt/amdp/debugger/main/${encodeURIComponent(mainId)}`, {
         method: 'GET',
-        headers: { Accept: 'application/xml' }
+        // resume 在队列空时可能被服务端长挂：客户端 8s 收敛，awaitStop 把超时
+        // 解释为"还没等到"，由 agent 轮询重试——也避免楔住 stateful 会话
+        timeout: AMDP_RESUME_TIMEOUT_MS,
+        headers: { Accept: '*/*' }
     });
     const body = String(response.body ?? '');
     return { events: parseMainResponses(body), body };
@@ -304,13 +322,19 @@ export async function amdpDebuggerAwaitStop(
             resume = await amdpDebuggerResume(h, mainId);
         } catch (error) {
             // 队列空/资源异常："还没有东西停止"。观察成功但无命中，可再次轮询。
+            const detail = summarizeError(error);
+            // 超时型失败=我们放弃了服务端长挂的空队列轮询：该 stateful 会话的
+            // handler 仍在跑，后续同会话操作会排队超时，需等其自然完成（经验 1-2 分钟）
+            const wedgeHint = /timeout/i.test(detail)
+                ? '; note: the empty-queue resume long-polls server-side, wait ~1-2min before the next operation on this session'
+                : '';
             return {
                 stopped: false,
                 events,
                 breakpointVerdict: verdict,
                 variables: [],
                 callStack: [],
-                note: `nothing stopped yet (${summarizeError(error)}); the debuggee may not have run`
+                note: `nothing stopped yet (${detail}); the debuggee may not have run${wedgeHint}`
             };
         }
         for (const event of resume.events) {
@@ -354,7 +378,8 @@ export async function amdpDebuggerTerminate(
         (hardStop ? '?hardStop=true' : '');
     await h.request(uri, {
         method: 'DELETE',
-        headers: { Accept: 'application/xml' }
+        timeout: AMDP_HTTP_TIMEOUT_MS,
+        headers: { Accept: '*/*' }
     });
 }
 
