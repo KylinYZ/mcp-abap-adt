@@ -971,7 +971,8 @@ ENDFORM.
 FORM f4_open_file USING VALUE(iv_filter) TYPE string
                   CHANGING cv_path TYPE string.
 
-  DATA: lt_file TYPE cl_gui_frontend_services=>file_table,
+  " filetable 是 SE11 全局表类型（行结构 FILE_TABLE）——cl_gui_frontend_services=>file_table 不是合法类型名
+  DATA: lt_file TYPE filetable,
         lv_rc   TYPE i.
 
   cl_gui_frontend_services=>file_open_dialog(
