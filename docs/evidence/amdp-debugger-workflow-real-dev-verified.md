@@ -60,3 +60,36 @@ PASS 受控清理 + 缺席复核：测试类已删除
 - 未验证（另行立项）：断点命中路径（ON_BREAK 停止事件真实返回，需 debuggee
   并发触发）、AMDP_STEP/变量分页读取（矩阵注记的后续 wave）、表变量数据预览
   （VSP 自证未打通，不在范围）。
+
+## 第二波（2026-10-04）：AMDP_STEP/AMDP_READ_VARIABLE 与命中路径实验
+
+### 已落地并自动化验证
+
+- 协议层新增 `amdpDebuggerStep`（POST `.../debuggees/{id}?step=over|continue`，
+  SQLScript 无 into）与 `amdpDebuggerReadVariable`（GET `.../variables/{name}?
+  offset=0&length=8192` → Location 头 requestId → 排空响应队列匹配应答 →
+  scalarValues 解析，截断可判定）；受控链新增 `AMDP_STEP`/`AMDP_READ_VARIABLE`
+  两 kind，debuggeeId 由 await 命中内部登记（拒调用方句柄）。单测 +9（协议
+  XML 样本 + 状态机），全量基线 182/182 suites、2004/2004 tests 绿。
+- **真机边界如实声明**：STEP/READ_VARIABLE 语义依赖"存在已停止的 debuggee"，
+  而命中路径在目标环境未打通（见下），两者仅自动化验证、未真机执行。
+
+### 命中路径实验（scripts/amdp-debugger-hit-real-dev-smoke.mjs，未打通，证据留档）
+
+| 实验 | 结果 |
+| --- | --- |
+| 受控创建含 classrun 入口的 AMDP 类 + 测试 include | PASS（过程编译、include 内容/激活态均正确读回） |
+| aunit 触发（testruns 三种配置变体 + runUnitCoverage 双通道） | runResult 恒空——运行器未发现测试类（本系统历史 coverage 验证目标无测试类，"发现侧"从未被证明过） |
+| classrun 触发（ADT 类运行器，独立会话） | **AMDP 过程真实执行**（`rows=3` 回读）但断点未命中；第二轮 classrun 一度挂起 >30s 后仍正常完成，无 ON_BREAK |
+| 时序变体（先发射后监听/零等待监听/180s 间隔 5 轮轮询） | 均未拿到 ON_BREAK；第 5 轮捞到 12 条 **kind="STOP"** 事件（VSP 文档未记载的生命周期事件，新协议知识） |
+
+- **判定**：断点判定通路（VALID）与过程执行通路都真实工作，但命中递交未发生。
+  怀疑方向（环境相关，未证实）：应用服务器亲和（classrun 与 ADT 会话可能落在
+  不同实例）、HANA 调试桥的会话级联条件、或调试会话生命周期（STOP 事件暗示
+  状态迁移）。VSP 的命中经其 RFC helper 路径，传输层差异可能相关。
+- **影响**：ON_BREAK/STEP/READ_VARIABLE 的真机验证被环境阻塞，里程碑保持
+  记录；实现保留（协议形状按 VSP 真机注释与单测样本固化），待环境条件明确后
+  用同一 smoke 重验。
+- **残留清扫**：实验类已全部受控清理；一个无挂起 debuggee 的调试会话
+  （mainId 尾 406000）未及终止，将自过期，且任何后续 `AMDP_START(stopExisting=true)`
+  都会清扫。
