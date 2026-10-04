@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-10-04T03:53:34.159Z",
+  "results": [
+    {
+      "name": "创建链:ABAP_CLASS",
+      "status": "PASS",
+      "detail": "ZVCL_DEV_WS_A0B3746"
+    },
+    {
+      "name": "创建链:PROGRAM",
+      "status": "PASS",
+      "detail": "ZV_DEV_WS_P0B3746"
+    },
+    {
+      "name": "受控源修改:abapChange",
+      "status": "PASS",
+      "detail": "method farewell 新增"
+    },
+    {
+      "name": "描述修改",
+      "status": "FAIL",
+      "detail": "UNKNOWN_OUTCOME（读回证实未落地，sap-dev 响应慢族）{\"code\":\"UNKNOWN_OUTCOME\",\"stage\":\"EXECUTE\",\"message\":\"The description change outcome is unknown. Review the object metadata befor"
+    },
+    {
+      "name": "程序文本池写入",
+      "status": "PASS",
+      "detail": "2 条"
+    },
+    {
+      "name": "文本池读回",
+      "status": "FAIL",
+      "detail": "{\"status\":\"success\",\"result\":{\"program\":\"ZV_DEV_WS_P0B3746\",\"language\":\"EN\",\"entries\":[{\"id\":\"H\",\"key\":\"listHeader\",\"tex"
+    },
+    {
+      "name": "创建链:MESSAGE_CLASS",
+      "status": "PASS",
+      "detail": "ZV_DEV_WS_MC746"
+    },
+    {
+      "name": "消息文本写入",
+      "status": "PASS",
+      "detail": "2 条"
+    },
+    {
+      "name": "创建链:DDIC_DOMAIN",
+      "status": "PASS",
+      "detail": "ZV_DEV_WS_DOM3746"
+    },
+    {
+      "name": "创建链:DATA_ELEMENT",
+      "status": "PASS",
+      "detail": "ZV_DEV_WS_D3746"
+    },
+    {
+      "name": "DDIC 链",
+      "status": "FAIL",
+      "detail": "undefined preview: {\"code\":\"VALIDATION_FAILED\",\"stage\":\"VALIDATE\",\"message\":\"data element metadata must be an object.\",\"nextStep\":\"Correct the bounded operation"
+    },
+    {
+      "name": "克隆链",
+      "status": "FAIL",
+      "detail": "{\"code\":\"UNKNOWN_OUTCOME\",\"stage\":\"EXECUTE\",\"message\":\"The clone outcome is unknown. Review the target object before retrying.\",\"nextStep\":\"Use only r"
+    },
+    {
+      "name": "受控重命名",
+      "status": "FAIL",
+      "detail": "{\"code\":\"UNKNOWN_OUTCOME\",\"stage\":\"EXECUTE\",\"message\":\"The rename outcome is unknown (creation side). Review the target object before retrying.\",\"next"
+    },
+    {
+      "name": "清理链:重命名产物",
+      "status": "PASS",
+      "detail": "ZVCL_DEV_WS_R0B3746"
+    },
+    {
+      "name": "质量检查:ABAP_UNIT",
+      "status": "PASS",
+      "detail": "run+summary"
+    },
+    {
+      "name": "激活链:preview",
+      "status": "PASS",
+      "detail": "当前未激活 15 个（空=系统干净）"
+    },
+    {
+      "name": "包迁移:preview",
+      "status": "PASS",
+      "detail": "同包迁移被校验拒绝（预期语义）"
+    },
+    {
+      "name": "lock/unLock",
+      "status": "PASS",
+      "detail": "lock→unlock"
+    },
+    {
+      "name": "RAP:validateInitial",
+      "status": "NA",
+      "detail": "无 RAP 就绪对象（语义反馈正常）"
+    },
+    {
+      "name": "RAP:previewGenerate",
+      "status": "NA",
+      "detail": "需 RAP 就绪数据模型（语义反馈: {\"code\":\"POLICY_DENIED\",\"stage\":\"policy\",\"message\":\"Object name is required.\",\"n）"
+    },
+    {
+      "name": "调试:authorize/execute/variableChange",
+      "status": "NA",
+      "detail": "需真实挂起 debuggee（AMDP 四操作已专项真机验证）"
+    },
+    {
+      "name": "清理:ZVCL_DEV_WS_A0B3746",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "清理:ZV_DEV_WS_P0B3746",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "清理:ZV_DEV_WS_MC746",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "清理:ZV_DEV_WS_D3746",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "清理:ZV_DEV_WS_DOM3746",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "传输清理链",
+      "status": "NA",
+      "detail": "S4DK900109 非空/状态不满足三条红线（E071 登记残留属正常）：{\"code\":\"VALIDATION_FAILED\",\"stage\":\"PREVIEW\",\"message\":\"Transport S4DK900109 still contains 42 obje"
+    }
+  ],
+  "summary": {
+    "PASS": 18,
+    "FAIL": 5,
+    "NA": 4
+  }
+}

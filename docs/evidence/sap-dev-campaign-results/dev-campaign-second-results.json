@@ -1,0 +1,104 @@
+{
+  "generatedAt": "2026-10-04T03:44:28.128Z",
+  "results": [
+    {
+      "name": "callRfm",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "describeRfm",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "readRfcTable",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "readRuntimeDumps",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "groupRuntimeDumps",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "findSimilarDumps",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "sm21Read",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Unable to read SM21 through the configured ADT HTTP service. Confirm SICF service /sap/bc/z-mcp/sm21 i"
+    },
+    {
+      "name": "readApplicationLog",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "debuggerListeners",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get debugger listeners: 出现异常\",\"code\":-32603}"
+    },
+    {
+      "name": "listJobs",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: listJobs failed.\",\"code\":-32603}"
+    },
+    {
+      "name": "getObjectSource",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get object source: Cannot read properties of undefined (reading 'match')\",\"code\":-32603}"
+    },
+    {
+      "name": "getAbapMemberSource",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "inspectAbapObject",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "classIncludes",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get class includes: clas.includes is not iterable\",\"code\":-32603}"
+    },
+    {
+      "name": "fragmentMappings",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Fragment mappings failed: URI-Mapping cannot be performed due to invalid fragment type=CLAS;name=ZVCL_"
+    },
+    {
+      "name": "runUnitCoverage",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "unitTestEvaluation",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to evaluate unit test: Cannot read properties of undefined (reading 'map')\",\"code\":-32603}"
+    },
+    {
+      "name": "getTextPoolInLanguage",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "mainPrograms",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get main programs: Request failed with status code 404\",\"code\":-32603}"
+    }
+  ],
+  "summary": {
+    "PASS": 11,
+    "FAIL": 8
+  }
+}

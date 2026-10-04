@@ -1,0 +1,543 @@
+{
+  "generatedAt": "2026-10-04T03:40:14.960Z",
+  "env": "C:/Users/068157/.codex/sap-abap-adt/env/sap-dev.env",
+  "target": "http://10.30.255.42:8000 client 200",
+  "results": [
+    {
+      "name": "healthcheck",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "sapDoctor",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "inspectSapSystem",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "objectTypes",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "annotationDefinitions",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "atcCustomizing",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "checkInstallPrerequisites",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "checkAmdpDebugger",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "inactiveObjects",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "listRepositoryObjectCreationCapabilities",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "probeRfcSystem",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "rapGenIsAvailable",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "tracesList",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "tracesListRequests",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "listJobs",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: listJobs failed.\",\"code\":-32603}"
+    },
+    {
+      "name": "listSpoolRequests",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "readRuntimeDumps",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: from must be an ISO-8601 timestamp with an explicit offset.\",\"code\":-32602}"
+    },
+    {
+      "name": "findSimilarDumps",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: findSimilarDumps requires a non-empty runtimeError to match.\",\"code\":-32602}"
+    },
+    {
+      "name": "groupRuntimeDumps",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: from must be an ISO-8601 timestamp with an explicit offset.\",\"code\":-32602}"
+    },
+    {
+      "name": "debuggerListeners",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get debugger listeners: Parameter debuggingMode could not be found.\",\"code\":-32603}"
+    },
+    {
+      "name": "sm21Read",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: SM21 time range must be between 0 and 24 hours.\",\"code\":-32602}"
+    },
+    {
+      "name": "readApplicationLog",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: readApplicationLog: time window spans 33 days; narrow it to at most 31 days to avoid unbounded full-table scans "
+    },
+    {
+      "name": "searchObject",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "findObjectPath",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "objectStructure",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "objectStructureElements",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "classComponents",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "classIncludes",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get class includes: clas.includes is not iterable\",\"code\":-32603}"
+    },
+    {
+      "name": "getObjectSource",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get object source: Cannot read properties of undefined (reading 'match')\",\"code\":-32603}"
+    },
+    {
+      "name": "getAbapMemberSource",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: SAP ADT did not resolve exactly one class member or include named DESCRIPTION.\",\"code\":-32602}"
+    },
+    {
+      "name": "inspectAbapObject",
+      "status": "FAIL",
+      "detail": "{\"status\":\"error\",\"error\":{\"code\":\"POLICY_DENIED\",\"stage\":\"policy\",\"message\":\"Object CL_ABAP_TYPEDESCR is outside the allowed namespaces.\",\""
+    },
+    {
+      "name": "mainPrograms",
+      "status": "NA",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get main programs: Request failed with status code 404\",\"code\":-32603}"
+    },
+    {
+      "name": "fragmentMappings",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Fragment mappings failed: URI-Mapping cannot be performed due to invalid fragment type=CLAS;name=CL_ABAP_TYPEDES"
+    },
+    {
+      "name": "objectEnhancements",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "revisions",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "compareSourceObjects",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "compareObjectLanguages",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getObjectContentInLanguage",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "typeHierarchy",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "findDefinition",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "usageReferences",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "usageReferenceSnippets",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getCallees",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getDependencyContext",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "analyzeDependencies",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "parseAbapSource",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "analyzeSourceEffects",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getLoadGraph",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "buildLoadDependencyGraph",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getCrHistory",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getCoChange",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getTransportScope",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getWhereUsedConfig",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getUsageExamples",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "checkPackageBoundaries",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "analyzeDependencyGraph",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "ddicElement",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "describeClassicTable",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "tableContents",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "runQuery",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "readRfcTable",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: readRfcTable failed: getFunctionInterface before connect (open-rfc transport)\",\"code\":-32603}"
+    },
+    {
+      "name": "describeRfm",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: describeRfm failed: getFunctionInterface before connect (open-rfc transport)\",\"code\":-32603}"
+    },
+    {
+      "name": "callRfm",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: callRfm failed: invoke before connect (open-rfc transport)\",\"code\":-32603}"
+    },
+    {
+      "name": "getTransaction",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getMessages",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getTextElements",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getTextPoolInLanguage",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: getTextPoolInLanguage failed.\",\"code\":-32603}"
+    },
+    {
+      "name": "getAbapDocumentation",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "searchImgActivities",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getCdsDependencies",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: getCdsDependencies failed.\",\"code\":-32603}"
+    },
+    {
+      "name": "syntaxCheckCode",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Syntax check failed: Cannot read properties of undefined (reading 'match')\",\"code\":-32603}"
+    },
+    {
+      "name": "grepObjects",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "grepPackage",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "atcCheckVariant",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "atcDocumentation",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: ATC documentation read failed.\",\"code\":-32603}"
+    },
+    {
+      "name": "unitTestEvaluation",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32603: Failed to evaluate unit test: Cannot read properties of undefined (reading 'map')\",\"code\":-32603}"
+    },
+    {
+      "name": "runUnitCoverage",
+      "status": "FAIL",
+      "detail": "{\"error\":\"MCP error -32602: runUnitCoverage supports objectType PROGRAM, CLASS or FUNCTION_MODULE only.\",\"code\":-32602}"
+    },
+    {
+      "name": "transportInfo",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "packageSearchHelp",
+      "status": "NA",
+      "detail": "{\"error\":\"MCP error -32603: Failed to get package search help: Request failed with status code 404\",\"code\":-32603}"
+    },
+    {
+      "name": "ui5ListApps",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "rapGenIsAvailable",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getFmTestDataSets",
+      "status": "PASS",
+      "detail": "data:empty"
+    },
+    {
+      "name": "getDataElementLabels",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getDomainProperties",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getDataElementProperties",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "getCdsDependencies",
+      "status": "NA",
+      "detail": "系统未发现 I_CURRENCY* CDS"
+    },
+    {
+      "name": "getAbapChangeStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getAbapObjectCreationStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getCloneObjectStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getControlledRenameStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getDebugOperationStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getDescriptionChangeStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getMessageTextChangeStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getObjectActivationStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getQualityCheckStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getRepositoryObjectCleanupStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getRepositoryObjectCreationStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getTextPoolChangeStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getTransportCleanupStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "getTransportCreationStatus",
+      "status": "PASS-ERR",
+      "detail": ""
+    },
+    {
+      "name": "sap(help)",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "sap(system)",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "ui5GetApp",
+      "status": "PASS",
+      "detail": "ok"
+    },
+    {
+      "name": "tracesHitList",
+      "status": "NA",
+      "detail": "系统无 trace 数据"
+    },
+    {
+      "name": "readSpoolContent",
+      "status": "NA",
+      "detail": "系统无 spool 请求"
+    },
+    {
+      "name": "readSpoolContent-jobs",
+      "status": "NA",
+      "detail": "系统无后台作业"
+    }
+  ],
+  "summary": {
+    "PASS": 65,
+    "FAIL": 21,
+    "NA": 6,
+    "PASS-ERR": 14
+  }
+}
