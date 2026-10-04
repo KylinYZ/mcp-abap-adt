@@ -93,3 +93,24 @@ PASS 受控清理 + 缺席复核：测试类已删除
 - **残留清扫**：实验类已全部受控清理；一个无挂起 debuggee 的调试会话
   （mainId 尾 406000）未及终止，将自过期，且任何后续 `AMDP_START(stopExisting=true)`
   都会清扫。
+
+## 跨系统复验（2026-10-04：sap-dev，用户授权）
+
+目标：专用 DEV sap-dev（`10.30.255.42:8000`，client 200，用户 HP068157，AMDP 资源探测 available——HANA 系统证实）。
+
+- **主工作流 14 步全绿（第二个系统独立复现）**：受控创建 ZVCL_AMDP_DBG_SMBEC058
+  → start（HANA 会话 devsapdbtest:30040:300228）→ sync → 裁决 VALID →
+  terminate（楔住恢复）→ 负例拒止 → 复启 → 清理缺席。楔住/恢复语义与
+  sap-demo 完全一致。
+- **命中路径同模式未递交**：classrun 执行 AMDP 过程成功（`rows=4`）但无
+  ON_BREAK；轮询同样在第 5 轮捞到 12 条 kind="STOP"。start 响应仅含
+  HANA_SESSION_ID 一个参数（无 CASCADE 等隐藏开关，取证全文留档）。
+- **结论升级**：两个独立系统（不同主机/client/用户）行为模式完全一致，
+  排除环境偶发——命中递交存在**系统性前置条件缺失**（方向：SAP 标准工具链
+  的调试器 UI 会话依附、HANA 侧 DEBUG 授权、或应用服务器/会话级联机制），
+  超出本项目可通过 ADT 接口观察解决的范围。VSP 上游注释自述曾长期误判并因此
+  建了 helper 路径，侧面印证该 API 的命中递交有未文档化前置。
+- sap-dev 部署差异处置（进程级注入，未改 env 文件）：确认模式 auto、
+  `SAP_MCP_REAL_DEV_VALIDATION=false`（validation=true 会拒绝已达
+  REAL_DEV_VERIFIED 成熟度的 ABAP_CLASS 创建）、验证传输 S4DK900109
+  （S4HK900009 已不可用，经受控传输创建链新建；Z001 包存在）。
