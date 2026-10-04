@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from "../lib/McpErrorCompat.js";
 import { BaseHandler } from './BaseHandler.js';
 import type { ToolDefinition } from '../types/tools.js';
-import { ADTClient } from '../adt/index.js';
+import { ADTClient, isClassStructure } from '../adt/index.js';
 
 export class ClassHandlers extends BaseHandler {
     getTools(): ToolDefinition[] {
@@ -51,7 +51,17 @@ export class ClassHandlers extends BaseHandler {
     async handleClassIncludes(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await ADTClient.classIncludes(args.clas);
+            // 两步：先取类结构（includes 清单），再经静态工具转为 includeType→URL 映射。
+            // 直接把类名字符串传给静态 classIncludes 会因缺 includes 数组而崩溃（战役缺陷 1）。
+            const clasName = String(args.clas || '').trim().toUpperCase();
+            if (!clasName) throw new McpError(ErrorCode.InvalidParams, 'classIncludes requires a class name (clas).');
+            const structure = await this.adtclient.objectStructure(`/sap/bc/adt/oo/classes/${clasName.toLowerCase()}`);
+            if (!isClassStructure(structure)) {
+                throw new McpError(ErrorCode.InternalError, `Object ${clasName} is not a class or exposes no class structure.`);
+            }
+            const includesMap = ADTClient.classIncludes(structure);
+            // Map 直接 JSON 序列化为 {}——转普通对象让 MCP 输出可读
+            const result = Object.fromEntries(includesMap);
             this.trackRequest(startTime, true);
             return {
                 content: [

@@ -186,13 +186,26 @@ export async function setTextElements(
   if (transport) qs.corrNr = transport
   const body = formatTextElements(elements, category)
   const u = `${url}/source/${category}`
-  // 真机实证（2026-09-30，sap-demo 415）：文本池源端点只接受 text/plain——
-  // adt.textelements.v1 专用媒体类型会被服务端 415 拒绝（"Supported Media
-  // Types: text/plain"）。文本池本体就是源码形态（@MaxLength + KEY=TEXT 行）。
-  await h.request(u, {
-    method: "PUT",
-    headers: { "Content-Type": "text/plain; charset=UTF-8", Accept: "text/plain" },
-    qs,
-    body
-  })
+  // 媒体类型按系统自适应（415 重试）：同一端点在不同系统的白名单相反——
+  //   sap-demo（2026-09-30 实测）：只认 text/plain，v1 专用类型 415；
+  //   sap-dev（2026-10-04 实测）：只认 application/vnd.sap.adt.textelements.<sub>.v1，
+  //   text/plain 415。先发 ADT 规范的 v1 类型，415 再退 text/plain 重试。
+  const v1Accept = `application/vnd.sap.adt.textelements.${category}.v1`
+  try {
+    await h.request(u, {
+      method: "PUT",
+      headers: { "Content-Type": v1Accept, Accept: v1Accept },
+      qs,
+      body
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!/415|Unsupported Media Type|not acceptable/i.test(message)) throw error
+    await h.request(u, {
+      method: "PUT",
+      headers: { "Content-Type": "text/plain; charset=UTF-8", Accept: "text/plain" },
+      qs,
+      body
+    })
+  }
 }

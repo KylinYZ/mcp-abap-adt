@@ -32,6 +32,7 @@ export type SafeErrorCode =
   | 'DEBUG_CONTEXT_MISSING'
   | 'DEBUG_STATE_DRIFT'
   | 'AMDP_SESSION_REQUIRED'
+  | 'OBJECT_NOT_FOUND'
   | 'REMOTE_RESULT_UNKNOWN'
   | 'SESSION_EXPLICITLY_LOGGED_OUT'
   | 'LOCK_FAILED'
@@ -122,6 +123,8 @@ function nextStepFor(code: SafeErrorCode): string {
       return 'Attach to the intended DEV debuggee before requesting session authorization or control.';
     case 'AMDP_SESSION_REQUIRED':
       return 'Run AMDP_START first; AMDP sync/await/terminate only operate on the session this workflow started.';
+    case 'OBJECT_NOT_FOUND':
+      return 'Verify the exact object name on the target system, then create a new preview.';
     case 'DEBUG_STATE_DRIFT':
       return 'Read the current debug stack and variables, then create a new operation preview.';
     case 'REMOTE_RESULT_UNKNOWN':

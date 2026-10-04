@@ -225,14 +225,18 @@ export class DescriptionChangeWorkflow {
         throw error;
       }
       if (error instanceof SafeAbapError && error.code === 'PLAN_EXPIRED') throw error;
-      // PUT 已发出后的失败：结果未知——终止，不自动重试
-      const wasWrite = /PUT/i.test(String((error as any)?.stack ?? '')) || true; // 描述修改只有一次写调用，异常按未知保守处理
-      void wasWrite;
+      // PUT 已发出后的失败：结果未知——终止，不自动重试。
+      // 原始异常类别透传进 UNKNOWN 消息（战役缺陷 6：sap-dev 上 UNKNOWN 且
+      // 读回证实未落地，但原始错误被吞导致不可诊断）。
+      const originCategory = /timeout|ETIMEDOUT|ECONNRESET|socket/i.test(String((error as { message?: unknown })?.message || ''))
+        ? 'remote request timeout/connection failure'
+        : 'unexpected failure during lock/read/write sequence';
       this.plans.setStatus(plan.descriptionPlanId, 'UNKNOWN_OUTCOME');
       try {
         await this.deps.audit.append(this.auditEvent(plan, 'DESCRIPTION_CHANGE_UNKNOWN', false, { unknownOutcome: true }));
       } catch { /* 审计失败不掩盖主错误 */ }
-      throw new SafeAbapError('UNKNOWN_OUTCOME', 'EXECUTE', 'The description change outcome is unknown. Review the object metadata before retrying.');
+      throw new SafeAbapError('UNKNOWN_OUTCOME', 'EXECUTE',
+        `The description change outcome is unknown (${originCategory}: ${String((error as { message?: unknown })?.message || error).slice(0, 180)}). Review the object metadata before retrying.`);
     }
 
     this.plans.setStatus(plan.descriptionPlanId, outcome);

@@ -195,13 +195,27 @@ export class DdicPropertyChangeWorkflow {
 
   private async resolveTarget(operation: Record<string, unknown>, objectName: string): Promise<DdicTarget> {
     const kind = String(operation.kind || '');
+    // 对象不存在时底层读会抛原生 ADT 异常——包装为可读的 OBJECT_NOT_FOUND，
+    // 避免 -32603 Internal server error 穿透到调用方（战役缺陷 5）
+    const wrapMissing = async <T>(read: () => Promise<T>, kindLabel: string): Promise<T> => {
+      try {
+        return await read();
+      } catch (error) {
+        const message = String((error as { message?: unknown })?.message || error);
+        // active 版本读失败只有两类：对象不存在、无显示授权——都可读报错。
+        // 错误文本随系统语言变化（sap-dev 中文："从数据库导入对象 X 时出错"），
+        // 不能靠关键词匹配语言形态，一律映射并保留原文（战役缺陷 5）。
+        throw new SafeAbapError('OBJECT_NOT_FOUND', 'RESOLVE',
+          `${kindLabel} ${objectName} could not be read on the target system (it may not exist or display access is missing): ${message.slice(0, 180)}`);
+      }
+    };
     if (kind === 'SET_DOMAIN_PROPERTIES') {
-      const current = await this.client.getDomainProperties(ddicUrl('domains', objectName), 'active');
+      const current = await wrapMissing(() => this.client.getDomainProperties(ddicUrl('domains', objectName), 'active'), 'Domain');
       assertIdentity(current.metaData.name, objectName, 'domain');
       return { objectType: 'DOMAIN', objectName, objectUrl: ddicUrl('domains', objectName), propertyUrl: ddicUrl('domains', objectName), packageName: current.metaData.packageName };
     }
     if (kind === 'SET_DATA_ELEMENT_PROPERTIES') {
-      const current = await this.client.getDataElementProperties(ddicUrl('dataelements', objectName), 'active');
+      const current = await wrapMissing(() => this.client.getDataElementProperties(ddicUrl('dataelements', objectName), 'active'), 'Data element');
       assertIdentity(current.metaData.name, objectName, 'data element');
       return { objectType: 'DATA_ELEMENT', objectName, objectUrl: ddicUrl('dataelements', objectName), propertyUrl: ddicUrl('dataelements', objectName), packageName: current.metaData.packageName };
     }

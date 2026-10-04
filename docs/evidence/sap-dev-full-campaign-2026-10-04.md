@@ -63,3 +63,28 @@
   覆盖完成**；7 项真缺陷/问题定性待修复立项，8 项环境/形态限制如实记录。
 - 全部结果 JSON：`dev-campaign-read-results.json`、`dev-campaign-second-results.json`、
   `dev-campaign-write-results.json`（战役目录留存）。
+
+## 修复轮（2026-10-04 同日，真机复验 6/7 PASS）
+
+战役定性后当日完成修复（提交见 git log "campaign fixes"），复验 harness
+`scripts/dev-campaign-fix-verify.mjs`：
+
+| # | 修复 | 真机复验 |
+| --- | --- | --- |
+| F1 | `classIncludes` 处理器两步修复：类名→objectStructure→静态 classIncludes，补 isClassStructure 守卫与 Map→对象序列化 | PASS（includes 内容完整返回） |
+| F2 | `unitTestEvaluation` 契约修复：类名→先 runUnitTest 取测试类清单→逐类评估汇总；无测试返回空数组+note | PASS |
+| F3 | `ValidateObjectUrl` 防御：undefined/空 URL 给可读 BADOBJECTURL | PASS（含缺参分支） |
+| F4 | `runWithOrderFallback` 空 WHERE 也回退无 ORDER BY（sap-dev 多列 ORDER BY 本身被拒） | PASS（listJobs 恢复工作） |
+| F5 | DDIC 属性链对象存在性前置：active 读失败一律映射 OBJECT_NOT_FOUND（保留系统原文——错误文本随系统语言变化，sap-dev 为中文） | PASS |
+| F6 | 描述链 UNKNOWN 透传原始异常类别（timeout/unexpected failure 分类） | PASS（诊断透传；执行未落地根因仍在排查方向：sap-dev 远端处理超时） |
+| F7 | 文本池 415 媒体类型自适应（v1 专用类型→text/plain 重试） | **FAIL 保持——开放问题** |
+
+### F7 开放问题定性（写链解锁后不持久）
+
+复验取证链：PUT（锁下）→ apply 内 readback **通过** → unlock → GET（active 与
+inactive）**均为空**；PUT 带 `sap-language` 报锁无效；激活链 preview 显示程序
+未进 inactive 清单。定性：**文本池写入随解锁回滚（疑似缺程序激活/提交步骤）**，
+且媒体类型白名单跨系统相反（sap-demo 只认 text/plain / sap-dev 只认 v1）。
+影响：applyTextPoolChange 的 readback 在锁上下文内通过，但持久性不保证——
+调用方使用后必须独立读回验证。harness 与 415 自适应修复保留，待 SAP 侧机制
+明确（或对照 SE32 的激活流量）后收口。

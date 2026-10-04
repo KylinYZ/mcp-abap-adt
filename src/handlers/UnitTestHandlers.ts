@@ -131,7 +131,35 @@ export class UnitTestHandlers extends BaseHandler {
     async handleUnitTestEvaluation(args: any): Promise<any> {
         const startTime = performance.now();
         try {
-            const result = await this.readDomain.unitTestEvaluation(args.clas, args.flags);
+            // 底层 unitTestEvaluation 吃 runUnitTest 结果里的 UnitTestClass 对象
+            //（含 testmethods 的 uri 清单），不是类名字符串——契约错位曾致
+            // undefined.map 崩溃（战役缺陷 2）。修复：按类名先跑一次单元测试
+            // 取测试类清单，再逐个评估汇总；无测试类时返回空数组而非崩溃。
+            const className = String(args.clas || '').trim().toUpperCase();
+            if (!className) {
+                throw new McpError(ErrorCode.InvalidParams, 'unitTestEvaluation requires a class name (clas).');
+            }
+            const classUrl = `/sap/bc/adt/oo/classes/${className.toLowerCase()}`;
+            const testClasses = await this.readDomain.unitTestRun(classUrl, args.flags ?? undefined) ?? [];
+            if (!Array.isArray(testClasses) || testClasses.length === 0) {
+                this.trackRequest(startTime, true);
+                return {
+                    content: [{
+                        type: 'text',
+                        text: JSON.stringify({ status: 'success', result: [], note: `No unit tests found for ${className}.` })
+                    }]
+                };
+            }
+            const result = [];
+            for (const testClass of testClasses) {
+                try {
+                    const evaluated = await this.readDomain.unitTestEvaluation(testClass, args.flags ?? undefined);
+                    result.push(...(Array.isArray(evaluated) ? evaluated : []));
+                } catch (perClassError: any) {
+                    // 单个测试类评估失败不拖垮整体：记录并继续
+                    result.push({ testClass: String((testClass as unknown as Record<string, unknown>)['adtcore:name'] || 'unknown'), evaluationError: perClassError?.message || 'Unknown error' });
+                }
+            }
             this.trackRequest(startTime, true);
             return {
                 content: [

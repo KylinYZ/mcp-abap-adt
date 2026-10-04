@@ -285,6 +285,16 @@ export function adtException(message: string, number = 0) {
 }
 
 export function ValidateObjectUrl(url: string) {
+  // 防御：调用方传 undefined/空串时给出可读错误而非 TypeError（战役缺陷 3——
+  // 'match' undefined 对 MCP 调用方完全不透明）
+  if (typeof url !== "string" || url.trim() === "") {
+    throw new AdtErrorException(
+      0,
+      {},
+      "BADOBJECTURL",
+      "Invalid Object URL: an object source URL is required (e.g. /sap/bc/adt/oo/classes/<name>/source/main)"
+    )
+  }
   if (url.match(/^\/sap\/bc\/adt\/[a-z]+\/[a-zA-Z%\$]?[\w%]+/)) return // valid
   throw new AdtErrorException(
     0,
