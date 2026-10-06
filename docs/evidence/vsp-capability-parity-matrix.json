@@ -2273,14 +2273,14 @@
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。helper 部署进展（2026-10-06，sap-dev 10.30.255.42:8000/200）：$ZADT_VSP 包 9 对象（ZIF_VSP_SERVICE+8 CLAS，含 _s4d_fix 修复版 RFC/DEBUG/AMDP 三服务类）已全部创建并激活（幂等重激活复核零 E/A/X、零 inactive 残留），APC/SICF 服务面待用户 GUI 两步配置（探测基线 /sap/bc/apc/sap/zadt_vsp=501、/sap/bc/sicf=404）。剩余：1) 用户完成 SAPC/SICF；2) 本项目需自研 WebSocket 桥客户端对接 ZCL_VSP_GIT_SERVICE 后再设计只读导出（GitTypes/GitExport，跳确认链留审计）。",
+        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。helper 部署进展（2026-10-06，sap-dev 10.30.255.42:8000/200）：$ZADT_VSP 包 9 对象（ZIF_VSP_SERVICE+8 CLAS，含 _s4d_fix 修复版 RFC/DEBUG/AMDP 三服务类）已全部创建并激活（幂等重激活复核零 E/A/X、零 inactive 残留），APC/SICF 服务面待用户 GUI 两步配置（探测基线 /sap/bc/apc/sap/zadt_vsp=501、/sap/bc/sicf=404）。剩余（2026-10-06 用户已完成 SAPC/SICF，WebSocket 端到端冒烟通过：握手 101+RFC6455 accept 匹配、system 域 ping→pong:true、结构化错误路径正常）：本项目需自研 WebSocket 桥客户端（对接 ZCL_VSP_APC_HANDLER 的 JSON 协议）后设计 git 域只读导出（GitTypes/GitExport，跳确认链留审计）。注意：ZCL_VSP_GIT_SERVICE 因缺 abapGit 前置（ZCX_ABAPGIT_EXCEPTION unknown）保持未激活，handler 已注释其域注册——git 域启用需先部署 abapGit。",
         "liftCondition": "abapgit-export-alignment 任务确定只读导出路径后晋级。"
       },
       "priority": "P1",
       "evidence": [
         "source-audit"
       ],
-      "nextMilestone": "zadt-vsp-sapc-sicf-user-setup"
+      "nextMilestone": "websocket-bridge-client-engineering"
     },
     {
       "id": "install.zadt-vsp",

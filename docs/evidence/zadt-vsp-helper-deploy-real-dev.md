@@ -26,10 +26,30 @@
 2. **sap-dev 的 LOCK 与 sap-demo 行为差异**：`POST objectUrl?_action=LOCK&accessMode=MODIFY` 无 body 在 sap-dev 报"系统期望的是元素 abapClass"——必须走本项目 axios 栈（`X-sap-adt-sessiontype: stateful` 头 + cookie 管理）；纯 python urllib 复刻同 query 无 body 仍被拒。结论：**锁链路必须复用本项目 ADT 协议栈实现**，不手写。
 3. **对象幂等创建判定**：sap-dev 对已存在对象返回 400 `ExceptionResourceAlreadyExists`（非 409），文案 "does already exist"。
 
+## 激活修复与端到端冒烟（2026-10-06 续）
+
+**激活完整性修复**：首轮部署的"激活 OK"只激活了主源码 URI——8 个类的大量 include 段（definitions/implementations/methods）实际处于 inactive，导致用户创建 APC application 时报 `TY_MESSAGE is unknown`（引用解析失败）。修复方法：读 `/activation/inactiveobjects` 全量清单（注意 ioc:ref 的 URI 值含斜杠，正则必须非贪婪；对象 URI 是小写），按对象分组、逐组把全部 include 引用放进 activation 请求，循环至 `ALL INACTIVE CLEAN`。**教训：CLAS 激活必须整对象树（含全部 include 段），单 URI 激活不完整且响应无告警；inactive 复核正则大小写/斜杠敏感需实测验证。**
+
+**补依赖类**：`ZCL_ADT_00_AMDP_TEST`（VSP 安装清单外的依赖，amdp_service L712 引用其 TT_RESULT）——创建 + main 源 + 激活完成；testclasses include 已创建但源写入 404（空壳合法，不影响桥；留档为 A8 侧小尾巴）。
+
+**git 域禁用**：`zcl_vsp_git_service` 缺 abapGit 前置（`ZCX_ABAPGIT_EXCEPTION` unknown）——按 VSP 安装器 skip_git_service 同思路，apc_handler 的 class_constructor 中注释其域注册（行首 `*` 注释；注意缩进 `*` 在 ABAP 中不是注释）。git 域启用需先部署完整 abapGit。
+
+**端到端冒烟（全部通过）**：
+
+| 步骤 | 结果 |
+| --- | --- |
+| HTTP GET 服务面 | 501（APC 端点对非 WebSocket 请求的正常形态） |
+| RFC 6455 握手 | **101 Switching Protocols**，sec-websocket-accept 与测试向量精确匹配，sap-authenticated=true |
+| system/ping | `{"id":"mcp-smoke-1","success":true,"data":{"pong":true,"timestamp":"20261006T112014"}}` |
+| 未实现 action | 结构化错误 `UNKNOWN_DOMAIN`（错误路径正常） |
+
+用户操作完成：SAPC 创建 APC application（ID ZADT_VSP、Handler ZCL_VSP_APC_HANDLER、Stateful、包 $ZADT_VSP）+ SICF 激活节点。**桥已完全打通**：RFC/DEBUG/AMDP/REPORT 四域路由就绪，git 域待 abapGit。
+
 ## 剩余步骤（git.abapgit/桥前置）
 
-1. **用户 GUI 两步**（无法经 ADT REST 完成）：SAPC 激活 APC application `ZADT_VSP` + SICF 服务发布。服务面探测基线（配置前）：`/sap/bc/apc/sap/zadt_vsp` → 501、`/sap/bc/sicf` 节点 → 404；配置后复验应非 404/501。
-2. **WebSocket 桥客户端**（本项目工程轮）：对接 `ZCL_VSP_APC_HANDLER` 的 WebSocket 协议后，评估 git.abapgit 的只读导出（GitTypes/GitExport，跳确认链留审计）。
+1. **（已完成 2026-10-06）**：用户 SAPC 创建 APC application + SICF 激活，WebSocket 端到端冒烟通过（见上）。
+2. **WebSocket 桥客户端**（本项目下一工程轮）：对接 `ZCL_VSP_APC_HANDLER` 的 JSON 消息协议（握手→带 id 的 JSON 请求→响应帧），实现 git 域只读导出（GitTypes/GitExport，跳确认链留审计）。前置：abapGit 部署 + 恢复 handler 的 git 域注册。
+3. 矩阵 git.abapgit 行 nextMilestone=`websocket-bridge-client-engineering`。
 
 ## 验证状态
 
