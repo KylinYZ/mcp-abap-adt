@@ -67,6 +67,7 @@
 
 - `analyzeHealth(CLAS, ZCL_MCP_SM21_ADT_HTTP)` 调用链完整（未被客户端 30s 杀死、返回结构完整）；四信号全 60s ERROR——根因（缺陷 10）：guardrails 的 per-request 60s 超时 + 四采集器并发共享同一 stateful 会话（SAP 同会话排队处理），262s 的 ATC 把快信号拖死。防线语义正确兜底：verdict=UNKNOWN、notes 逐信号点名 "this check failed, so it is not evidence of health"。
 - **附带修复（缺陷 10）**：health 内部四采集器改顺序执行——慢信号只拖总时长、不再误伤快信号（直连端到端为并发但无 per-request 超时故能跑通；串行化在两种通道下均正确）。
+- **串行化修复复验（2026-10-06，客户端重启加载新 dist 后）**：`analyzeHealth(CLAS, ZCL_MCP_SM21_ADT_HTTP)` MCP 面返回真实快信号——tests=NONE（0 类）、staleness=ACTIVE（53 天），headline 缺口清单从四信号收缩为 "atc and boundaries"；atc 仍 60s ERROR（真机 ATC 需 262s，MCP 面全绿需部署侧 `timeoutMs≥300s`）。缺陷 10 修复在 MCP 面实证。
 
 ## 验证状态
 

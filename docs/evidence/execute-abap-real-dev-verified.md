@@ -65,3 +65,7 @@ DELETE 成功后置位。
 - 模板注入防线：returnVariable 必须满足 ABAP 变量名规则（字母/下划线开头、
   ≤30 位），handler 层 InvalidParams 前置 + API 层二次校验（零 SAP 调用）。
 - 对象自持：临时程序名/URI/锁句柄由服务端生成，调用方无任何 URL/XML 入参。
+
+## MCP 客户端面复验（2026-10-06）
+
+客户端重启加载受控链后首次经 MCP 工具面执行：`executeAbap({ code: "rv_result = |OK: sy-subrc=| && sy-subrc && |, date=| && sy-datlo.", returnVariable: "rv_result", riskLevel: "harmless" })` → success=true，输出 `OK: sy-subrc=0, date=20261006` 正确捕获；临时程序 ZTEMP_EXEC_50839888 创建并清理（cleanedUp=true、零警告）。rawAlerts 中的 failedAssertion（标题含 EXEC_RESULT 前缀）是输出捕获协议的载体而非真实失败，与三态失败语义一致。
