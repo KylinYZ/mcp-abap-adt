@@ -64,7 +64,8 @@
     "test:where-used-config-real-dev": "node ./scripts/where-used-config-real-dev-smoke.mjs",
     "test:usage-examples-real-dev": "node ./scripts/usage-examples-real-dev-smoke.mjs",
     "test:f1-textpool-real-dev": "node ./scripts/f1-textpool-focused-real-dev-smoke.mjs",
-    "test:textpool-controlled-real-dev": "node ./scripts/textpool-controlled-real-dev-smoke.mjs"
+    "test:textpool-controlled-real-dev": "node ./scripts/textpool-controlled-real-dev-smoke.mjs",
+    "test:execute-abap-real-dev": "node scripts/execute-abap-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",

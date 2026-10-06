@@ -15,6 +15,7 @@ const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
   getFmTestDataSets: ['function'],
   getWhereUsedConfig: ['variable', 'grep', 'maxGrep'],
   getUsageExamples: ['objectType', 'objectName', 'method', 'form', 'maxExamples'],
+  executeAbap: ['code', 'riskLevel', 'returnVariable', 'keepProgram'],
   buildLoadDependencyGraph: ['objectType', 'objectName', 'direction', 'maxDepth', 'maxQueries', 'maxNodes', 'maxEdges'],
   analyzeDependencyGraph: ['operation', 'graph', 'root', 'maxDepth', 'maxEntries', 'edgeKinds', 'boundaryScope'],
   sap: ['action', 'params'],
