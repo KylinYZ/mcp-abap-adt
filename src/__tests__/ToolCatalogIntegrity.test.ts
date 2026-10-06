@@ -30,10 +30,13 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 198],
+    ['development', 201],
     ['diagnostic-readonly', 146],
-    ['legacy-full', 209],
-    ['development-workbench', 168],
+    // legacy-full 211：210 + executeAbap（devtools.execute-abap 受控执行，
+    // 执行类工具与 runUnitCoverage 同面，仅专家完整面）
+    ['legacy-full', 211],
+    // development-workbench 173：172 + executeAbap（workbench 显式名单同步收录）
+    ['development-workbench', 173],
     ['business-readonly', 18],
     // operations-readonly 54：53 + getUsageExamples（analysis.usage_examples，
     // 与 vsp-capability-parity-matrix 的 operations-readonly 声明同步收录）

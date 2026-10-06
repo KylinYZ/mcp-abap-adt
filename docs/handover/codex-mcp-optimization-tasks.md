@@ -181,13 +181,13 @@
 - **决策项**：解除条件是所有者重新放开方向 + 受控执行工作流设计评审。现状：S4D 已部署 ZCL_VSP_REPORT_SERVICE（WebSocket 底座）；sap-adt 服务器的 RunReport/RunReportAsync/GetVariants 是可对照的成熟实现（后台作业+spool 取回）。
 - **若放开**：设计要点——preview/确认/apply 纪律、作业与 spool 清理、QAS/PRD 硬拒、负载护栏（作业名白名单/超时上限）。先评审后实施，默认不开。
 
-### F4 [P2] transport.merge-move（GAP）：请求合并/对象跨请求移动
+### F4 [P2] transport.merge-move（GAP→INTENTIONAL_RESTRICTION，2026-10-04 已定性）
 
-- 本仓库传输链已覆盖仅创建/仅删空请求；合并与移动可补偿清理场景（如残留 S4HK900029 这类"待属主处理"请求的整理）。需按受控链设计（不可直改 E071/E071K 红线不变）。
+- 勘察结论（VSP pkg/adt/transport_merge.go@9886d272 头注）：ADT REST 无合并/移动资源面；SE09 背后 FM（TR_MERGE_REQUESTS、TR_APPEND_TO_COMM_OBJS_KEYS、TRINT_DELETE_COMM_OBJECT_KEYS）非 remote-enabled，VSP 自身也必须经 ZADT_VSP CALL FUNCTION WebSocket 桥执行。语义上 merge=并入后删除 from（非空请求删除）、move=FM 直改 E071/E071K，与本项目传输红线直接冲突；当前 sap-demo 亦无 helper 桥。已落矩阵 INTENTIONAL_RESTRICTION（解除条件：helper 桥部署 + 所有者显式放开红线），不再立任务。
 
-### F5 [P2] ui5.write（GAP）：UI5 BSP 应用与文件的受控创建/上传/删除
+### F5 [P2] ui5.write（GAP→PARTIAL，2026-10-04 离线落地）
 
-- 本仓库仅读（ui5ListApps/ui5GetApp/ui5GetFileContent）。写入面需受控工作流设计评审；优先级低于 F1-F4。
+- 受控写链已实现：`previewUi5Operation`/`applyUi5Operation`/`getUi5OperationStatus` 三件套（DEV + development/development-workbench），四 kind（create_app/upload_file/delete_file/delete_app）对齐 VSP ui5.go 的 filestore POST/PUT/DELETE 协议；preview 冻结旧状态 → apply 漂移复核 → 单次执行 → readback；filestore 写不走 workbench 对象锁。离线单测全绿（185 suites/2039 tests），矩阵晋级 PARTIAL；剩余真机 DEV smoke（nextMilestone=ui5-write-real-dev-smoke）后晋级 EQUIVALENT。见 docs/evidence/ui5-write-controlled-offline.md。
 
 ### F6 [P2] diagnostics.knowledge-queries 收尾（PARTIAL）
 

@@ -65,6 +65,12 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'getCdsDependencies', 'getCdsImpactAnalysis', 'getCdsElementInfo',
   // Wave 3 分析五工具：源码 grep/交叉引用/应用日志（只读）+ 覆盖率执行（other-mutation）
   'grepPackage', 'grepObjects', 'getCallees', 'readApplicationLog', 'runUnitCoverage',
+  // 受控 ABAP 执行（devtools.execute-abap）：执行级门控与 runUnitCoverage 同面
+  // （workbench 显式收录 + legacy-full）——临时程序包装 + ABAP Unit 单次运行
+  'executeAbap',
+  // Health 聚合查询（analysis.history 行 health 子操作）：tests 信号真正执行
+  // 单测——执行级门控与 runUnitCoverage 同面（workbench 显式收录 + legacy-full）
+  'analyzeHealth',
   // dump 增值分析（diagnostics.dumps）：窗口内分组聚合与同类检索，只读
   'groupRuntimeDumps', 'findSimilarDumps',
   // 依赖上下文四工具（codeintel.context）：客户端侧压缩/解析/依赖/副作用分析，只读
@@ -129,7 +135,12 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 受控程序文本池写入链（F1 完整方案）：preview/apply/status 三件套
   'previewTextPoolChange',
   'applyTextPoolChange',
-  'getTextPoolChangeStatus'
+  'getTextPoolChangeStatus',
+  // 受控 UI5 filestore 写入链（F5：ui5.write 关缺口）：preview/apply/status
+  // 三件套，四 kind（create_app/upload_file/delete_file/delete_app）
+  'previewUi5Operation',
+  'applyUi5Operation',
+  'getUi5OperationStatus'
 ]);
 
 export const BUSINESS_READONLY_TOOL_NAMES = new Set([

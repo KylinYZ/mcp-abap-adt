@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-24",
+  "generatedAt": "2026-10-06",
   "vspRevision": "9886d2727f47506368b0a3c2f1c1766f1200f747",
   "vspWorktreeState": "dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪）",
   "projectRevision": "a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef",
-  "projectWorktreeState": "dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等）",
+  "projectWorktreeState": "dirty: 基线之后的未提交改动——devtools.execute-abap 受控执行链（ExecuteAbapApi/Handlers、smoke 脚本、包脚本）与 ui5.write/health 受控链（Ui5Write*、Health*、profile/policy 接线）；由本轮提交收敛",
   "statusVocabulary": {
     "MCP_SUPERSET": "本项目完成同一任务，且多了可验证的安全或复读保证；计入完成率",
     "EQUIVALENT": "两边可完成同一任务，关键输入、输出和副作用相当；计入完成率",
@@ -907,7 +907,7 @@
     {
       "id": "devtools.execute-abap",
       "domain": "devtools",
-      "task": "直接执行 ABAP 片段/类并取回输出",
+      "task": "直接执行 ABAP 片段并取回输出",
       "vsp": {
         "surface": "SAP(action=analyze, params={type:execute_abap})",
         "source": [
@@ -919,22 +919,39 @@
         ]
       },
       "mcp": {
-        "status": "PARTIAL",
+        "status": "EQUIVALENT",
         "taskPath": [
-          "runClass"
+          "executeAbap"
         ],
         "profiles": [
+          "development-workbench",
           "legacy-full"
         ],
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "仅专家 profile 的 runClass 原子入口；无受控执行链，输出与副作用边界弱于 VSP 的 execute_abap。",
-        "liftCondition": "评估受控执行任务（固定入口 + 输出捕获）后晋级。"
+        "restrictionReason": "executeAbap 受控执行链已真机验证（2026-10-06，docs/evidence/execute-abap-real-dev-verified.md）：VSP workflows_execute.go ExecuteABAP 执行核移植——用户片段包进一次性 ABAP Unit 测试程序（$TMP、无 transport），激活后单次运行，EXEC_RESULT 断言消息携带输出值出测试沙箱，运行后临时程序即删。三态失败语义同 VSP：syntaxError（激活步 200 内消息或异常）、notRun（ABAP Unit 零测试类——\"空\"不是\"通过\"）、PayloadFailure（exception 优先 + 行号回译到用户代码）；清理失败记 cleanupWarnings 不重试（UNKNOWN_OUTCOME 不回放）。片段执行=executeAbap、类执行=既有 runClass 原子入口，双入口覆盖 VSP execute_abap 任务面。门控与 runUnitCoverage 同级（DEV + workbench/legacy-full + OTHER_MUTATION 写槽串行）。",
+        "liftCondition": "",
+        "alternatePaths": [
+          {
+            "purpose": "专家原子入口 runClass（任意代码执行风险，仅专家面直达）",
+            "tools": [
+              "runClass"
+            ],
+            "profiles": [
+              "legacy-full"
+            ],
+            "systemRoles": [
+              "DEV"
+            ]
+          }
+        ]
       },
       "priority": "P1",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
       "nextMilestone": ""
     },
@@ -1330,12 +1347,12 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
+        "status": "INTENTIONAL_RESTRICTION",
         "taskPath": [],
         "profiles": [],
         "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "restrictionReason": "ADT REST 层不存在传输合并/对象移动资源（VSP pkg/adt/transport_merge.go@9886d272 头注：SE09 Utilities→Reorganize 在 ADT 无对应面；organizer 资源只能加对象/改属主/释放，不能移除条目）。SE09 背后 FM TR_MERGE_REQUESTS、TR_APPEND_TO_COMM_OBJS_KEYS、TRINT_DELETE_COMM_OBJECT_KEYS 均非 remote-enabled，VSP 自身也必须经 ZADT_VSP 的 CALL FUNCTION WebSocket 桥关对话框执行。语义上 merge=把 from 的任务与对象并入 to 后删除 from（非空请求删除）、move=FM 直改 E071/E071K，与本项目传输安全红线（释放/改属主/加用户/删非空或他人请求与直改 E071·E071K 一律禁止）直接冲突；且当前 sap-demo client 300 未部署 ZCL_VSP_* helper 桥（2026-10-03 核实仅 SAPC/SICF 配置面）。维持不做。",
+        "liftCondition": "仅当同时满足：1) 目标 DEV 部署 ZADT_VSP CALL FUNCTION 桥并通过 install.diagnostics 可用性诊断；2) 所有者显式放开传输红线并完成受控工作流设计评审（补偿/审计/回滚语义）。二者缺一即维持限制，无当前计划。"
       },
       "priority": "P2",
       "evidence": [
@@ -2217,12 +2234,13 @@
           "QAS",
           "PRD"
         ],
-        "restrictionReason": "cr_history、co_change 与 loads 三个子操作已在真实 DEV 端到端验证。cr_history/co_change（2026-09-18，docs/evidence/transport-history-real-dev-verified.md）：E071 R3TR+LIMU → E070 任务→请求层级 → 同请求共现频次排行。loads（2026-09-24，scripts/load-graph-real-dev-smoke.mjs，npm run test:load-graph-real-dev）：D010INC 编译期加载图——ZCL_MCP_SM21_ADT_HTTP 真机读回 26 条对象间加载边，填充池名归一化（ZCL_X====CP→CLAS、L<组>TOP→FUGR）、内核机器行（<SYSINI>/%_CABAP/~伴随池）与自包含行全过滤、up 方向全包含时 notes 如实标注；语义对照 VSP pkg/adt/loads.go + pkg/graph/builder_loads.go 逐函数移植。loads 是加载不是调用（INCLUDE 拆分依赖只在 D010INC 出现），notes 恒带语义声明。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 等图引擎类分析（pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。 2026-09-24 离线推进：analyzeDependencyGraph 提供调用方快照的 impact 反向 BFS 与 stats 统计（VSP pkg/graph/queries_impact.go + graph.go 对齐）；无 SAP 数据采集、无远端图构建，不能视为系统级 impact/graph_stats 等价。证据与边界见 docs/evidence/dependency-graph-offline-alignment.md；本行维持 PARTIAL。 后续离线接线：buildLoadDependencyGraph 将已有 D010INC 只读单跳查询串行组合成有界多跳图，输出结构化采集状态、预算截断和未展开节点，并附 LOADS 快照影响面；FUGR 反向展开显式限制。只完成 mock/fixtures 验证，未做多跳真机验证，不能视为系统级对齐；见 docs/evidence/load-dependency-graph-offline-alignment.md。 对象集合边界离线子集：analyzeDependencyGraph 的 boundaries 操作支持显式 TR/CR 成员集合的对外结构依赖分类，严格身份匹配、动态/命名空间/包未知显式报告、明细有界；未采集真实传输成员，不证明可释放，仍 PARTIAL。见 docs/evidence/transport-boundaries-offline-alignment.md。 显式传输成员只读采集：getTransportScope 使用既有 E070/E071 SQL 通道，任务归并父请求及兄弟任务，只输出 R3TR 成员；LIMU、缺失、冲突及截断显式 partial。离线 fixture/MCP 分派验证，不包含 E070A CR 分组或真机验证；见 docs/evidence/transport-scope-offline-alignment.md。 组合链真机验证（2026-09-25，docs/evidence/transport-scope-real-dev-verified.md，npm run test:transport-scope-real-dev）：getTransportScope 对 S4HK900010 完成任务→父请求 S4HK900009 归并、194 个 R3TR 成员采集与 includeLoadBoundaries 组合边界分类（partial 三来源如实传播、summary 恒等关系成立、安全常量不放宽）；真机抓到并修复 NULL 列 undefined 单元格被拒缺陷（datapreview 对 NULL 列不输出 <data> 元素）。buildLoadDependencyGraph 对真实类读回 26 条 LOADS 边。该段是 2026-09-24 状态的历史记录，后续 WBCROSSGT/CROSS 已由下文 2026-09-25 crossref 真机证据验证；当前仍缺 E070A CR 分组、动态调用解析，以及 VSP impact/health/graph_stats 图引擎语义。 crossref 结构边真机验证（2026-09-25，docs/evidence/transport-crossref-real-dev-verified.md，npm run test:transport-crossref-real-dev）：getTransportScope 新增 includeCrossRefBoundaries 开关，对传输范围代码承载成员采集 WBCROSSGT/CROSS 出向边（REFERENCES/CALLS 口径，DIRECT 行过滤、PERFORM 交换、组件段合并、兄弟池归属过滤），端到端产出边界分类——决定性正例 S4HK900012：FUGR:ZMCP_TOOLS→UNKNOWN:S_ADMI_FCD（CALLS）真实产出并正确分类 standardCandidates，getCallees 同源对照 21 条引用，summary 恒等关系与安全常量断言通过。tr_boundaries 核心链路（成员采集→结构边→分类）至此真机闭环。剩余：E070A CR 分组（服务器未配置）、动态调用解析、impact/health/graph_stats（图引擎轮）。 where_used_config 子操作真机验证（2026-09-28，docs/evidence/where-used-config-real-dev-verified.md，npm run test:where-used-config-real-dev）：getWhereUsedConfig 两段式（WBCROSSGT OTYPE=TY + CROSS TYPE=S 候选配对 → 每候选源码 grep 变量名确认），决定性正例用直连 ADT 写链自造数据（自有验证程序引用 TVARVC 并激活）读回 readers=1 confirmed=1，grep 预算外与失败一律 unsearched 不借义，双源失败硬错误非空答案。剩余缺口：usage_examples 子操作（callers 源码片段呈现层，可后续收编）与 impact/health/graph_stats（图引擎轮）；E070A CR 分组服务器未配置。 usage_examples 子操作真机验证（2026-09-29，docs/evidence/usage-examples-real-dev-verified.md，npm run test:usage-examples-real-dev）：getUsageExamples 两段式（交叉表候选按目标类型选 CROSS 单字符码 F/R/U 与 WBCROSSGT LIKE → 逐候选读 source/main 做结构形态匹配），决定性正例用直连 ADT 写链自造 caller（自有类引用 ZCL_MCP_SM21_ADT_HTTP）读回 totalCallers=2、CLASS_REFERENCE HIGH 示例命中、WBCROSSGT 行形态（30 位填充池+TY+目标名）与归一化吻合。剩余缺口：impact/health/graph_stats（VSP 图引擎轮）；E070A CR 分组服务器未配置。",
+        "restrictionReason": "cr_history、co_change 与 loads 三个子操作已在真实 DEV 端到端验证。cr_history/co_change（2026-09-18，docs/evidence/transport-history-real-dev-verified.md）：E071 R3TR+LIMU → E070 任务→请求层级 → 同请求共现频次排行。loads（2026-09-24，scripts/load-graph-real-dev-smoke.mjs，npm run test:load-graph-real-dev）：D010INC 编译期加载图——ZCL_MCP_SM21_ADT_HTTP 真机读回 26 条对象间加载边，填充池名归一化（ZCL_X====CP→CLAS、L<组>TOP→FUGR）、内核机器行（<SYSINI>/%_CABAP/~伴随池）与自包含行全过滤、up 方向全包含时 notes 如实标注；语义对照 VSP pkg/adt/loads.go + pkg/graph/builder_loads.go 逐函数移植。loads 是加载不是调用（INCLUDE 拆分依赖只在 D010INC 出现），notes 恒带语义声明。剩余缺口：VSP 的 impact/tr_boundaries/cr_boundaries/health/graph_stats 等图引擎类分析（pkg/graph 多跳遍历/边界引擎，独立工程轮）；co_change 为同请求共现简化口径（无多跳图），notes 如实声明。 2026-09-24 离线推进：analyzeDependencyGraph 提供调用方快照的 impact 反向 BFS 与 stats 统计（VSP pkg/graph/queries_impact.go + graph.go 对齐）；无 SAP 数据采集、无远端图构建，不能视为系统级 impact/graph_stats 等价。证据与边界见 docs/evidence/dependency-graph-offline-alignment.md；本行维持 PARTIAL。 后续离线接线：buildLoadDependencyGraph 将已有 D010INC 只读单跳查询串行组合成有界多跳图，输出结构化采集状态、预算截断和未展开节点，并附 LOADS 快照影响面；FUGR 反向展开显式限制。只完成 mock/fixtures 验证，未做多跳真机验证，不能视为系统级对齐；见 docs/evidence/load-dependency-graph-offline-alignment.md。 对象集合边界离线子集：analyzeDependencyGraph 的 boundaries 操作支持显式 TR/CR 成员集合的对外结构依赖分类，严格身份匹配、动态/命名空间/包未知显式报告、明细有界；未采集真实传输成员，不证明可释放，仍 PARTIAL。见 docs/evidence/transport-boundaries-offline-alignment.md。 显式传输成员只读采集：getTransportScope 使用既有 E070/E071 SQL 通道，任务归并父请求及兄弟任务，只输出 R3TR 成员；LIMU、缺失、冲突及截断显式 partial。离线 fixture/MCP 分派验证，不包含 E070A CR 分组或真机验证；见 docs/evidence/transport-scope-offline-alignment.md。 组合链真机验证（2026-09-25，docs/evidence/transport-scope-real-dev-verified.md，npm run test:transport-scope-real-dev）：getTransportScope 对 S4HK900010 完成任务→父请求 S4HK900009 归并、194 个 R3TR 成员采集与 includeLoadBoundaries 组合边界分类（partial 三来源如实传播、summary 恒等关系成立、安全常量不放宽）；真机抓到并修复 NULL 列 undefined 单元格被拒缺陷（datapreview 对 NULL 列不输出 <data> 元素）。buildLoadDependencyGraph 对真实类读回 26 条 LOADS 边。该段是 2026-09-24 状态的历史记录，后续 WBCROSSGT/CROSS 已由下文 2026-09-25 crossref 真机证据验证；当前仍缺 E070A CR 分组、动态调用解析，以及 VSP impact/health/graph_stats 图引擎语义。 crossref 结构边真机验证（2026-09-25，docs/evidence/transport-crossref-real-dev-verified.md，npm run test:transport-crossref-real-dev）：getTransportScope 新增 includeCrossRefBoundaries 开关，对传输范围代码承载成员采集 WBCROSSGT/CROSS 出向边（REFERENCES/CALLS 口径，DIRECT 行过滤、PERFORM 交换、组件段合并、兄弟池归属过滤），端到端产出边界分类——决定性正例 S4HK900012：FUGR:ZMCP_TOOLS→UNKNOWN:S_ADMI_FCD（CALLS）真实产出并正确分类 standardCandidates，getCallees 同源对照 21 条引用，summary 恒等关系与安全常量断言通过。tr_boundaries 核心链路（成员采集→结构边→分类）至此真机闭环。剩余：E070A CR 分组（服务器未配置）、动态调用解析、impact/health/graph_stats（图引擎轮）。 where_used_config 子操作真机验证（2026-09-28，docs/evidence/where-used-config-real-dev-verified.md，npm run test:where-used-config-real-dev）：getWhereUsedConfig 两段式（WBCROSSGT OTYPE=TY + CROSS TYPE=S 候选配对 → 每候选源码 grep 变量名确认），决定性正例用直连 ADT 写链自造数据（自有验证程序引用 TVARVC 并激活）读回 readers=1 confirmed=1，grep 预算外与失败一律 unsearched 不借义，双源失败硬错误非空答案。剩余缺口：usage_examples 子操作（callers 源码片段呈现层，可后续收编）与 impact/health/graph_stats（图引擎轮）；E070A CR 分组服务器未配置。 usage_examples 子操作真机验证（2026-09-29，docs/evidence/usage-examples-real-dev-verified.md，npm run test:usage-examples-real-dev）：getUsageExamples 两段式（交叉表候选按目标类型选 CROSS 单字符码 F/R/U 与 WBCROSSGT LIKE → 逐候选读 source/main 做结构形态匹配），决定性正例用直连 ADT 写链自造 caller（自有类引用 ZCL_MCP_SM21_ADT_HTTP）读回 totalCallers=2、CLASS_REFERENCE HIGH 示例命中、WBCROSSGT 行形态（30 位填充池+TY+目标名）与归一化吻合。剩余缺口：impact/health/graph_stats（VSP 图引擎轮）；E070A CR 分组服务器未配置。 health 子操作离线收编（2026-10-04，对齐 VSP internal/mcp/handlers_health.go@9886d272 573 行）：analyzeHealth 工具提供包级四信号（tests=单测执行限 5 测试类/atc=createAtcRun+atcWorklists/boundaries=复用已真机验证的 checkPackageBoundaries/staleness=revisions 最新日期 365/90 阈值）与对象级三信号（boundaries 无单对象裁定器，如实 UNKNOWN 指向包级工具）；VSP 测试 pin 的两道防缺陷语义逐行移植（incomplete 信号阻断 GOOD verdict、跑失败的测试记 ERROR/unsearched 而非 PASS、零扫描边界不判 CLEAN），12 单测覆盖。执行级门控同 runUnitCoverage（tests 信号运行用户测试代码，workbench/legacy-full）。health 组合层真机取证（2026-10-05，sap-demo）：ZCL_MCP_SM21_ADT_HTTP/Z001 上 tests（RunUnitTests 返回空类集→NONE 语义正确）、boundaries（checkPackageBoundaries 完整报告，字段形态与 HealthCapability 契约一致、notes 上提 partial）、staleness（revisions 2026-08-13→ACTIVE）三信号全通且形态匹配；ATC 信号两次超 30s 客户端超时（ATC 运行时长>限制，失败形态由 errorSignal→verdict UNKNOWN 防线兜住；需 mcp.servers timeoutMs 提升并重启客户端后可复验）；listPackageObjects 的 IN 形态 SQL 在 ADT 客户端通道成立（checkPackageBoundaries 内部同款真机成功佐证），MCP runQuery 工具的 datapreview 通道对 IN 列表 SQL 有独立缺陷（单值 = 成功、IN 列表内部错误，另行留档不涉本实现）。，图引擎全量语义（pkg/graph 的 loadable/遍历型 health 输入）与 E070A CR 分组、动态调用解析仍缺。",
         "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation"
       ],
       "nextMilestone": ""
     },
@@ -2518,18 +2536,28 @@
         ]
       },
       "mcp": {
-        "status": "GAP",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "",
-        "liftCondition": ""
+        "status": "PARTIAL",
+        "taskPath": [
+          "previewUi5Operation",
+          "applyUi5Operation",
+          "getUi5OperationStatus"
+        ],
+        "profiles": [
+          "development",
+          "development-workbench"
+        ],
+        "systemRoles": [
+          "DEV"
+        ],
+        "restrictionReason": "受控写链已离线落地（2026-10-04，四 kind：create_app/upload_file/delete_file/delete_app，对齐 VSP pkg/adt/ui5.go@9886d272 L273-419 的 POST/PUT/DELETE filestore 协议）：preview 冻结旧状态快照+内容 hash+TTL+上下文绑定，apply 漂移复核（STATE_DRIFT 拒绝）→ 单次执行 → readback 比对（VERIFICATION_FAILED），请求后异常 UNKNOWN_OUTCOME 终结不重试，同值短路，部署级 autoApprove 注入；ADT 层应用名/路径白名单+穿越拒绝+2MiB 上限+Content-Type 形态校验。filestore 写不走 ABAP workbench 对象锁（BSP 容器操作，VSP 同款），事务边界由 preview 冻结+readback 补齐；三 profile 运行时 catalog 成员已验证（development/development-workbench，DEV 角色）。真机取证（2026-10-05，sap-demo 10.30.254.48:8001/300，curl 直连 ADT 与实现逐字同协议）：CSRF fetch 流程与状态ful 会话打通、GET 读面正常；全部写方法（POST create/PUT content/DELETE file+app）被资源控制器以 405 ExceptionMethodNotSupported 拒绝——\"Resource controller does not support method POST/DELETE\"，即该系统 ui5-bsp filestore 控制器为只读面；sap-adt 服务器对同一系统的 feature 探测独立佐证（features 含 ✗ui5）。写往返与缺席复核在该系统不可执行，无残留对象（create 未成功）。 阻塞定性：实现协议栈正确（服务器语义应答非授权/路径错误），缺口在目标系统未提供 filestore 写控制器；需要具备写控制器的目标 DEV 才能完成全 kind 往返 smoke。",
+        "liftCondition": "在提供 ui5-bsp filestore 写控制器的目标 DEV 上完成自建应用→上传→读回→删除→缺席复核全 kind 往返 smoke 后晋级 EQUIVALENT；sap-demo 不满足前置（2026-10-05 实测 405 只读面）。"
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation"
       ],
-      "nextMilestone": ""
+      "nextMilestone": "ui5-write-real-dev-smoke"
     },
     {
       "id": "i18n.read",

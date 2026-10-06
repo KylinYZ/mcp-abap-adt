@@ -116,10 +116,19 @@ import { createWhereUsedConfigClient } from './adt/WhereUsedConfigApi.js';
 import { UsageExamplesHandlers } from './handlers/UsageExamplesHandlers.js';
 import { TextPoolHandlers } from './handlers/TextPoolHandlers.js';
 import { TextPoolWorkflow } from './safe/TextPoolWorkflow.js';
+import { Ui5WriteHandlers } from './handlers/Ui5WriteHandlers.js';
+import { HealthHandlers } from './handlers/HealthHandlers.js';
+import type { HealthCapability } from './adt/HealthApi.js';
+import { runUnitTest } from './adt/api/unittest.js';
+import { Ui5WriteWorkflow } from './safe/Ui5WriteWorkflow.js';
+import { createUi5WriteClient } from './adt/Ui5FilestoreApi.js';
 import { createUsageExamplesClient } from './adt/UsageExamplesApi.js';
 import {
   createUnitCoverageClient
 } from './adt/UnitCoverageApi.js';
+import {
+  createExecuteAbapClient
+} from './adt/ExecuteAbapApi.js';
 import {
   createApplicationLogClient
 } from './adt/ApplicationLogApi.js';
@@ -153,6 +162,7 @@ import { TransportScopeHandlers } from './handlers/TransportScopeHandlers.js';
 import { RfcProbeHandlers } from './handlers/RfcProbeHandlers.js';
 import { SourceGrepHandlers } from './handlers/SourceGrepHandlers.js';
 import { UnitCoverageHandlers } from './handlers/UnitCoverageHandlers.js';
+import { ExecuteAbapHandlers } from './handlers/ExecuteAbapHandlers.js';
 import { ApplicationLogHandlers } from './handlers/ApplicationLogHandlers.js';
 import { CrossReferenceHandlers } from './handlers/CrossReferenceHandlers.js';
 import { ContextAnalysisHandlers } from './handlers/ContextAnalysisHandlers.js';
@@ -211,6 +221,7 @@ export class AbapAdtServer extends Server {
   private cdsAnalysisHandlers: CdsAnalysisHandlers;
   private sourceGrepHandlers: SourceGrepHandlers;
   private unitCoverageHandlers: UnitCoverageHandlers;
+  private executeAbapHandlers: ExecuteAbapHandlers;
   private applicationLogHandlers: ApplicationLogHandlers;
   private crossReferenceHandlers: CrossReferenceHandlers;
   private contextAnalysisHandlers: ContextAnalysisHandlers;
@@ -234,6 +245,8 @@ export class AbapAdtServer extends Server {
   private whereUsedConfigHandlers: WhereUsedConfigHandlers;
   private usageExamplesHandlers: UsageExamplesHandlers;
   private textPoolHandlers: TextPoolHandlers;
+  private ui5WriteHandlers: Ui5WriteHandlers;
+  private healthHandlers: HealthHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -414,6 +427,43 @@ export class AbapAdtServer extends Server {
     // 走 runQuery 的 datapreview 通道（decode=true，DIRECT 标志依赖解码）。
     this.sourceGrepHandlers = new SourceGrepHandlers(createSourceGrepClient(readClient.httpClient));
     this.unitCoverageHandlers = new UnitCoverageHandlers(createUnitCoverageClient(this.adtClient.httpClient));
+    // 受控 ABAP 执行（devtools.execute-abap 行）：临时程序包装 + ABAP Unit
+    // 单次运行。锁/源码写入是 stateful 专属操作（ValidateStateful），必须绑
+    // 主会话 adtClient（写域 stateful），与 runClass/unitTestRun 同面。
+    this.executeAbapHandlers = new ExecuteAbapHandlers(createExecuteAbapClient(this.adtClient.httpClient));
+    // Health 聚合查询（analysis.history 行 health 子操作）：tests 信号真正执行
+    // 单测（执行行为），执行类原语绑主会话 adtClient；boundaries 复用已真机
+    // 验证的包边界证据链（readClient），TADIR 枚举走同款自由 SQL 通道。
+    const healthCapability: HealthCapability = {
+      runUnitTest: url => runUnitTest(this.adtClient.httpClient, url),
+      createAtcRun: (variant, mainUrl, maxResults) => this.adtClient.createAtcRun(variant, mainUrl, maxResults),
+      atcWorklists: runResultId => this.adtClient.atcWorklists(runResultId),
+      checkPackageBoundaries: input => createBoundaryCheckClient(readClient).checkPackageBoundaries(input),
+      revisions: objectUrl => this.adtClient.revisions(objectUrl),
+      listPackageObjects: async (packageName, kinds, limit) => {
+        const kindList = kinds.map(k => `'${k}'`).join(', ');
+        const rows = (await readClient.runQuery(
+          `SELECT obj_name, object FROM tadir WHERE pgmid = 'R3TR' AND devclass = '${packageName}' AND object IN (${kindList}) ORDER BY obj_name`,
+          limit
+        )).values ?? [];
+        return rows.map(row => ({
+          name: String(row['OBJ_NAME'] ?? row['obj_name'] ?? '').trim().toUpperCase(),
+          type: String(row['OBJECT'] ?? row['object'] ?? '').trim().toUpperCase()
+        }));
+      },
+      objectUrl: (objectType, objectName, parent) => {
+        const name = objectName.toLowerCase();
+        switch (objectType) {
+          case 'CLAS': return `/sap/bc/adt/oo/classes/${name}`;
+          case 'INTF': return `/sap/bc/adt/oo/interfaces/${name}`;
+          case 'PROG': return `/sap/bc/adt/programs/programs/${name}`;
+          case 'FUGR': return `/sap/bc/adt/functions/groups/${name}`;
+          case 'FUNC': return parent ? `/sap/bc/adt/functions/groups/${parent.toLowerCase()}/fmodules/${name}` : undefined;
+          default: return undefined;
+        }
+      }
+    };
+    this.healthHandlers = new HealthHandlers(healthCapability);
     this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
     this.crossReferenceHandlers = new CrossReferenceHandlers(
       createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
@@ -596,6 +646,25 @@ export class AbapAdtServer extends Server {
         const plan = textPoolWorkflow.status(planId);
         return { program: plan.program, category: plan.category, newCount: plan.newElements.length,
           systemHost: plan.systemHost, client: plan.client };
+      }
+    });
+    // 受控 UI5 filestore 写入（F5：ui5.write 关缺口）：四 kind（create_app/
+    // upload_file/delete_file/delete_app）受控链。写域必须绑定 stateful 主会话
+    // （this.adtClient.httpClient），与读域 stateless client 分离；filestore 写
+    // 不走 workbench 对象锁，事务边界由 preview 冻结 + apply 漂移复核/readback 补齐。
+    const ui5WriteWorkflow = new Ui5WriteWorkflow({
+      client: createUi5WriteClient(this.adtClient.httpClient),
+      policy: this.safetyPolicy,
+      audit: auditLogger
+    });
+    this.ui5WriteHandlers = new Ui5WriteHandlers(ui5WriteWorkflow, {
+      supportsFormElicitation: () => Boolean(this.currentClientCapabilities()?.elicitation?.form),
+      autoApprove: () => this.safetyPolicy.confirmationAutoApprove,
+      elicitInput: (params, timeoutMs) => this.elicitViaActiveRequest(params, timeoutMs),
+      planSummary: planId => {
+        const plan = ui5WriteWorkflow.status(planId);
+        return { kind: plan.kind, appName: plan.appName, filePath: plan.filePath,
+          fileCount: plan.oldState.fileCount, systemHost: plan.systemHost, client: plan.client };
       }
     });
 
@@ -1101,6 +1170,7 @@ export class AbapAdtServer extends Server {
       ...this.descriptionChangeHandlers.getTools(),
       ...this.messageTextHandlers.getTools(),
       ...this.textPoolHandlers.getTools(),
+      ...this.ui5WriteHandlers.getTools(),
       ...this.cloneObjectHandlers.getTools(),
       ...this.renameControlledHandlers.getTools()
     ];
@@ -1148,8 +1218,13 @@ export class AbapAdtServer extends Server {
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
-    // 组合面与 diagnostic-readonly。
-    const coverageTools = this.unitCoverageHandlers.getTools();
+    // 组合面与 diagnostic-readonly。executeAbap 同级执行类（临时程序包装
+    // + ABAP Unit 单次运行），随 coverageTools 进同一 catalog 分组。
+    const coverageTools = [
+      ...this.unitCoverageHandlers.getTools(),
+      ...this.healthHandlers.getTools(),
+      ...this.executeAbapHandlers.getTools()
+    ];
     const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools, ...analyticReadTools];
     const focusedTools = this.focusedTaskHandlers.getTools();
     const legacyTools = [
@@ -1351,6 +1426,16 @@ export class AbapAdtServer extends Server {
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);
         }
+        // 受控 ABAP 执行（devtools.execute-abap）：执行类工具，catalog 成员
+        // 已限定 workbench/legacy-full 面，QAS/PRD 由入口策略拒绝，写槽串行。
+        if (this.executeAbapHandlers.supports(toolName)) {
+          return this.executeAbapHandlers.handle(toolName, limitedArguments);
+        }
+        // Health 聚合查询（执行级——tests 信号运行用户测试代码）：catalog 成员
+        // 已限定 workbench/legacy-full 面。
+        if (this.healthHandlers.supports(toolName)) {
+          return this.healthHandlers.handle(toolName, limitedArguments);
+        }
         if (this.repositoryObjectCreationHandlers.supports(toolName)) {
           return this.repositoryObjectCreationHandlers.handle(toolName, limitedArguments, signal);
         }
@@ -1382,6 +1467,11 @@ export class AbapAdtServer extends Server {
         if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
           && this.textPoolHandlers.supports(toolName)) {
           return this.textPoolHandlers.handle(toolName, limitedArguments);
+        }
+        // 受控 UI5 filestore 写入（F5：ui5.write）：同型分派（DEV + workbench/development）。
+        if ((this.safetyPolicy.toolProfile === 'development' || this.safetyPolicy.toolProfile === 'development-workbench')
+          && this.ui5WriteHandlers.supports(toolName)) {
+          return this.ui5WriteHandlers.handle(toolName, limitedArguments);
         }
         // 受控对象克隆链：profile/role 门控已由 assertToolOperationAllowed 前置把关，
         // catalog 成员检查保证非 development/development-workbench profile 不可见。

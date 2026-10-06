@@ -2,9 +2,16 @@ import {
   ui5ListApps,
   ui5GetApp,
   ui5GetFileContent,
+  ui5CreateApp,
+  ui5UploadFile,
+  ui5DeleteFile,
+  ui5DeleteApp,
   normalizeUi5AppName,
   normalizeUi5FilePath,
-  createUi5FilestoreClient
+  normalizeUi5ContentType,
+  isAdtNotFound,
+  createUi5FilestoreClient,
+  createUi5WriteClient
 } from '../adt/Ui5FilestoreApi.js';
 import type { AdtHTTP } from '../adt/AdtHTTP.js';
 
@@ -150,6 +157,85 @@ describe('createUi5FilestoreClient binding', () => {
     const list = await client.ui5ListApps({});
     const app = await client.ui5GetApp({ appName: 'ZAPP_SIMPLE' });
     expect(list.apps).toHaveLength(2);
+    expect(app.files).toHaveLength(3);
+  });
+});
+
+describe('ui5 write operations (VSP ui5.go L273-419 port, controlled-chain ADT layer)', () => {
+  it('ui5CreateApp posts the bsp:application XML with corrNr and escapes attributes', async () => {
+    const http = httpMock([{ match: () => true, body: '' }]);
+    await ui5CreateApp(http, { appName: 'znew', description: 'Demo <"app">', packageName: 'zpkg', transport: 's4hk900010' });
+    const { url, opts } = http.calls[0];
+    expect(url).toBe('/sap/bc/adt/filestore/ui5-bsp/objects');
+    expect(opts.method).toBe('POST');
+    expect(opts.qs).toEqual({ corrNr: 'S4HK900010' });
+    expect(opts.headers['Content-Type']).toBe('application/xml');
+    expect(opts.body).toContain('<bsp:application xmlns:bsp="http://www.sap.com/adt/bsp"');
+    expect(opts.body).toContain('adtcore:name="ZNEW"');
+    expect(opts.body).toContain('adtcore:description="Demo &lt;&quot;app&quot;&gt;"');
+    expect(opts.body).toContain('adtcore:packageName="ZPKG"');
+  });
+
+  it('ui5CreateApp rejects malformed package names', async () => {
+    const http = httpMock([{ match: () => true, body: '' }]);
+    await expect(ui5CreateApp(http, { appName: 'ZNEW', packageName: 'z pkg!' })).rejects.toThrow(/not a valid package name/);
+    expect(http.calls).toHaveLength(0);
+  });
+
+  it('ui5UploadFile puts merged escaped path content with a default or explicit content type', async () => {
+    const http = httpMock([{ match: () => true, body: '' }]);
+    await ui5UploadFile(http, { appName: 'ZAPP_SIMPLE', filePath: 'WebContent/index.html', content: '<h1/>' });
+    expect(http.calls[0].url).toBe('/sap/bc/adt/filestore/ui5-bsp/objects/ZAPP_SIMPLE%2FWebContent%2Findex.html/content');
+    expect(http.calls[0].opts.method).toBe('PUT');
+    expect(http.calls[0].opts.headers['Content-Type']).toBe('application/octet-stream');
+    await ui5UploadFile(http, { appName: 'ZAPP_SIMPLE', filePath: 'x.json', content: '{}', contentType: 'application/json' });
+    expect(http.calls[1].opts.headers['Content-Type']).toBe('application/json');
+  });
+
+  it('ui5UploadFile rejects oversized payloads and header-injecting content types', async () => {
+    const http = httpMock([{ match: () => true, body: '' }]);
+    await expect(ui5UploadFile(http, { appName: 'ZAPP', filePath: 'a.txt', content: 'x'.repeat(2 * 1024 * 1024 + 1) })).rejects.toThrow(/byte limit/);
+    await expect(ui5UploadFile(http, { appName: 'ZAPP', filePath: 'a.txt', content: 'x', contentType: 'text/plain; charset=x\r\nX-Inject: 1' })).rejects.toThrow(/not a valid Content-Type/);
+    expect(http.calls).toHaveLength(0);
+  });
+
+  it('ui5DeleteFile and ui5DeleteApp send DELETE with the VSP URL shapes', async () => {
+    const http = httpMock([{ match: () => true, body: '' }]);
+    await ui5DeleteFile(http, { appName: 'ZAPP_SIMPLE', filePath: 'WebContent/index.html' });
+    expect(http.calls[0].url).toBe('/sap/bc/adt/filestore/ui5-bsp/objects/ZAPP_SIMPLE%2FWebContent%2Findex.html');
+    expect(http.calls[0].opts.method).toBe('DELETE');
+    await ui5DeleteApp(http, { appName: 'ZAPP_SIMPLE', transport: 'S4HK900010' });
+    expect(http.calls[1].url).toBe('/sap/bc/adt/filestore/ui5-bsp/objects/ZAPP_SIMPLE');
+    expect(http.calls[1].opts.qs).toEqual({ corrNr: 'S4HK900010' });
+  });
+
+  it('normalizeUi5ContentType defaults and validates', () => {
+    expect(normalizeUi5ContentType(undefined)).toBe('application/octet-stream');
+    expect(normalizeUi5ContentType('text/html')).toBe('text/html');
+    expect(() => normalizeUi5ContentType('bad type')).toThrow(/not a valid Content-Type/);
+  });
+
+  it('isAdtNotFound normalizes 404 detection for readback', () => {
+    expect(isAdtNotFound(Object.assign(new Error('x'), { status: 404 }))).toBe(true);
+    // 真机形态（2026-10-05 sap-demo）：AdtErrorException 的状态码在 err 字段
+    expect(isAdtNotFound(Object.assign(new Error('应用程序 ZMCP_UI5_SMOKE 不存在'), { err: 404 }))).toBe(true);
+    // 本地化 message 兜底（服务器登录语言）
+    expect(isAdtNotFound(new Error('应用程序 ZMCP_UI5_SMOKE 不存在'))).toBe(true);
+    expect(isAdtNotFound(new Error('Application ZFOO does not exist'))).toBe(true);
+    expect(isAdtNotFound(new Error('404 not found'))).toBe(true);
+    expect(isAdtNotFound(Object.assign(new Error('x'), { status: 500 }))).toBe(false);
+    expect(isAdtNotFound(Object.assign(new Error('x'), { err: 405 }))).toBe(false);
+    expect(isAdtNotFound(new Error('network down'))).toBe(false);
+  });
+
+  it('createUi5WriteClient binds write + readback onto one client', async () => {
+    const http = httpMock([
+      { match: (url: string) => url.includes('/content'), body: APP_CONTENT_FEED },
+      { match: () => true, body: '' }
+    ]);
+    const client = createUi5WriteClient(http);
+    await client.ui5CreateApp({ appName: 'ZNEW', packageName: 'ZPKG' });
+    const app = await client.ui5GetApp({ appName: 'ZAPP_SIMPLE' });
     expect(app.files).toHaveLength(3);
   });
 });

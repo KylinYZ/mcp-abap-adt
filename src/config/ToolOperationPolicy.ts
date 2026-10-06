@@ -61,6 +61,20 @@ export const CONTROLLED_TEXT_POOL_TOOL_NAMES = new Set([
   'getTextPoolChangeStatus'
 ]);
 
+/**
+ * 受控 UI5 filestore 写入链（F5：ui5.write 关缺口）。
+ * → preview（只读预检：存在性/漂移基线/内容上限 + 冻结 plan）；apply（确认型
+ *   写执行：漂移复核 → POST/PUT/DELETE → readback）；status（本地读取）。
+ * 四 kind：create_app/upload_file/delete_file/delete_app。filestore 写不走
+ * ABAP workbench 对象锁（BSP 容器操作，VSP 同款）；仅 DEV 角色 +
+ * development/development-workbench。
+ */
+export const CONTROLLED_UI5_WRITE_TOOL_NAMES = new Set([
+  'previewUi5Operation',
+  'applyUi5Operation',
+  'getUi5OperationStatus'
+]);
+
 export const CONTROLLED_CLONE_TOOL_NAMES = new Set([
   'previewCloneObject',
   'applyCloneObject',
@@ -121,7 +135,8 @@ const LOCAL_TOOL_NAMES = new Set([
   'getObjectActivationStatus', 'getCloneObjectStatus', 'getControlledRenameStatus',
   'getTransportCreationStatus', 'getTransportCleanupStatus',
   'getMessageTextChangeStatus',
-  'getTextPoolChangeStatus'
+  'getTextPoolChangeStatus',
+  'getUi5OperationStatus'
 ]);
 
 const READ_ONLY_TOOL_NAMES = new Set([
@@ -183,6 +198,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'previewMessageTextChange',
   // 受控程序文本池 preview（F1 完整方案）：只读读现文本池+冻结 plan
   'previewTextPoolChange',
+  // 受控 UI5 filestore preview（F5：ui5.write）：只读预检（存在性/漂移基线/
+  // 内容上限）+冻结 plan，不触碰写路径
+  'previewUi5Operation',
   // 受控对象克隆 preview（crud.clone-object 一站式）：只读预检（源码快照+
   // 本地声明改名），不触碰写路径
   'previewCloneObject',
@@ -251,6 +269,10 @@ const OTHER_MUTATION_TOOL_NAMES = new Set([
   'login', 'logout', 'dropSession', 'createTransport', 'setTransportsConfig',
   'createTransportsConfig', 'transportDelete', 'transportRelease', 'transportSetOwner',
   'transportAddUser', 'lock', 'unLock', 'reentranceTicket', 'runClass', 'unitTestRun',
+  // 受控 ABAP 执行（devtools.execute-abap）：临时程序包装 + ABAP Unit 单次运行，
+  // 与 runClass/unitTestRun 同级执行行为（自建 $TMP 临时程序创建/激活/删除 +
+  // 用户代码执行，非只读；QAS/PRD 拒绝，写槽串行）
+  'executeAbap',
   'setPrettyPrinterSetting', 'gitCreateRepo', 'gitPullRepo', 'gitUnlinkRepo', 'stageRepo',
   'pushRepo', 'switchRepoBranch', 'publishServiceBinding', 'unPublishServiceBinding',
   'createAtcRun', 'atcExemptProposal', 'atcRequestExemption', 'atcChangeContact',
@@ -265,6 +287,9 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   'applyObjectActivation',
   // runUnitCoverage 运行被测对象的用户代码，是执行行为（与 unitTestRun 同级，非只读）
   'runUnitCoverage',
+  // analyzeHealth 的 tests 信号真正执行单测（健康检查里的执行行为，非只读；
+  // 同 runUnitCoverage 级别，仅 workbench/legacy-full catalog 面）
+  'analyzeHealth',
   // 受控描述修改 apply（crud.set-description）：repository 写入，受控链单次执行
   'applyDescriptionChange',
   // 受控消息文本 apply（i18n.write 的 write_message_texts）：repository 写入，
@@ -273,6 +298,9 @@ const ADVANCED_MUTATION_TOOL_NAMES = new Set([
   // 受控程序文本池 apply（F1 完整方案）：repository 写入（text/plain 源形态），
   // stateful 锁链单次执行
   'applyTextPoolChange',
+  // 受控 UI5 filestore apply（F5：ui5.write）：filestore POST/PUT/DELETE（BSP
+  // 容器操作，不走 workbench 对象锁），漂移复核 + readback 单次执行
+  'applyUi5Operation',
   // 受控对象克隆 apply（crud.clone-object 一站式）：委托受控创建链的 repository
   // 写入，单确认单执行
   'applyCloneObject',
@@ -325,6 +353,7 @@ export const CONTROLLED_WRITE_CHAIN_READONLY_TOOLS = new Set<string>([
   ...CONTROLLED_REPOSITORY_CREATION_TOOL_NAMES,
   ...CONTROLLED_MESSAGE_TEXT_TOOL_NAMES,
   ...CONTROLLED_TEXT_POOL_TOOL_NAMES,
+  ...CONTROLLED_UI5_WRITE_TOOL_NAMES,
   ...CONTROLLED_CLONE_TOOL_NAMES,
   ...CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES,
   ...CONTROLLED_TRANSPORT_CLEANUP_TOOL_NAMES,
@@ -350,6 +379,8 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_RENAME_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_MESSAGE_TEXT_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   if (CONTROLLED_TEXT_POOL_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  // 受控 UI5 filestore 写链：任何一环都不应在 QAS/PRD/未知角色下面世
+  if (CONTROLLED_UI5_WRITE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输创建链：任何一环都不应在 QAS/PRD/未知角色下面世（仅创建、DEV 专属）
   if (CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输清理链（空请求边界）：同上，删除动作整体 DEV 专属
@@ -460,6 +491,17 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled text pool write requires DEV development or development-workbench profile.'
+    );
+  }
+  // 受控 UI5 filestore 写入链（F5：ui5.write）：仅 DEV +
+  // development/development-workbench；filestore 写不走 workbench 对象锁，
+  // 事务边界由 preview 冻结 + apply readback 补齐。
+  if (CONTROLLED_UI5_WRITE_TOOL_NAMES.has(toolName)
+    && ((profile !== 'development' && profile !== 'development-workbench') || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Controlled UI5 filestore write requires DEV development or development-workbench profile.'
     );
   }
   // 受控传输创建链（cts.create-request 专属动作）：仅 DEV +

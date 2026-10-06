@@ -21,8 +21,12 @@ import { fullParse, xmlArray, xmlNode, xmlNodeAttr } from './utilities'
  *     （应用名与文件路径合并后整体做路径转义，斜杠编码为 %2f）
  *
  * 设计规则（业务约束）：
- *   - 全部只读（HTTP GET），不涉及任何 SAP 写操作、锁、传输或激活；
- *     VSP 的 upload/delete/create 方向刻意不移植（矩阵 ui5.write 维持缺口）。
+ *   - 读取方向全部只读（HTTP GET），不涉及任何 SAP 写操作、锁、传输或激活。
+ *   - 写入方向（ui5.write 受控链，对齐 VSP ui5.go L273-419 的四个写操作）：
+ *     ui5CreateApp / ui5UploadFile / ui5DeleteFile / ui5DeleteApp。协议为纯
+ *     ADT filestore REST（POST/PUT/DELETE），不依赖 ZADT_VSP WebSocket 桥；
+ *     filestore 写不走 ABAP workbench 对象锁（BSP 容器操作），传输号以
+ *     corrNr 查询参数携带（仅 create/delete app 需要，VSP 同款可选）。
  *   - 应用名与文件路径在本层做白名单校验与路径穿越拒绝（'..' 段、查询串、
  *     协议分隔符），任何可疑输入在 HTTP 请求发出前即被拒绝；URL 由名称拼接、
  *     整体转义，绝不接受调用方传入的任意 URL。
@@ -39,6 +43,12 @@ export const DEFAULT_MAX_RESULTS = 100
 export const MAX_RESULTS_CAP = 500
 const APP_NAME_MAX_LENGTH = 40
 const FILE_PATH_MAX_LENGTH = 240
+
+/**
+ * 单文件上传字节上限（2 MiB）。VSP 无上限，本层防御性收紧：filestore PUT
+ * 把整个内容作为请求体发送，过大内容既拖垮会话也放大误操作影响面。
+ */
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 /** 单个 UI5/Fiori BSP 应用（VSP ui5.go L15-22 UI5App 的等价精简结构）。 */
 export interface Ui5App {
@@ -291,6 +301,152 @@ export async function ui5GetFileContent(
   return { appName, filePath, content, size: Buffer.byteLength(content, 'utf8') }
 }
 
+/* ==========================================================================
+ * 写入方向（ui5.write 受控链的 ADT 层：对齐 VSP ui5.go L273-419 四个写操作）
+ * ========================================================================== */
+
+/** XML 属性值转义（VSP ui5.go L420-427 escapeXMLAttr 等价：& < > " '）。 */
+function escapeXmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/** Content-Type 白名单形态：token/subtype（可带参数外的常用字符），防 header 注入。 */
+const CONTENT_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_./+-]*$/
+
+/**
+ * 规范化 Content-Type：空值退 application/octet-stream（VSP 同款默认）；
+ * 非法字符（分号参数、空白、控制字符）一律拒绝——该值将原样进入请求头。
+ */
+export function normalizeUi5ContentType(value: unknown): string {
+  const contentType = String(value ?? '').trim()
+  if (!contentType) return 'application/octet-stream'
+  if (contentType.length > 100 || !CONTENT_TYPE_PATTERN.test(contentType)) {
+    throw new Error(`ui5UploadFile: "${contentType}" is not a valid Content-Type (token/subtype without parameters).`)
+  }
+  return contentType
+}
+
+/** ui5CreateApp 的入参。 */
+export interface Ui5CreateAppInput {
+  appName: string
+  /** 应用描述（进入 adtcore:description 属性，层内做 XML 转义）。 */
+  description?: string
+  /** BSP 应用的开发包名（必填——包是 filestore 应用的归属锚点）。 */
+  packageName: string
+  /** 传输请求号（可选，corrNr；未给则由系统决定归属）。 */
+  transport?: string
+}
+
+/**
+ * 创建 UI5/Fiori BSP 应用（VSP ui5.go L345-385 UI5CreateApp）：
+ * POST {base}?corrNr=<t>，body 为 bsp:application XML（name/description/
+ * packageName 属性），Content-Type application/xml。
+ */
+export async function ui5CreateApp(h: AdtHTTP, input: Ui5CreateAppInput): Promise<void> {
+  const appName = normalizeUi5AppName(input?.appName, 'ui5CreateApp')
+  const packageName = String(input?.packageName ?? '').trim().toUpperCase()
+  if (!/^\$?[A-Z][A-Z0-9_]{0,29}$/.test(packageName)) {
+    throw new Error(`ui5CreateApp: "${String(input?.packageName ?? '')}" is not a valid package name.`)
+  }
+  const description = String(input?.description ?? '')
+  const qs: Record<string, string> = {}
+  if (input?.transport) qs.corrNr = String(input.transport).trim().toUpperCase()
+  // bsp:application 载荷逐字对齐 VSP（ui5.go L365-371）：三个 adtcore 属性
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<bsp:application xmlns:bsp="http://www.sap.com/adt/bsp"
+    xmlns:adtcore="http://www.sap.com/adt/core"
+    adtcore:name="${escapeXmlAttr(appName)}"
+    adtcore:description="${escapeXmlAttr(description)}"
+    adtcore:packageName="${escapeXmlAttr(packageName)}">
+</bsp:application>`
+  await h.request(UI5_FILESTORE_BASE, {
+    method: 'POST',
+    qs,
+    body: xmlPayload,
+    headers: { 'Content-Type': 'application/xml', Accept: 'application/xml' }
+  })
+}
+
+/** ui5UploadFile 的入参。 */
+export interface Ui5UploadFileInput {
+  appName: string
+  filePath: string
+  /** 文件内容（UTF-8 文本；filestore PUT 以原始字节传输）。 */
+  content: string
+  /** Content-Type（缺省 application/octet-stream；白名单形态校验）。 */
+  contentType?: string
+}
+
+/**
+ * 上传/覆盖应用内单个文件（VSP ui5.go L273-311 UI5UploadFile）：
+ * PUT {base}/<APP%2fPATH>/content，body 为文件内容，Content-Type 自定。
+ * filestore PUT 无对象锁、无版本协商——覆盖即替换（受控链在 preview 冻结
+ * 旧内容、apply 后 readback 比对来补齐事务边界）。
+ */
+export async function ui5UploadFile(h: AdtHTTP, input: Ui5UploadFileInput): Promise<void> {
+  const appName = normalizeUi5AppName(input?.appName, 'ui5UploadFile')
+  const filePath = normalizeUi5FilePath(input?.filePath, 'ui5UploadFile')
+  const content = typeof input?.content === 'string' ? input.content : ''
+  if (Buffer.byteLength(content, 'utf8') > MAX_UPLOAD_BYTES) {
+    throw new Error(`ui5UploadFile: content exceeds the ${MAX_UPLOAD_BYTES}-byte limit.`)
+  }
+  const contentType = normalizeUi5ContentType(input?.contentType)
+  await h.request(
+    `${UI5_FILESTORE_BASE}/${encodeURIComponent(`${appName}/${filePath}`)}/content`,
+    { method: 'PUT', body: content, headers: { 'Content-Type': contentType } }
+  )
+}
+
+/**
+ * 删除应用内单个文件（VSP ui5.go L312-344 UI5DeleteFile）：
+ * DELETE {base}/<APP%2fPATH>（无 content 后缀、无查询参数）。
+ */
+export async function ui5DeleteFile(h: AdtHTTP, input: { appName: string; filePath: string }): Promise<void> {
+  const appName = normalizeUi5AppName(input?.appName, 'ui5DeleteFile')
+  const filePath = normalizeUi5FilePath(input?.filePath, 'ui5DeleteFile')
+  await h.request(`${UI5_FILESTORE_BASE}/${encodeURIComponent(`${appName}/${filePath}`)}`, {
+    method: 'DELETE'
+  })
+}
+
+/**
+ * 删除整个 UI5/Fiori BSP 应用（VSP ui5.go L387-419 UI5DeleteApp）：
+ * DELETE {base}/<APP>?corrNr=<t>（可选传输号）。破坏面最大——受控链 preview
+ * 必须先读文件树把影响面（文件数）冻结进 plan。
+ */
+export async function ui5DeleteApp(h: AdtHTTP, input: { appName: string; transport?: string }): Promise<void> {
+  const appName = normalizeUi5AppName(input?.appName, 'ui5DeleteApp')
+  const qs: Record<string, string> = {}
+  if (input?.transport) qs.corrNr = String(input.transport).trim().toUpperCase()
+  await h.request(`${UI5_FILESTORE_BASE}/${encodeURIComponent(appName)}`, {
+    method: 'DELETE',
+    qs
+  })
+}
+
+/**
+ * 判定 AdtHTTP 异常是否为 404（readback 的"目标不存在"判定——受控链用）。
+ * 真机形态（2026-10-05 sap-demo 实测）：ADT 对不存在应用的 404 造出的
+ * AdtErrorException 把状态码放在 `err` 字段（不是 status getter），且 message
+ * 为服务器登录语言的本地化文本（中文环境为"应用程序 X 不存在"）。三个通道
+ * 依次判定：err/status 字段 → 父链 → 多语言 message 词表。
+ */
+export function isAdtNotFound(error: unknown): boolean {
+  for (const candidate of [error, (error as { parent?: unknown })?.parent]) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const status = (candidate as { status?: unknown }).status
+    const err = (candidate as { err?: unknown }).err
+    if (status === 404 || err === 404) return true
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  return /\b404\b|not\s*found|does not exist|existiert nicht|不存在|introuvable|no existe/i.test(message)
+}
+
 /** 处理器注入用的窄客户端接口（风格对齐 CdsAnalysisClient）。 */
 export interface Ui5FilestoreClient {
   ui5ListApps(input: { query?: string; maxResults?: number }): Promise<Ui5ListAppsResult>
@@ -302,6 +458,33 @@ export interface Ui5FilestoreClient {
 export function createUi5FilestoreClient(h: AdtHTTP): Ui5FilestoreClient {
   return {
     ui5ListApps: input => ui5ListApps(h, input),
+    ui5GetApp: input => ui5GetApp(h, input),
+    ui5GetFileContent: input => ui5GetFileContent(h, input)
+  }
+}
+
+/**
+ * 写链专用的窄客户端接口（受控工作流 deps——必须绑定写域 stateful 主会话，
+ * 与读域 stateless client 分离；readback 复用同会话的只读函数保证同视图）。
+ */
+export interface Ui5WriteClient {
+  ui5CreateApp(input: Ui5CreateAppInput): Promise<void>
+  ui5UploadFile(input: Ui5UploadFileInput): Promise<void>
+  ui5DeleteFile(input: { appName: string; filePath: string }): Promise<void>
+  ui5DeleteApp(input: { appName: string; transport?: string }): Promise<void>
+  /** readback：应用文件树（不存在时抛 404）。 */
+  ui5GetApp(input: { appName: string }): Promise<Ui5GetAppResult>
+  /** readback：文件内容（不存在时抛 404）。 */
+  ui5GetFileContent(input: { appName: string; filePath: string }): Promise<Ui5GetFileContentResult>
+}
+
+/** 把写域主会话绑定成受控工作流可注入的窄客户端。 */
+export function createUi5WriteClient(h: AdtHTTP): Ui5WriteClient {
+  return {
+    ui5CreateApp: input => ui5CreateApp(h, input),
+    ui5UploadFile: input => ui5UploadFile(h, input),
+    ui5DeleteFile: input => ui5DeleteFile(h, input),
+    ui5DeleteApp: input => ui5DeleteApp(h, input),
     ui5GetApp: input => ui5GetApp(h, input),
     ui5GetFileContent: input => ui5GetFileContent(h, input)
   }

@@ -10,9 +10,9 @@
 | 项目 | commit | 工作树状态 |
 | --- | --- | --- |
 | VSP（只读对照） | `9886d2727f47506368b0a3c2f1c1766f1200f747` | dirty: 未提交 RFC/兼容层改动（pkg/adt/client.go、features.go、http.go 等已修改；abap/src/zvsp_compat/、docs/legacy-751-compat.md 等未跟踪） |
-| 本项目 | `a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef` | dirty: 未提交 focused profile 与 repository cleanup 改动（src/index.ts、src/config/ToolProfiles.ts 等） |
+| 本项目 | `a8cdeda38dc4bbb8a98896e4f42e5925eed3d8ef` | dirty: 基线之后的未提交改动——devtools.execute-abap 受控执行链（ExecuteAbapApi/Handlers、smoke 脚本、包脚本）与 ui5.write/health 受控链（Ui5Write*、Health*、profile/policy 接线）；由本轮提交收敛 |
 
-生成日期：2026-09-24；矩阵行数：71。
+生成日期：2026-10-06；矩阵行数：71。
 profile 别名：focused 是 development-workbench 的默认入口别名；矩阵一律使用规范 profile 名，不使用 focused。
 
 ## 状态与证据词汇
@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 4 | 14 | 2 | 0 | 5 | 0 | 25 |
-| P2 | 5 | 11 | 2 | 2 | 5 | 0 | 25 |
-| 合计 | 13 | 42 | 4 | 2 | 10 | 0 | 71 |
+| P1 | 4 | 15 | 1 | 0 | 5 | 0 | 25 |
+| P2 | 5 | 11 | 3 | 0 | 6 | 0 | 25 |
+| 合计 | 13 | 43 | 4 | 0 | 11 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**55/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**56/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -87,7 +87,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `devtools.atc-run` | 对对象发起 ATC 检查运行 | SAP(action=test, params={type:atc}) + focused RunATCCheck | EQUIVALENT | P0 | `previewQualityCheck`、`runQualityCheck`、`getQualityCheckStatus` | development-workbench | DEV |
 | `devtools.atc-read` | 读取 ATC 结果工作清单、检查变体与定制 | SAP(action=test, params={type:atc\|atc_customizing}) 结果读取 + focused GetCheckRunResults | EQUIVALENT | P0 | `atcWorklists`、`atcCheckVariant`、`atcCustomizing`、`atcDocumentation` | development, development-workbench, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `devtools.activate` | 重新激活未激活对象（单对象/多对象/整包） | SAP(action=edit, target="ACTIVATE\|ACTIVATE_MULTI\|ACTIVATE_PACKAGE") + focused Activate/ActivatePackage | EQUIVALENT | P0 | `previewObjectActivation`、`applyObjectActivation`、`getObjectActivationStatus` | development, development-workbench | DEV |
-| `devtools.execute-abap` | 直接执行 ABAP 片段/类并取回输出 | SAP(action=analyze, params={type:execute_abap}) | PARTIAL | P1 | `runClass` | legacy-full | DEV |
+| `devtools.execute-abap` | 直接执行 ABAP 片段并取回输出 | SAP(action=analyze, params={type:execute_abap}) | EQUIVALENT | P1 | `executeAbap` | development-workbench, legacy-full | DEV |
 
 ### crud
 
@@ -107,7 +107,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `transport.read` | 查询传输请求、配置与用户传输清单 | system type=list_transports\|get_transport\|get_user_transports\|get_transport_info + focused ListTransports/GetTransport | EQUIVALENT | P0 | `transportInfo`、`hasTransportConfig`、`transportConfigurations`、`getTransportConfiguration`、`userTransports`、`transportsByConfig`、`systemUsers`、`transportReference` | development, diagnostic-readonly, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `transport.create-release` | 创建、释放或删除传输请求 | system type=create_transport\|release_transport\|delete_transport | EQUIVALENT | P0 | `createTransport`、`transportRelease`、`transportDelete` | legacy-full | DEV |
-| `transport.merge-move` | 合并传输请求或在请求间移动对象 | system type=merge_transports\|move_transport_object | GAP | P2 | （无） | （无） | （无） |
+| `transport.merge-move` | 合并传输请求或在请求间移动对象 | system type=merge_transports\|move_transport_object | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
 
 ### rfc
 
@@ -189,7 +189,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | id | 任务 | VSP surface | 状态 | 优先级 | 本项目任务路径 | profiles | roles |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ui5.read` | UI5/Fiori BSP 应用发现与文件读取 | SAP(action=read, target="UI5_LIST\|UI5_APP\|UI5_FILE") + focused UI5ListApps/UI5GetApp/UI5GetFileContent | EQUIVALENT | P2 | `ui5ListApps`、`ui5GetApp`、`ui5GetFileContent` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `ui5.write` | UI5 应用与文件的创建/上传/删除 | SAP(action=create\|edit\|delete, target="UI5_APP\|UI5_FILE") | GAP | P2 | （无） | （无） | （无） |
+| `ui5.write` | UI5 应用与文件的创建/上传/删除 | SAP(action=create\|edit\|delete, target="UI5_APP\|UI5_FILE") | PARTIAL | P2 | `previewUi5Operation`、`applyUi5Operation`、`getUi5OperationStatus` | development, development-workbench | DEV |
 
 ### i18n
 
@@ -221,6 +221,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 ## 与 VSP 的有意差异（INTENTIONAL_RESTRICTION）
 
+- **`transport.merge-move`**（P2）：ADT REST 层不存在传输合并/对象移动资源（VSP pkg/adt/transport_merge.go@9886d272 头注：SE09 Utilities→Reorganize 在 ADT 无对应面；organizer 资源只能加对象/改属主/释放，不能移除条目）。SE09 背后 FM TR_MERGE_REQUESTS、TR_APPEND_TO_COMM_OBJS_KEYS、TRINT_DELETE_COMM_OBJECT_KEYS 均非 remote-enabled，VSP 自身也必须经 ZADT_VSP 的 CALL FUNCTION WebSocket 桥关对话框执行。语义上 merge=把 from 的任务与对象并入 to 后删除 from（非空请求删除）、move=FM 直改 E071/E071K，与本项目传输安全红线（释放/改属主/加用户/删非空或他人请求与直改 E071·E071K 一律禁止）直接冲突；且当前 sap-demo client 300 未部署 ZCL_VSP_* helper 桥（2026-10-03 核实仅 SAPC/SICF 配置面）。维持不做。
+  解除条件：仅当同时满足：1) 目标 DEV 部署 ZADT_VSP CALL FUNCTION 桥并通过 install.diagnostics 可用性诊断；2) 所有者显式放开传输红线并完成受控工作流设计评审（补偿/审计/回滚语义）。二者缺一即维持限制，无当前计划。
 - **`rfc.helper-bridge`**（P1）：ZADT_VSP bridge 依赖 SAP 端预先安装的 helper 对象（存在 SAP 端前置条件），其任意 FM 触发路径绕过本项目的 ADT 审计与确认边界；不作为 RFC transport 的替代。2026-09-17 规划修订后，remote-enabled FM 的等价方向由 open-rfc 基座承接，本行限制仅针对非 remote-enabled FM 与 helper 底座，不受该修订影响。
   解除条件：仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。
 - **`debug.amdp-helper`**（P1）：AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。
