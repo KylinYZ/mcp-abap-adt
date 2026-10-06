@@ -2273,14 +2273,14 @@
         "systemRoles": [
           "DEV"
         ],
-        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。真机实测（2026-09-17，checkInstallPrerequisites）：该 DEV 的 /sap/bc/adt/abapgit/repos 资源不存在（abapGit 未安装），abapGit 对齐在当前环境无从验证，前置现状可经 checkInstallPrerequisites 只读发现。",
+        "restrictionReason": "本项目走 ADT abapGit 仓库管理（链接/拉取/暂存/推送），无 ZADT_VSP 式 ZIP 导出；读写仅在专家 profile。helper 部署进展（2026-10-06，sap-dev 10.30.255.42:8000/200）：$ZADT_VSP 包 9 对象（ZIF_VSP_SERVICE+8 CLAS，含 _s4d_fix 修复版 RFC/DEBUG/AMDP 三服务类）已全部创建并激活（幂等重激活复核零 E/A/X、零 inactive 残留），APC/SICF 服务面待用户 GUI 两步配置（探测基线 /sap/bc/apc/sap/zadt_vsp=501、/sap/bc/sicf=404）。剩余：1) 用户完成 SAPC/SICF；2) 本项目需自研 WebSocket 桥客户端对接 ZCL_VSP_GIT_SERVICE 后再设计只读导出（GitTypes/GitExport，跳确认链留审计）。",
         "liftCondition": "abapgit-export-alignment 任务确定只读导出路径后晋级。"
       },
       "priority": "P1",
       "evidence": [
         "source-audit"
       ],
-      "nextMilestone": "abapgit-export-alignment"
+      "nextMilestone": "zadt-vsp-sapc-sicf-user-setup"
     },
     {
       "id": "install.zadt-vsp",
