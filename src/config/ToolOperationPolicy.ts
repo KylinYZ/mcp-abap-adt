@@ -225,6 +225,9 @@ const READ_ONLY_TOOL_NAMES = new Set([
   // 对象间源码对比（矩阵 crud.compare-source 行）：双对象当前源码 LCS unified
   // diff；源 URL 服务端解析，不接受任意 URL
   'compareSourceObjects',
+  // git 域桥接只读二工具（矩阵 git.abapgit 行）：经 ZADT_VSP APC WebSocket 的
+  // abapGit 类型清单与包导出（ZIP base64）；helper 只在 DEV，DEV-only 门见下
+  'gitTypes', 'gitExport',
   // 事务码元数据只读（矩阵 read.transaction 行）：TSTC/TSTCT 自由 SQL
   //（vit/wb TRAN 端点在该 DEV 无映射）；事务码运行不在此列
   'getTransaction',
@@ -381,6 +384,8 @@ export function isToolAllowedForSystemRole(toolName: string, systemRole: string)
   if (CONTROLLED_TEXT_POOL_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控 UI5 filestore 写链：任何一环都不应在 QAS/PRD/未知角色下面世
   if (CONTROLLED_UI5_WRITE_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
+  // git 域桥接（gitTypes/gitExport）：helper 只部署于 DEV，QAS/PRD 无服务面
+  if (toolName === 'gitTypes' || toolName === 'gitExport') return systemRole === 'DEV';
   // 受控传输创建链：任何一环都不应在 QAS/PRD/未知角色下面世（仅创建、DEV 专属）
   if (CONTROLLED_TRANSPORT_CREATION_TOOL_NAMES.has(toolName)) return systemRole === 'DEV';
   // 受控传输清理链（空请求边界）：同上，删除动作整体 DEV 专属
@@ -502,6 +507,16 @@ export function assertToolOperationAllowed(toolName: string, profile: ToolProfil
       'POLICY_DENIED',
       'policy',
       'Controlled UI5 filestore write requires DEV development or development-workbench profile.'
+    );
+  }
+  // git 域桥接（gitTypes/gitExport）：仅 DEV + development-workbench（helper
+  // 服务面与 abapGit 依赖只在 DEV 部署）。
+  if ((toolName === 'gitTypes' || toolName === 'gitExport')
+    && (profile !== 'development-workbench' || systemRole !== 'DEV')) {
+    throw new SafeAbapError(
+      'POLICY_DENIED',
+      'policy',
+      'Git bridge tools require DEV development-workbench profile (ZADT_VSP helper is DEV-only).'
     );
   }
   // 受控传输创建链（cts.create-request 专属动作）：仅 DEV +

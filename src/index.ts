@@ -118,6 +118,7 @@ import { TextPoolHandlers } from './handlers/TextPoolHandlers.js';
 import { TextPoolWorkflow } from './safe/TextPoolWorkflow.js';
 import { Ui5WriteHandlers } from './handlers/Ui5WriteHandlers.js';
 import { HealthHandlers } from './handlers/HealthHandlers.js';
+import { GitBridgeHandlers, gitBridgeTargetFromEnv } from './handlers/GitBridgeHandlers.js';
 import type { HealthCapability } from './adt/HealthApi.js';
 import { runUnitTest } from './adt/api/unittest.js';
 import { Ui5WriteWorkflow } from './safe/Ui5WriteWorkflow.js';
@@ -247,6 +248,7 @@ export class AbapAdtServer extends Server {
   private textPoolHandlers: TextPoolHandlers;
   private ui5WriteHandlers: Ui5WriteHandlers;
   private healthHandlers: HealthHandlers;
+  private gitBridgeHandlers: GitBridgeHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -464,6 +466,12 @@ export class AbapAdtServer extends Server {
       }
     };
     this.healthHandlers = new HealthHandlers(healthCapability);
+    // git 域桥接（git.abapgit）：ZADT_VSP APC WebSocket 的只读导出面
+    // （gitTypes/gitExport）。桥走独立 TCP+Basic auth（同 ADT 凭据），不占用
+    // ADT 会话；仅 DEV + development-workbench（policy 门控）。
+    this.gitBridgeHandlers = new GitBridgeHandlers(
+      gitBridgeTargetFromEnv(process.env, process.env.SAP_URL as string, process.env.SAP_CLIENT as string)
+    );
     this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
     this.crossReferenceHandlers = new CrossReferenceHandlers(
       createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
@@ -1223,7 +1231,8 @@ export class AbapAdtServer extends Server {
     const coverageTools = [
       ...this.unitCoverageHandlers.getTools(),
       ...this.healthHandlers.getTools(),
-      ...this.executeAbapHandlers.getTools()
+      ...this.executeAbapHandlers.getTools(),
+      ...this.gitBridgeHandlers.getTools()
     ];
     const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools, ...analyticReadTools];
     const focusedTools = this.focusedTaskHandlers.getTools();
@@ -1425,6 +1434,11 @@ export class AbapAdtServer extends Server {
         }
         if (this.unitCoverageHandlers.supports(toolName)) {
           return this.unitCoverageHandlers.handle(toolName, limitedArguments);
+        }
+        // git 域桥接只读二工具（git.abapgit）：经 ZADT_VSP WebSocket，独立于
+        // ADT 会话；DEV + workbench 门控见 policy。
+        if (this.gitBridgeHandlers.supports(toolName)) {
+          return this.gitBridgeHandlers.handle(toolName, limitedArguments);
         }
         // 受控 ABAP 执行（devtools.execute-abap）：执行类工具，catalog 成员
         // 已限定 workbench/legacy-full 面，QAS/PRD 由入口策略拒绝，写槽串行。

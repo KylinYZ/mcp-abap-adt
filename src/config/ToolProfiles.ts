@@ -71,6 +71,8 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // Health 聚合查询（analysis.history 行 health 子操作）：tests 信号真正执行
   // 单测——执行级门控与 runUnitCoverage 同面（workbench 显式收录 + legacy-full）
   'analyzeHealth',
+  // git 域桥接只读二工具（git.abapgit）：abapGit 类型清单 + 包导出 ZIP
+  'gitTypes', 'gitExport',
   // dump 增值分析（diagnostics.dumps）：窗口内分组聚合与同类检索，只读
   'groupRuntimeDumps', 'findSimilarDumps',
   // 依赖上下文四工具（codeintel.context）：客户端侧压缩/解析/依赖/副作用分析，只读
