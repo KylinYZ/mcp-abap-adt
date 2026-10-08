@@ -8,7 +8,7 @@
  *   - 注入两条既有只读通道：交叉表 SQL（datapreview）+ 源码读取（AbapObjectResolver）；
  *   - 对象名/组件名处理器层 token 预检，API 层引号包裹（纵深防御）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { UsageExamplesClient } from '../adt/UsageExamplesApi.js';
 

@@ -116,6 +116,41 @@ describe('git domain API over the bridge', () => {
     await server.close();
   });
 
+  it('gitGetTypes parses the real-server wire contract (data is a JSON string)', async () => {
+    // 真机契约（2026-10-07，sap-dev）：zcl_vsp_git_service build_json_response
+    // 把 data 序列化成 JSON 字符串——客户端首版当对象解析导致成功但全空
+    const server = await fakeServer({
+      onMessage: (msg, reply) => {
+        if (msg.action === 'get_types') reply({ id: msg.id, success: true, data: JSON.stringify({ count: 2, skipped: 1, types: ['CLAS', 'PROG'] }) });
+      }
+    });
+    const result = await gitGetTypes(target(server.port));
+    expect(result).toEqual({ count: 2, skipped: 1, types: ['CLAS', 'PROG'] });
+    await server.close();
+  });
+
+  it('gitExport maps the string-form data payload and reports malformed JSON as GIT_DATA_MALFORMED', async () => {
+    const server = await fakeServer({
+      onMessage: (msg, reply) => {
+        if (msg.action === 'export') {
+          reply({
+            id: msg.id, success: true,
+            data: JSON.stringify({
+              objectCount: 3, fileCount: 5, zipBase64: 'UEsDBA==',
+              errors: [{ path: 'INTF ZIF_X: boom', bytes: -1 }],
+              files: [{ path: 'src/z001/z001.clas.abap', bytes: 100 }]
+            })
+          });
+        }
+      }
+    });
+    const result = await gitExport(target(server.port), { packages: ['Z001'] });
+    expect(result.objectCount).toBe(3);
+    expect(result.errors[0]).toEqual({ path: 'INTF ZIF_X: boom', bytes: -1 });
+    expect(result.files[0]).toEqual({ path: 'src/z001/z001.clas.abap', bytes: 100 });
+    await server.close();
+  });
+
   it('gitExport sends packages/includeSubpackages and maps the zip payload', async () => {
     let seen: Record<string, unknown> = {};
     const server = await fakeServer({
@@ -138,6 +173,7 @@ describe('git domain API over the bridge', () => {
     expect((seen.params as any).includeSubpackages).toBe(false);
     expect(result).toEqual({
       objectCount: 3, fileCount: 5, zipBase64: 'UEsDBA==',
+      errors: [],
       files: [{ path: 'z001.clas.abap', bytes: 100 }]
     });
     await server.close();

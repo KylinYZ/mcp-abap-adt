@@ -7,7 +7,8 @@ export interface ToolSchemaProperty {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  additionalProperties?: boolean;
+  /** JSON Schema 形态：true/false 或键值形态声明（如 { type: 'string' }）。 */
+  additionalProperties?: boolean | ToolSchemaProperty;
   maxProperties?: number;
   properties?: Record<string, ToolSchemaProperty>;
   required?: string[];

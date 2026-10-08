@@ -30,17 +30,17 @@ describe('tool catalog integrity and raw advanced role policy', () => {
 
   it.each([
     ['safe', 7],
-    ['development', 201],
-    ['diagnostic-readonly', 146],
-    // legacy-full 211：210 + executeAbap（devtools.execute-abap 受控执行，
-    // 执行类工具与 runUnitCoverage 同面，仅专家完整面）
-    ['legacy-full', 213],
-    // development-workbench 173：172 + executeAbap（workbench 显式名单同步收录）
-    ['development-workbench', 175],
+    // development 202：201 + readClusterTable（cluster_read 收编，只读组合面）
+    ['development', 204],
+    // diagnostic-readonly 147：146 + readClusterTable（只读诊断入口）
+    ['diagnostic-readonly', 149],
+    // legacy-full 214：213 + readClusterTable（专家完整面）
+    ['legacy-full', 218],
+    // development-workbench 176：175 + readClusterTable（workbench 显式名单）
+    ['development-workbench', 180],
     ['business-readonly', 18],
-    // operations-readonly 54：53 + getUsageExamples（analysis.usage_examples，
-    // 与 vsp-capability-parity-matrix 的 operations-readonly 声明同步收录）
-    ['operations-readonly', 54]
+    // operations-readonly 55：54 + readClusterTable（运维诊断的集群表读取）
+    ['operations-readonly', 57]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;

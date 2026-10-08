@@ -147,6 +147,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'syntaxCheckCode', 'syntaxCheckCdsUrl', 'codeCompletion', 'findDefinition', 'usageReferences',
   'syntaxCheckTypes', 'codeCompletionFull', 'codeCompletionElement', 'usageReferenceSnippets',
   'fixProposals', 'fragmentMappings', 'abapDocumentation', 'inactiveObjects', 'objectRegistrationInfo',
+  // 报表变体清单（report.variants 收编）：VARID/VARIT 只读 SQL
+  'getReportVariants',
   'validateNewObject', 'getObjectSource', 'nodeContents', 'mainPrograms', 'featureDetails', 'collectionFeatureDetails',
   'findCollectionByUrl', 'loadTypes', 'adtDiscovery', 'adtCoreDiscovery', 'adtCompatibiliyGraph',
   'unitTestEvaluation', 'unitTestOccurrenceMarkers', 'prettyPrinterSetting', 'prettyPrinter',
@@ -236,14 +238,16 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'checkInstallPrerequisites',
   // 知识查询只读三工具（矩阵 diagnostics.knowledge-queries 行子集）：
   // DOKIL/DOKTL 文档读取 + IMG 活动检索 + IMG 活动详情（路径递归）；
-  // fm_test_data/cluster_read 不在子集
+  // fm_test_data/cluster_read 已收编（readClusterTable/getFmTestDataSets）
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   'getFmTestDataSets',
+  'readClusterTable',
   'getWhereUsedConfig',
   'getUsageExamples',
   // 传输历史只读二工具（矩阵 analysis.history 行子集）：E071/E070 自由 SQL
   //（真机复测可用）；VSP 图引擎类 impact/boundaries 不在子集
   'getCrHistory', 'getCoChange',
+  'getImpactAnalysis',
   // D010INC 加载图只读（analysis.history 的 loads 子操作，纯 SQL 无图引擎）
   'getLoadGraph', 'buildLoadDependencyGraph', 'getTransportScope',
   // RFC 直链四工具（矩阵 rfc.remote-enabled.discovery/read-table/call/describe）：
@@ -276,6 +280,10 @@ const OTHER_MUTATION_TOOL_NAMES = new Set([
   // 与 runClass/unitTestRun 同级执行行为（自建 $TMP 临时程序创建/激活/删除 +
   // 用户代码执行，非只读；QAS/PRD 拒绝，写槽串行）
   'executeAbap',
+  // 报表执行（report.run/report.async 收编，2026-10-07 所有者放开）：运行/调度
+  // 系统内已有报表 = 执行行为（非只读；DEV-only，写槽串行）
+  'runReport',
+  'submitReportJob',
   'setPrettyPrinterSetting', 'gitCreateRepo', 'gitPullRepo', 'gitUnlinkRepo', 'stageRepo',
   'pushRepo', 'switchRepoBranch', 'publishServiceBinding', 'unPublishServiceBinding',
   'createAtcRun', 'atcExemptProposal', 'atcRequestExemption', 'atcChangeContact',

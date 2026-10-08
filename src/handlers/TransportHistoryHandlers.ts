@@ -1,22 +1,25 @@
 import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { TransportHistoryClient } from '../adt/TransportHistoryApi.js';
+import type { ImpactAnalysisClient } from '../adt/ImpactAnalysisApi.js';
 
 /**
  * ============================================================================
  * 传输历史只读二工具 MCP 处理器（analysis.history 行：cr_history + co_change）
  * ============================================================================
  *
- * 暴露两个只读工具（数据源为传输控制表的自由 SQL SELECT）：
+ * 暴露三个只读工具（数据源为传输控制表/交叉引用表的自由 SQL SELECT）：
  *   - getCrHistory：一个对象被哪些传输/请求改过（E071 R3TR 精确 + LIMU
  *     前缀 → E070 任务→请求层级 + 用户/日期）
  *   - getCoChange：与目标对象共同变更的对象频次排行（同请求/任务共现统计）
+ *   - getImpactAnalysis：反向影响面（impact 子操作收编，2026-10-07）——目标
+ *     对象逐层 WBCROSSGT 反向引用 BFS（归一化/归属过滤/预算控界）
  *
  * 业务规则：
  *   - 只读工具（readOnlyHint=true、destructiveHint=false、approvalRequired=false；
  *     _meta.operationClass='read-only tenant'）。
  *   - 边界（notes 随结果返回）：E070A CR 属性联动未配置（cr 分组缺省）；
- *     VSP 的 impact/tr_boundaries 等图引擎类分析不在本子集。
+ *     tr_boundaries 已由 getTransportScope 组合链覆盖；impact 已收编。
  *   - 对象类型/名字处理器层 token 预检，API 层引号转义（纵深防御）。
  *   - 底层异常统一脱敏为 InternalError。
  */
@@ -36,14 +39,17 @@ type TransportHistoryToolDefinition = ToolDefinition & {
 };
 
 /** 本处理器认领的工具名。 */
-const TRANSPORT_HISTORY_TOOL_NAMES = new Set(['getCrHistory', 'getCoChange']);
+const TRANSPORT_HISTORY_TOOL_NAMES = new Set(['getCrHistory', 'getCoChange', 'getImpactAnalysis']);
 
 export class TransportHistoryHandlers {
   /**
    * @param transportHistory 传输历史只读客户端（集成时用
    *   src/adt/TransportHistoryApi.ts 的 createTransportHistoryClient(readClient) 构造）
    */
-  constructor(private readonly transportHistory: TransportHistoryClient) {}
+  constructor(
+    private readonly transportHistory: TransportHistoryClient,
+    private readonly impactAnalysis?: ImpactAnalysisClient
+  ) {}
 
   /** 该工具名是否由本处理器负责。 */
   supports(toolName: string): boolean {
@@ -118,6 +124,37 @@ export class TransportHistoryHandlers {
           required: ['objectType', 'objectName']
         },
         ...readOnly
+      },
+      {
+        name: 'getImpactAnalysis',
+        description:
+          'Reverse-dependency impact analysis for one object: layer-by-layer WBCROSSGT reverse cross-reference acquisition (NAME LIKE target%, bounded rows per query), include names normalized to object level with ownership filtering, BFS frontier up to maxDepth (default 3, cap 5), with direct callers, per-depth affected sets, per-edge evidence (raw include pool names) and a query-budget note. Backbone only: dynamic calls are not resolved (VSP marks them DYNAMIC_CALL without extending the frontier either). Read-only SQL.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            objectType: {
+              type: 'string',
+              description: 'Target object type: CLAS, INTF, PROG, FUGR, FUNC, TABL, DTEL, DOMA, MSAG or DEVC.',
+              enum: ['CLAS', 'INTF', 'PROG', 'FUGR', 'FUNC', 'TABL', 'DTEL', 'DOMA', 'MSAG', 'DEVC']
+            },
+            objectName: {
+              type: 'string',
+              description: 'Target object name, e.g. ZCL_FOO.',
+              minLength: 1,
+              maxLength: 40
+            },
+            maxDepth: {
+              type: 'number',
+              description: 'BFS depth cap; default 3, max 5.',
+              minimum: 1,
+              maximum: 5,
+              optional: true
+            }
+          },
+          required: ['objectType', 'objectName']
+        },
+        ...readOnly
       }
     ];
   }
@@ -127,6 +164,22 @@ export class TransportHistoryHandlers {
    */
   async handle(toolName: string, argumentsValue: Record<string, unknown> = {}): Promise<Record<string, any>> {
     try {
+      if (toolName === 'getImpactAnalysis') {
+        if (!this.impactAnalysis) {
+          throw new McpError(ErrorCode.InternalError, `${toolName} requires the impact-analysis capability, which is not wired on this profile.`);
+        }
+        const impactType = typeof argumentsValue?.objectType === 'string' ? argumentsValue.objectType.trim().toUpperCase() : '';
+        const impactName = typeof argumentsValue?.objectName === 'string' ? argumentsValue.objectName.trim().toUpperCase() : '';
+        if (!impactName || impactName.length > 40 || !/^[A-Z0-9_/=$]+$/.test(impactName)) {
+          throw invalid(`${toolName} requires objectName: a non-empty object name of at most 40 characters matching [A-Z0-9_/=$].`);
+        }
+        const maxDepth = this.boundedNumber(toolName, argumentsValue.maxDepth, 'maxDepth', 1, 5);
+        return success(await this.impactAnalysis.getImpactAnalysis({
+          objectType: impactType,
+          objectName: impactName,
+          ...(maxDepth !== undefined ? { maxDepth } : {})
+        }));
+      }
       if (toolName !== 'getCrHistory' && toolName !== 'getCoChange') {
         throw new McpError(ErrorCode.MethodNotFound, `Unknown transport-history tool: ${toolName}`);
       }
@@ -149,6 +202,14 @@ export class TransportHistoryHandlers {
       }));
     } catch (error) {
       if (error instanceof McpError) throw error;
+      // impact：API 层的参数校验错误（object_type/object_name 非法）对调用方
+      // 可排查，按 InvalidParams 透传；其余底层异常脱敏为 InternalError
+      if (toolName === 'getImpactAnalysis') {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/object_type .* is invalid|object_name .* is invalid/i.test(message)) {
+          throw new McpError(ErrorCode.InvalidParams, message);
+        }
+      }
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);
     }
   }

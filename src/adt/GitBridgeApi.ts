@@ -27,6 +27,8 @@ export interface GitBridgeTarget {
 export interface GitTypesResult {
   count: number
   types: string[]
+  /** 支持性检查抛异常而被跳过的类型数（容错收集语义，2026-10-07 SAP 侧新增）。 */
+  skipped?: number
   serverVersion?: string
 }
 
@@ -40,6 +42,8 @@ export interface GitExportInput {
 export interface GitExportResult {
   objectCount: number
   fileCount: number
+  /** 序列化失败逐对象诊断（对象身份 + 异常文本；部署缺口边界的诚实呈现）。 */
+  errors: Array<{ path: string; bytes: number }>
   zipBase64: string
   files: Array<{ path: string; bytes: number }>
 }
@@ -52,14 +56,29 @@ export class GitBridgeError extends Error {
   }
 }
 
+/**
+ * 提取响应 data：SAP 侧 build_json_response 的 data 是 **JSON 字符串**
+ * （真机 2026-10-07 契约，zcl_vsp_git_service build_json_response——客户端
+ * 首版当对象解析导致成功但全空）；容忍对象形态（测试桩/未来服务端演化）。
+ */
 function requireSuccess(response: Record<string, unknown>): Record<string, unknown> {
-  const data = response.data as Record<string, unknown> | undefined;
-  if (response.success === true && data) return data;
   const err = response.error as { code?: string; message?: string } | undefined;
-  throw new GitBridgeError(
-    err?.code ?? 'GIT_BRIDGE_FAILED',
-    err?.message ?? 'git domain returned no data'
-  );
+  if (response.success !== true) {
+    throw new GitBridgeError(
+      err?.code ?? 'GIT_BRIDGE_FAILED',
+      err?.message ?? 'git domain returned no data'
+    );
+  }
+  const raw = response.data;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch (e) {
+      throw new GitBridgeError('GIT_DATA_MALFORMED', 'git domain data is not valid JSON');
+    }
+  }
+  if (raw && typeof raw === 'object') return raw as Record<string, unknown>;
+  throw new GitBridgeError('GIT_BRIDGE_FAILED', 'git domain returned no data');
 }
 
 /** git get_types：abapGit 支持的对象类型清单。 */
@@ -75,6 +94,7 @@ export async function gitGetTypes(target: GitBridgeTarget): Promise<GitTypesResu
     return {
       count: typeof data.count === 'number' ? data.count : types.length,
       types,
+      ...(typeof data.skipped === 'number' ? { skipped: data.skipped } : {}),
       ...(typeof data.version === 'string' ? { serverVersion: data.version } : {})
     };
   } finally {
@@ -103,16 +123,19 @@ export async function gitExport(target: GitBridgeTarget, input: GitExportInput):
       target.timeoutMs
     );
     const data = requireSuccess(response);
-    return {
-      objectCount: Number(data.objectCount ?? 0),
-      fileCount: Number(data.fileCount ?? 0),
-      zipBase64: String(data.zipBase64 ?? ''),
-      files: Array.isArray(data.files)
-        ? (data.files as Array<{ path?: string; bytes?: number }>).map(f => ({
+    const mapEntries = (list: unknown): Array<{ path: string; bytes: number }> =>
+      Array.isArray(list)
+        ? (list as Array<{ path?: string; bytes?: number }>).map(f => ({
           path: String(f.path ?? ''),
           bytes: Number(f.bytes ?? 0)
         }))
-        : []
+        : [];
+    return {
+      objectCount: Number(data.objectCount ?? 0),
+      fileCount: Number(data.fileCount ?? 0),
+      errors: mapEntries(data.errors),
+      zipBase64: String(data.zipBase64 ?? ''),
+      files: mapEntries(data.files)
     };
   } finally {
     conn.close();

@@ -12,7 +12,12 @@ type ArgumentsValue = Record<string, unknown>;
 
 const STRICT_TOOL_FIELDS: Record<string, readonly string[]> = {
   getTransportScope: ['transports', 'includeLoadBoundaries', 'includeCrossRefBoundaries', 'maxDependencyQueries', 'maxEntries'],
-  getFmTestDataSets: ['function'],
+  getFmTestDataSets: ['function', 'includePayload'],
+  readClusterTable: ['table', 'where', 'maxRows'],
+  getImpactAnalysis: ['objectType', 'objectName', 'maxDepth'],
+  getReportVariants: ['report'],
+  runReport: ['report', 'variant', 'params', 'waitSeconds'],
+  submitReportJob: ['report', 'variant', 'params'],
   getWhereUsedConfig: ['variable', 'grep', 'maxGrep'],
   getUsageExamples: ['objectType', 'objectName', 'method', 'form', 'maxExamples'],
   executeAbap: ['code', 'riskLevel', 'returnVariable', 'keepProgram'],

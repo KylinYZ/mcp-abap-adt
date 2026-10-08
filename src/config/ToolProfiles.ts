@@ -22,7 +22,7 @@ export const READ_ONLY_LEGACY_TOOL_NAMES = new Set([
   'objectStructureElements', 'typeHierarchy', 'objectEnhancements',
   'getDomainProperties', 'getDataElementProperties', 'getTextElements', 'atcDocumentation',
   'changePackagePreview', 'rapGenValidateInitial', 'rapGenGetSchema', 'rapGenGetContent',
-  'rapGenGetUiConfig', 'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable'
+  'rapGenGetUiConfig', 'rapGenValidateContent', 'rapGenPreview', 'rapGenIsAvailable',
 ]);
 
 export const READ_ONLY_LEGACY_TOOL_COUNT = READ_ONLY_LEGACY_TOOL_NAMES.size;
@@ -68,6 +68,12 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 受控 ABAP 执行（devtools.execute-abap）：执行级门控与 runUnitCoverage 同面
   // （workbench 显式收录 + legacy-full）——临时程序包装 + ABAP Unit 单次运行
   'executeAbap',
+  // 报表执行面（report.run/async/variants 收编，2026-10-07 所有者放开）：
+  // variants 只读（全只读面同收）；runReport/submitReportJob 执行类
+  // （OTHER_MUTATION，DEV-only + 写槽）
+  'getReportVariants',
+  'runReport',
+  'submitReportJob',
   // Health 聚合查询（analysis.history 行 health 子操作）：tests 信号真正执行
   // 单测——执行级门控与 runUnitCoverage 同面（workbench 显式收录 + legacy-full）
   'analyzeHealth',
@@ -113,10 +119,13 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   // 文档 + IMG 检索 + IMG 活动详情（路径递归）
   'getAbapDocumentation', 'searchImgActivities', 'getImgActivity',
   'getFmTestDataSets',
+  'readClusterTable',
   'getWhereUsedConfig',
   'getUsageExamples',
+  'getReportVariants',
   // 传输历史只读二工具（analysis.history 子集）：CR 历史 + 共同变更频次
   'getCrHistory', 'getCoChange',
+  'getImpactAnalysis',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）：编译期加载关系
   'getLoadGraph', 'buildLoadDependencyGraph', 'getTransportScope',
   // 离线依赖图快照：反向影响面和图统计，无 SAP 调用。
@@ -172,13 +181,18 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   'compareRevisions',
   // 传输历史与共同变更只读（analysis.history 行：E071/E070 运维诊断）
   'getCrHistory', 'getCoChange',
+  'getImpactAnalysis',
   // TVARVC 变量读者定位只读（analysis.history 行：where_used_config，与矩阵声明同步）
   'getWhereUsedConfig',
   // 调用方示例只读（analysis.history 行：usage_examples，与矩阵声明同步；
   // 交叉表候选 + 源码形态匹配，纯只读）
   'getUsageExamples',
   // D010INC 加载图只读（analysis.history 的 loads 子操作）
-  'getLoadGraph', 'buildLoadDependencyGraph', 'analyzeDependencyGraph', 'getTransportScope'
+  'getLoadGraph', 'buildLoadDependencyGraph', 'analyzeDependencyGraph', 'getTransportScope',
+  // 集群表通用读取（knowledge-queries 行：cluster_read 收编，运维诊断可用）
+  'readClusterTable',
+  // 报表变体清单（report.variants 收编，运维诊断可用）
+  'getReportVariants'
 ]);
 
 export function selectProfileTools(

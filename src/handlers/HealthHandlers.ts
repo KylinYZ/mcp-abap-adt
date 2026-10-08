@@ -7,7 +7,7 @@
  *      对象级三信号（boundaries 无单对象裁定器，如实 UNKNOWN），顶层
  *      verdict + notes；"未查到问题"≠"查过没问题"（incomplete 防线）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { HealthCapability } from '../adt/HealthApi.js';
 

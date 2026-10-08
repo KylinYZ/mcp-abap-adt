@@ -7,10 +7,10 @@
  * 门控：仅 DEV 角色（helper 只部署在 DEV）；操作类别 read-only（只读导出，
  * 跳过确认链、保留审计——与矩阵行 alternatePaths 口径一致）。
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { GitBridgeTarget } from '../adt/GitBridgeApi.js';
-import { gitGetTypes, gitExport } from '../adt/GitBridgeApi.js';
+import { gitGetTypes, gitExport, GitBridgeError } from '../adt/GitBridgeApi.js';
 
 const GIT_BRIDGE_TOOL_NAMES = new Set(['gitTypes', 'gitExport']);
 
@@ -77,6 +77,11 @@ export class GitBridgeHandlers {
       throw new McpError(ErrorCode.MethodNotFound, `Unknown git bridge tool: ${toolName}`);
     } catch (error) {
       if (error instanceof McpError) throw error;
+      // 调用方输入校验失败（VALIDATION_FAILED）按 InvalidParams 透出；桥/服务端
+      // 故障按 InternalError 脱敏——语义错误与基础设施故障分层
+      if (error instanceof GitBridgeError && error.code === 'VALIDATION_FAILED') {
+        throw new McpError(ErrorCode.InvalidParams, `${toolName}: ${error.message}`);
+      }
       throw new McpError(ErrorCode.InternalError, `${toolName} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

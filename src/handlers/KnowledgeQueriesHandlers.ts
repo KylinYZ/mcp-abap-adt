@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { KnowledgeQueriesClient } from '../adt/KnowledgeQueriesApi.js';
+import type { ClusterReadClient } from '../adt/ClusterReadApi.js';
 
 /**
  * ============================================================================
@@ -18,8 +19,9 @@ import type { KnowledgeQueriesClient } from '../adt/KnowledgeQueriesApi.js';
  * 业务规则：
  *   - 只读工具（readOnlyHint=true、destructiveHint=false、approvalRequired=false；
  *     _meta.operationClass='read-only tenant'）。
- *   - 边界（notes 随结果返回）：fm_test_data、cluster_read（S/2 集群读取）
- *     不在本子集内（独立子系统）。
+ *   - cluster_read 已收编（2026-10-07）：readClusterTable——任意 INDX 型集群
+ *     表通用读取（DD03L 动态结构发现 + 续块组装 + S/2 解码），knowledge-queries
+ *     五子操作全覆盖。
  *   - 文本入参处理器层做长度预检，API 层引号转义 + 控制字符拒绝（纵深防御）。
  *   - "不存在"类错误按 InvalidParams 透出；底层异常统一脱敏为 InternalError。
  */
@@ -39,14 +41,17 @@ type KnowledgeToolDefinition = ToolDefinition & {
 };
 
 /** 本处理器认领的工具名。 */
-const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets']);
+const KNOWLEDGE_TOOL_NAMES = new Set(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets', 'readClusterTable']);
 
 export class KnowledgeQueriesHandlers {
   /**
    * @param knowledgeQueries 知识查询只读客户端（集成时用
    *   src/adt/KnowledgeQueriesApi.ts 的 createKnowledgeQueriesClient(readClient) 构造）
    */
-  constructor(private readonly knowledgeQueries: KnowledgeQueriesClient) {}
+  constructor(
+    private readonly knowledgeQueries: KnowledgeQueriesClient,
+    private readonly clusterRead?: ClusterReadClient
+  ) {}
 
   /** 该工具名是否由本处理器负责。 */
   supports(toolName: string): boolean {
@@ -173,7 +178,7 @@ export class KnowledgeQueriesHandlers {
       {
         name: 'getFmTestDataSets',
         description:
-          'List the saved Function Builder test data sets of a function module: EUFUNC directory entries (set numbers with author/date/time) without decoding payloads. Data source: EUFUNC (relid=FL) via read-only SQL. Payload contents (inputs/outputs) are EXPORT data clusters and require the S/2 cluster decoder, which is not implemented here. Read-only.',
+          'Read the saved Function Builder test data sets of a function module: EUFUNC directory entries (set numbers with author/date/time), optionally with decoded payload contents (inputs/outputs from the EXPORT data clusters, keys = parameter names, fields numbered by position; per-set decode failures reported in notes). Data source: EUFUNC (relid=FL) via read-only SQL; payload decoding uses the built-in S/2 cluster decoder (cluster formats 5/6, LZH/LZC). Read-only.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -183,9 +188,45 @@ export class KnowledgeQueriesHandlers {
               description: 'Function module name, e.g. Z_MCP_SM21_READ.',
               minLength: 1,
               maxLength: 30
+            },
+            includePayload: {
+              type: 'boolean',
+              description: 'Decode EXPORT payloads (default false: directory view only). Each set then carries inputs/outputs/others, runtime, rc, exception; the saved interface snapshot appears as interface. A set whose cluster cannot be decoded keeps its directory entry and adds a note.',
+              optional: true
             }
           },
           required: ['function']
+        },
+        ...readOnly
+      },
+      {
+        name: 'readClusterTable',
+        description:
+          'Read records of one INDX-type cluster table (BALDAT, INDX, EUFUNC, STXL and their kin) with payloads decoded: dynamic table discovery via DD03L (SRTF2/CLUSTR/CLUSTD columns + key columns), fragment rows joined per key in SRTF2 order, EXPORT data clusters decoded via the built-in S/2 cluster decoder (formats 5/6, LZH/LZC). Truncation drops the last (possibly incomplete) cluster and is reported. Data source: read-only SQL. Read-only.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            table: {
+              type: 'string',
+              description: 'Cluster table name, e.g. BALDAT, INDX, EUFUNC. Must have SRTF2/CLUSTR/CLUSTD columns (verified via DD03L).',
+              minLength: 1,
+              maxLength: 30
+            },
+            where: {
+              type: 'string',
+              description: "Optional WHERE clause on the key columns (Open SQL fragment form, e.g. \"relid = 'FL' AND name = 'MY_FM'\"). Control characters and semicolons rejected.",
+              optional: true
+            },
+            maxRows: {
+              type: 'number',
+              description: 'Maximum database fragment rows to read; default 500, cap 1000. When the cap is reached the last (possibly incomplete) cluster is dropped and truncation is reported.',
+              minimum: 1,
+              maximum: 1000,
+              optional: true
+            }
+          },
+          required: ['table']
         },
         ...readOnly
       }
@@ -253,7 +294,33 @@ export class KnowledgeQueriesHandlers {
         if (!fmName || fmName.length > 30 || !/^[A-Z0-9_]+$/.test(fmName)) {
           throw invalid(`${toolName} requires function: a function module name of at most 30 characters matching [A-Z0-9_].`);
         }
-        return success(await this.knowledgeQueries.getFmTestDataSets({ function: fmName }));
+        const includePayload = argumentsValue?.includePayload;
+        if (includePayload !== undefined && typeof includePayload !== 'boolean') {
+          throw invalid(`${toolName} supports includePayload as a boolean only.`);
+        }
+        return success(await this.knowledgeQueries.getFmTestDataSets({
+          function: fmName,
+          ...(includePayload === true ? { includePayload: true } : {})
+        }));
+      }
+      if (toolName === 'readClusterTable') {
+        if (!this.clusterRead) {
+          throw new McpError(ErrorCode.InternalError, `${toolName} requires the cluster-read capability, which is not wired on this profile.`);
+        }
+        const table = typeof argumentsValue?.table === 'string' ? argumentsValue.table.trim().toUpperCase() : '';
+        if (!table || table.length > 30 || !/^[A-Z$][A-Z0-9_/]*$/.test(table)) {
+          throw invalid(`${toolName} requires table: a cluster table name of at most 30 characters matching [A-Z0-9_/] with a leading letter or $.`);
+        }
+        const where = argumentsValue?.where;
+        if (where !== undefined && (typeof where !== 'string' || where.trim() === '')) {
+          throw invalid(`${toolName} requires where to be a non-empty Open SQL fragment when provided.`);
+        }
+        const maxRows = this.boundedNumber(toolName, argumentsValue.maxRows, 'maxRows', 1, 1000);
+        return success(await this.clusterRead.readClusterTable({
+          table,
+          ...(typeof where === 'string' && where.trim() !== '' ? { where: where.trim() } : {}),
+          ...(maxRows !== undefined ? { maxRows } : {})
+        }));
       }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown knowledge-queries tool: ${toolName}`);
     } catch (error) {
@@ -261,6 +328,11 @@ export class KnowledgeQueriesHandlers {
       // "不存在"类错误对调用方有排查价值，按 InvalidParams 透出；其余脱敏。
       const message = error instanceof Error ? error.message : String(error);
       if (/documentation for .* in language/.test(message) || /IMG activity .* does not exist/.test(message)) {
+        throw new McpError(ErrorCode.InvalidParams, message);
+      }
+      // cluster_read：表名非法/非集群表/SQL 读取失败——调用方可排查，透传原文
+      if (toolName === 'readClusterTable'
+        && (/is invalid|is not a cluster table|no active DD03L|reading .*:|control characters or semicolons/i.test(message))) {
         throw new McpError(ErrorCode.InvalidParams, message);
       }
       throw new McpError(ErrorCode.InternalError, `${toolName} failed.`);

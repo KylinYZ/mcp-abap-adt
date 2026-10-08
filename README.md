@@ -6,7 +6,7 @@
 
 ## Current release
 
-- Version `0.9.0`, published as `abap-ai-workbench-mcp@0.9.0`. MCP v2 dual-era (native 2026-07-28 + 2025 compatibility).
+- Version `0.9.1`, published as `abap-ai-workbench-mcp@0.9.1`. MCP v2 dual-era (native 2026-07-28 + 2025 compatibility).
 - Repository: [`KylinYZ/mcp-abap-adt`](https://github.com/KylinYZ/mcp-abap-adt).
 - The unscoped upstream package is a separate project; always use the scoped name.
 - Role entry points: `focused`/`developer` (150 development tools), `business` (18 read-only tools), `operations` (49 read-only tools), and `expert` (203 compatibility tools). Legacy profile names remain supported; see [`docs/产品定位.md`](docs/产品定位.md).
@@ -18,7 +18,7 @@
 ### npm (recommended)
 
 ```bash
-npx -y abap-ai-workbench-mcp@0.9.0
+npx -y abap-ai-workbench-mcp@0.9.1
 ```
 
 Example MCP configuration:
@@ -28,7 +28,7 @@ Example MCP configuration:
   "mcpServers": {
     "abap-ai-workbench-mcp": {
       "command": "npx",
-      "args": ["-y", "abap-ai-workbench-mcp@0.9.0"],
+      "args": ["-y", "abap-ai-workbench-mcp@0.9.1"],
       "env": { "SAP_MCP_ENV_FILE": "C:\\path\\to\\sap-dev.env" }
     }
   }

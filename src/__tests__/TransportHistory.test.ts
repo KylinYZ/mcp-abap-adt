@@ -6,6 +6,7 @@ import {
 } from '../adt/TransportHistoryApi.js';
 import type { TransportHistoryQueryRunner } from '../adt/TransportHistoryApi.js';
 import type { TransportHistoryClient } from '../adt/TransportHistoryApi.js';
+import type { ImpactAnalysisClient } from '../adt/ImpactAnalysisApi.js';
 import { ErrorCode } from '../lib/McpErrorCompat.js';
 
 /**
@@ -146,11 +147,20 @@ describe('TransportHistoryHandlers catalog and dispatch', () => {
     };
   }
 
-  it('publishes two uniquely named read-only tools and dispatches normalized inputs', async () => {
+  function impactMock(): ImpactAnalysisClient {
+    return {
+      getImpactAnalysis: jest.fn(async () => ({
+        target: { type: 'CLAS', name: 'Z1' }, directCallers: [], levels: [], edges: [],
+        totalAffected: 0, rounds: 0, notes: []
+      }))
+    };
+  }
+
+  it('publishes three uniquely named read-only tools and dispatches normalized inputs', async () => {
     const client = clientMock();
-    const handlers = new TransportHistoryHandlers(client);
+    const handlers = new TransportHistoryHandlers(client, impactMock());
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['getCrHistory', 'getCoChange']);
+    expect(tools.map(t => t.name)).toEqual(['getCrHistory', 'getCoChange', 'getImpactAnalysis']);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true
@@ -161,6 +171,11 @@ describe('TransportHistoryHandlers catalog and dispatch', () => {
     expect(client.getCrHistory).toHaveBeenCalledWith({ objectType: 'PROG', objectName: 'Z1' });
     await handlers.handle('getCoChange', { objectType: 'PROG', objectName: 'Z1', topN: 999 });
     expect(client.getCoChange).toHaveBeenCalledWith({ objectType: 'PROG', objectName: 'Z1', topN: 50 });
+    // impact 分派（注入的独立客户端）
+    const impact = impactMock();
+    const handlers2 = new TransportHistoryHandlers(client, impact);
+    await handlers2.handle('getImpactAnalysis', { objectType: ' clas ', objectName: ' z1 ', maxDepth: 9 });
+    expect(impact.getImpactAnalysis).toHaveBeenCalledWith({ objectType: 'CLAS', objectName: 'Z1', maxDepth: 5 });
   });
 
   it('rejects invalid inputs and unknown tools at the parameter layer', async () => {

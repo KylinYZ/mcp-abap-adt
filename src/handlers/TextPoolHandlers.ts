@@ -6,8 +6,8 @@
  *   2. applyTextPoolChange     —— 原生确认后单次执行（锁 → PUT → 解锁 → readback）
  *   3. getTextPoolChangeStatus —— 本地 plan 状态查询
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { SafeAbapError } from '../safe/errors.js';
 import type { TextPoolWorkflow } from '../safe/TextPoolWorkflow.js';

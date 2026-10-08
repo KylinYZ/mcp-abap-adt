@@ -2,7 +2,7 @@
 
 import { config } from 'dotenv';
 import { randomUUID } from 'crypto';
-// 0.9.0：协议栈迁移到官方 v2 双栈包（2026-07-28 modern + 2025 legacy）。
+// 0.9.0：协议栈迁移到官方 v2 双栈包（2026-07-28 modern + 2025 legacy）；0.9.1：能力收编批次（见 CHANGELOG）。
 // 低层 Server 保留自管工具目录模式；stdio 传输生命周期由 serveStdio 拥有。
 import { Server, inputRequired } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
@@ -119,11 +119,16 @@ import { TextPoolWorkflow } from './safe/TextPoolWorkflow.js';
 import { Ui5WriteHandlers } from './handlers/Ui5WriteHandlers.js';
 import { HealthHandlers } from './handlers/HealthHandlers.js';
 import { GitBridgeHandlers, gitBridgeTargetFromEnv } from './handlers/GitBridgeHandlers.js';
+import { ReportHandlers } from './handlers/ReportHandlers.js';
+import { createReportVariantsClient } from './adt/ReportVariantsApi.js';
+import { createReportJobClient } from './adt/ReportJobApi.js';
 import type { HealthCapability } from './adt/HealthApi.js';
 import { runUnitTest } from './adt/api/unittest.js';
 import { Ui5WriteWorkflow } from './safe/Ui5WriteWorkflow.js';
 import { createUi5WriteClient } from './adt/Ui5FilestoreApi.js';
 import { createUsageExamplesClient } from './adt/UsageExamplesApi.js';
+import { createClusterReadClient } from './adt/ClusterReadApi.js';
+import { createImpactAnalysisClient } from './adt/ImpactAnalysisApi.js';
 import {
   createUnitCoverageClient
 } from './adt/UnitCoverageApi.js';
@@ -249,6 +254,7 @@ export class AbapAdtServer extends Server {
   private ui5WriteHandlers: Ui5WriteHandlers;
   private healthHandlers: HealthHandlers;
   private gitBridgeHandlers: GitBridgeHandlers;
+  private reportHandlers: ReportHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -299,7 +305,7 @@ export class AbapAdtServer extends Server {
     super(
       {
         name: "abap-ai-workbench-mcp",
-        version: "0.9.0",
+        version: "0.9.1",
       },
       {
         capabilities: {
@@ -472,6 +478,17 @@ export class AbapAdtServer extends Server {
     this.gitBridgeHandlers = new GitBridgeHandlers(
       gitBridgeTargetFromEnv(process.env, process.env.SAP_URL as string, process.env.SAP_CLIENT as string)
     );
+    // 报表执行面（report.run/async/variants 收编，2026-10-07 所有者放开）：
+    // variants=纯 ADT SQL（readClient）；runReport=桥 report 域（同 git 桥目标）；
+    // submitReportJob=受控执行核包装 JOB_OPEN/SUBMIT/JOB_CLOSE（写域主会话）。
+    this.reportHandlers = new ReportHandlers(
+      createReportVariantsClient(readClient),
+      createReportJobClient(
+        createExecuteAbapClient(this.adtClient.httpClient),
+        async (sql, rowLimit) => (await readClient.runQuery(sql, rowLimit, true)) ?? { values: [] },
+        createSpoolJobClient(bindSpoolJobQueryRunner(readClient))
+      )
+    );
     this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
     this.crossReferenceHandlers = new CrossReferenceHandlers(
       createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
@@ -526,10 +543,19 @@ export class AbapAdtServer extends Server {
     );
     // 知识查询只读二工具（diagnostics.knowledge-queries 子集）：DOKIL/DOKTL
     // 文档 + IMG 自定义活动/文件夹检索，自由 SQL 只读。
-    this.knowledgeQueriesHandlers = new KnowledgeQueriesHandlers(createKnowledgeQueriesClient(readClient));
+    // cluster_read 收编（2026-10-07）：任意集群表读取（复用 datapreview 通道，
+    // 同 readClient——decode=false 保真 hex 由解码器还原）
+    this.knowledgeQueriesHandlers = new KnowledgeQueriesHandlers(
+      createKnowledgeQueriesClient(readClient),
+      createClusterReadClient(readClient)
+    );
     // 传输历史只读二工具（analysis.history 子集）：E071/E070 自由 SQL（真机
     // 复测可用——早前"受限"为 datapreview 会话预算耗尽的叠加假象）。
-    this.transportHistoryHandlers = new TransportHistoryHandlers(createTransportHistoryClient(readClient));
+    // impact 收编（2026-10-07）：反向影响面（WBCROSSGT 多跳 BFS，同 readClient）
+    this.transportHistoryHandlers = new TransportHistoryHandlers(
+      createTransportHistoryClient(readClient),
+      createImpactAnalysisClient(readClient)
+    );
     this.transportScopeHandlers = new TransportScopeHandlers(async (sql, limit) => {
       const result = await readClient.runQuery(sql, limit, true);
       return result ?? {};
@@ -1222,7 +1248,9 @@ export class AbapAdtServer extends Server {
       ...this.whereUsedConfigHandlers.getTools(),
       ...this.usageExamplesHandlers.getTools(),
       ...this.dependencyGraphHandlers.getTools(),
-      ...this.rfcProbeHandlers.getTools()
+      ...this.rfcProbeHandlers.getTools(),
+      // 报表变体清单只读工具（report.variants 收编）：与知识查询只读面同流向
+      ...[this.reportHandlers.getVariantsTool()]
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -1232,7 +1260,10 @@ export class AbapAdtServer extends Server {
       ...this.unitCoverageHandlers.getTools(),
       ...this.healthHandlers.getTools(),
       ...this.executeAbapHandlers.getTools(),
-      ...this.gitBridgeHandlers.getTools()
+      ...this.gitBridgeHandlers.getTools(),
+      // 报表执行两工具（report.run/async 收编）：执行类（OTHER_MUTATION，
+      // DEV-only 门控）；variants 只读工具在 analyticReadTools
+      ...this.reportHandlers.getExecutionTools()
     ];
     const runtimeTools = [...this.highLevelReadHandlers.getTools(), ...sm21Tools, ...analyticReadTools];
     const focusedTools = this.focusedTaskHandlers.getTools();
@@ -1444,6 +1475,12 @@ export class AbapAdtServer extends Server {
         // 已限定 workbench/legacy-full 面，QAS/PRD 由入口策略拒绝，写槽串行。
         if (this.executeAbapHandlers.supports(toolName)) {
           return this.executeAbapHandlers.handle(toolName, limitedArguments);
+        }
+        // 报表执行面（variants 只读 / runReport+submitReportJob 执行类）：
+        // 必须位于 legacy 兜底门（f1LegacyWriteAllowlist）之前，否则 workbench
+        // 面的非只读 legacy 拒绝会先命中。
+        if (this.reportHandlers.supports(toolName)) {
+          return this.reportHandlers.handle(toolName, limitedArguments);
         }
         // Health 聚合查询（执行级——tests 信号运行用户测试代码）：catalog 成员
         // 已限定 workbench/legacy-full 面。

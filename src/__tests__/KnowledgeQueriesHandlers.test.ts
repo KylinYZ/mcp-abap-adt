@@ -27,7 +27,9 @@ describe('KnowledgeQueriesHandlers tool catalog', () => {
   it('publishes four uniquely named read-only tools', () => {
     const handlers = new KnowledgeQueriesHandlers(clientMock());
     const tools = handlers.getTools();
-    expect(tools.map(t => t.name)).toEqual(['getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets']);
+    expect(tools.map(t => t.name)).toEqual([
+      'getAbapDocumentation', 'searchImgActivities', 'getImgActivity', 'getFmTestDataSets', 'readClusterTable'
+    ]);
     for (const tool of tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true

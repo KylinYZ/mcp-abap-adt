@@ -6,8 +6,8 @@
  *   2. applyUi5Operation     —— 原生确认后单次执行（漂移复核 → 写 → readback）
  *   3. getUi5OperationStatus —— 本地 plan 状态查询
  */
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ElicitRequestFormParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
+import type { ElicitRequestFormParams, ElicitResult } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import { SafeAbapError } from '../safe/errors.js';
 import type { Ui5WriteWorkflow } from '../safe/Ui5WriteWorkflow.js';
