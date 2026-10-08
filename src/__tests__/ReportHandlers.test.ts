@@ -33,11 +33,11 @@ describe('ReportHandlers', () => {
     const deps = makeDeps();
     const handlers = new ReportHandlers(deps.variants, deps.job);
     const all = handlers.getTools().map(t => t.name);
-    expect(all).toEqual(['getReportVariants', 'runReport', 'submitReportJob']);
+    expect(all).toEqual(['getReportVariants', 'runReport', 'submitReportJob', 'helperCallRfm']);
     expect(handlers.getVariantsTool().name).toBe('getReportVariants');
     expect(handlers.getVariantsTool().annotations?.readOnlyHint).toBe(true);
     const exec = handlers.getExecutionTools().map(t => t.name);
-    expect(exec).toEqual(['runReport', 'submitReportJob']);
+    expect(exec).toEqual(['runReport', 'submitReportJob', 'helperCallRfm']);
     for (const tool of handlers.getExecutionTools()) {
       expect(tool.annotations?.readOnlyHint).toBe(false);
       expect(tool._meta?.operationClass).toBe('mutating tenant');

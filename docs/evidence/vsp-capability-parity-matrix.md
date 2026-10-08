@@ -31,11 +31,11 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | 优先级 | MCP_SUPERSET | EQUIVALENT | PARTIAL | GAP | INTENTIONAL_RESTRICTION | UNVERIFIED | 合计 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | 4 | 17 | 0 | 0 | 0 | 0 | 21 |
-| P1 | 4 | 19 | 0 | 0 | 2 | 0 | 25 |
-| P2 | 5 | 13 | 1 | 0 | 6 | 0 | 25 |
-| 合计 | 13 | 49 | 1 | 0 | 8 | 0 | 71 |
+| P1 | 4 | 20 | 0 | 0 | 1 | 0 | 25 |
+| P2 | 5 | 14 | 1 | 0 | 5 | 0 | 25 |
+| 合计 | 13 | 51 | 1 | 0 | 6 | 0 | 71 |
 
-计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**62/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
+计入完成率的行（MCP_SUPERSET + EQUIVALENT）：**64/71**；所有数字均为源码审计结论，未经真实 SAP 验证。
 
 ## P0 缺口（防回退关注点）
 
@@ -116,7 +116,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | `rfc.remote-enabled.call` | 通过 classic RFC 直连调用任意 remote-enabled 函数模块 | SAP(action=rfc, target="<FM>", params={op:call,args}) — open-rfc-go gateway 直连（非 ADT） | EQUIVALENT | P0 | `callRfm` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `rfc.remote-enabled.describe` | 描述 remote-enabled 函数模块接口（JSON Schema） | SAP(action=rfc, target="<FM>", params={op:describe}) | EQUIVALENT | P0 | `describeRfm` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `rfc.remote-enabled.discovery` | RFC 探测（RFC_SYSTEM_INFO/RFC_PING/probe 指纹）与 remote-enabled FM 搜索 | SAP(action=rfc, params={op:info\|ping\|probe\|search}) | EQUIVALENT | P1 | `inspectSapSystem`、`searchObject`、`packageSearchHelp`、`probeRfcSystem` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `rfc.helper-bridge` | 经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座 | debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座 | INTENTIONAL_RESTRICTION | P1 | （无） | （无） | （无） |
+| `rfc.helper-bridge` | 经 ZADT_VSP WebSocket helper 触发任意 FM 执行（含非 remote-enabled）与 Git 导出、报表执行等底座 | debug CALL_RFC + focused CallRFC；GitExport/RunReport 同底座 | EQUIVALENT | P1 | `helperCallRfm` | development-workbench, legacy-full | DEV |
 | `rfc.remote-enabled.read-table` | 经 RFC 直读 DDIC 表（fields/where/top） | SAP(action=rfc, target="<TABLE>", params={op:read_table,fields,where,top}) | EQUIVALENT | P1 | `tableContents`、`runQuery`、`describeClassicTable`、`readRfcTable` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 
 ### debug
@@ -154,7 +154,7 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `analysis.callgraph` | 调用图/调用者/被调用者分析与静态-动态对比 | SAP(action=analyze, params={type:call_graph\|callers\|callees\|analyze_call_graph\|compare_call_graphs\|trace_execution}) + focused GetCallGraph/GetCallersOf/GetCalleesOf/AnalyzeCallGraphs/CompareCallGraphs/TraceExecution | EQUIVALENT | P0 | `usageReferences`、`usageReferenceSnippets`、`typeHierarchy`、`getCallees` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.boundaries` | 包边界违规检查（clean core） | SAP(action=analyze, params={type:check_boundaries,package}) + focused CheckBoundaries | EQUIVALENT | P2 | `checkPackageBoundaries` | development, development-workbench, diagnostic-readonly, legacy-full | DEV, QAS, PRD |
-| `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | INTENTIONAL_RESTRICTION | P2 | （无） | （无） | （无） |
+| `analysis.lint` | 离线 ABAP 静态分析（abaplint） | SAP(action=lint) 或 SAP(action=analyze, params={type:lint}) + focused AnalyzeABAPCode | EQUIVALENT | P2 | `analyzeLint` | development, diagnostic-readonly, development-workbench, operations-readonly, legacy-full | DEV, QAS, PRD |
 | `analysis.history` | 共同变更、影响面、变更单历史与传输边界分析 | SAP(action=analyze, params={type:co_change\|impact\|cr_history\|tr_boundaries\|cr_boundaries\|health\|loads\|graph_stats\|where_used_config\|usage_examples}) | EQUIVALENT | P2 | `revisions`、`transportInfo`、`getCrHistory`、`getCoChange`、`getLoadGraph`、`analyzeDependencyGraph`、`buildLoadDependencyGraph`、`getTransportScope`、`getWhereUsedConfig`、`getUsageExamples`、`analyzeHealth`、`getImpactAnalysis` | development-workbench, legacy-full | DEV |
 
 ### git
@@ -223,12 +223,8 @@ profile 别名：focused 是 development-workbench 的默认入口别名；矩�
 
 - **`transport.merge-move`**（P2）：ADT REST 层不存在传输合并/对象移动资源（VSP pkg/adt/transport_merge.go@9886d272 头注：SE09 Utilities→Reorganize 在 ADT 无对应面；organizer 资源只能加对象/改属主/释放，不能移除条目）。SE09 背后 FM TR_MERGE_REQUESTS、TR_APPEND_TO_COMM_OBJS_KEYS、TRINT_DELETE_COMM_OBJECT_KEYS 均非 remote-enabled，VSP 自身也必须经 ZADT_VSP 的 CALL FUNCTION WebSocket 桥关对话框执行。语义上 merge=把 from 的任务与对象并入 to 后删除 from（非空请求删除）、move=FM 直改 E071/E071K，与本项目传输安全红线（释放/改属主/加用户/删非空或他人请求与直改 E071·E071K 一律禁止）直接冲突；且当前 sap-demo client 300 未部署 ZCL_VSP_* helper 桥（2026-10-03 核实仅 SAPC/SICF 配置面）。维持不做。
   解除条件：仅当同时满足：1) 目标 DEV 部署 ZADT_VSP CALL FUNCTION 桥并通过 install.diagnostics 可用性诊断；2) 所有者显式放开传输红线并完成受控工作流设计评审（补偿/审计/回滚语义）。二者缺一即维持限制，无当前计划。
-- **`rfc.helper-bridge`**（P1）：ZADT_VSP bridge 依赖 SAP 端预先安装的 helper 对象（存在 SAP 端前置条件），其任意 FM 触发路径绕过本项目的 ADT 审计与确认边界；不作为 RFC transport 的替代。2026-09-17 规划修订后，remote-enabled FM 的等价方向由 open-rfc 基座承接，本行限制仅针对非 remote-enabled FM 与 helper 底座，不受该修订影响。
-  解除条件：仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。
 - **`debug.amdp-helper`**（P1）：AMDP helper 调试依赖 SAP 端 ZADT_VSP helper 对象；本项目不自动部署 SAP 端对象，也不在缺 helper 时退化成不受控调用。
   解除条件：专用 DEV + 明确授权 + helper 前置检查通过并完成独立风险评审后单独评估。
-- **`analysis.lint`**（P2）：abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。
-  解除条件：出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。
 - **`install.zadt-vsp`**（P2）：本项目不自动在 SAP 端安装/部署对象；helper 部署属于有业务副作用的系统变更。
   解除条件：用户在 SAP 端自行完成安装后，本项目仅提供只读前置检查与诊断。
 - **`install.abapgit`**（P2）：本项目不自动在 SAP 端安装/部署对象；abapGit 部署属于有业务副作用的系统变更。

@@ -122,6 +122,8 @@ import { GitBridgeHandlers, gitBridgeTargetFromEnv } from './handlers/GitBridgeH
 import { ReportHandlers } from './handlers/ReportHandlers.js';
 import { createReportVariantsClient } from './adt/ReportVariantsApi.js';
 import { createReportJobClient } from './adt/ReportJobApi.js';
+import { HelperRfcBridge } from './adt/HelperRfcApi.js';
+import { AnalyzeLintHandlers } from './handlers/AnalyzeLintHandlers.js';
 import type { HealthCapability } from './adt/HealthApi.js';
 import { runUnitTest } from './adt/api/unittest.js';
 import { Ui5WriteWorkflow } from './safe/Ui5WriteWorkflow.js';
@@ -255,6 +257,7 @@ export class AbapAdtServer extends Server {
   private healthHandlers: HealthHandlers;
   private gitBridgeHandlers: GitBridgeHandlers;
   private reportHandlers: ReportHandlers;
+  private analyzeLintHandlers: AnalyzeLintHandlers;
   private dependencyGraphHandlers = new DependencyGraphHandlers();
   private rfcProbeHandlers: RfcProbeHandlers;
   private dumpAnalysisHandlers: DumpAnalysisHandlers;
@@ -487,8 +490,16 @@ export class AbapAdtServer extends Server {
         createExecuteAbapClient(this.adtClient.httpClient),
         async (sql, rowLimit) => (await readClient.runQuery(sql, rowLimit, true)) ?? { values: [] },
         createSpoolJobClient(bindSpoolJobQueryRunner(readClient))
+      ),
+      // helper 桥 rfc 域（rfc.helper-bridge 收编）：与 git 桥同 APC 目标；
+      // allowlist 默认=callRfm 只读白名单（fail-closed）
+      new HelperRfcBridge(
+        gitBridgeTargetFromEnv(process.env, process.env.SAP_URL as string, process.env.SAP_CLIENT as string)
       )
     );
+    // analyzeLint（analysis.lint 收编，2026-10-10）：本地 abaplint 引擎（@abaplint/core），
+    // 纯客户端执行——无 SAP 交互，全角色/全环境可见
+    this.analyzeLintHandlers = new AnalyzeLintHandlers();
     this.applicationLogHandlers = new ApplicationLogHandlers(createApplicationLogClient(readClient.httpClient));
     this.crossReferenceHandlers = new CrossReferenceHandlers(
       createCrossReferenceClient(bindRunSqlToAdtQuery(readClient))
@@ -1250,7 +1261,9 @@ export class AbapAdtServer extends Server {
       ...this.dependencyGraphHandlers.getTools(),
       ...this.rfcProbeHandlers.getTools(),
       // 报表变体清单只读工具（report.variants 收编）：与知识查询只读面同流向
-      ...[this.reportHandlers.getVariantsTool()]
+      ...[this.reportHandlers.getVariantsTool()],
+      // 本地 abaplint 静态分析（analysis.lint 收编）：纯客户端只读，无 SAP 交互
+      ...this.analyzeLintHandlers.getTools()
     ];
     // runUnitCoverage 是执行行为（运行被测对象的用户代码），按 other-mutation
     // 语义仅进入 workbench 显式名单与 legacy-full 专家面，不给 development
@@ -1481,6 +1494,10 @@ export class AbapAdtServer extends Server {
         // 面的非只读 legacy 拒绝会先命中。
         if (this.reportHandlers.supports(toolName)) {
           return this.reportHandlers.handle(toolName, limitedArguments);
+        }
+        // analyzeLint：纯客户端静态分析（本地 abaplint 引擎），只读，无 SAP 交互
+        if (this.analyzeLintHandlers.supports(toolName)) {
+          return this.analyzeLintHandlers.handle(toolName, limitedArguments);
         }
         // Health 聚合查询（执行级——tests 信号运行用户测试代码）：catalog 成员
         // 已限定 workbench/legacy-full 面。

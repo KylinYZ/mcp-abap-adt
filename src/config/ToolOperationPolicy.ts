@@ -147,6 +147,8 @@ const READ_ONLY_TOOL_NAMES = new Set([
   'syntaxCheckCode', 'syntaxCheckCdsUrl', 'codeCompletion', 'findDefinition', 'usageReferences',
   'syntaxCheckTypes', 'codeCompletionFull', 'codeCompletionElement', 'usageReferenceSnippets',
   'fixProposals', 'fragmentMappings', 'abapDocumentation', 'inactiveObjects', 'objectRegistrationInfo',
+  // 本地 abaplint 静态分析（analysis.lint 收编）：纯客户端只读，无 SAP 交互
+  'analyzeLint',
   // 报表变体清单（report.variants 收编）：VARID/VARIT 只读 SQL
   'getReportVariants',
   'validateNewObject', 'getObjectSource', 'nodeContents', 'mainPrograms', 'featureDetails', 'collectionFeatureDetails',
@@ -284,6 +286,9 @@ const OTHER_MUTATION_TOOL_NAMES = new Set([
   // 系统内已有报表 = 执行行为（非只读；DEV-only，写槽串行）
   'runReport',
   'submitReportJob',
+  // helper 桥 rfc 域（rfc.helper-bridge 收编，2026-10-10 所有者授权）：桥内
+  // CALL FUNCTION 执行行为（allowlist 硬门；DEV-only，写槽串行）
+  'helperCallRfm',
   'setPrettyPrinterSetting', 'gitCreateRepo', 'gitPullRepo', 'gitUnlinkRepo', 'stageRepo',
   'pushRepo', 'switchRepoBranch', 'publishServiceBinding', 'unPublishServiceBinding',
   'createAtcRun', 'atcExemptProposal', 'atcRequestExemption', 'atcChangeContact',

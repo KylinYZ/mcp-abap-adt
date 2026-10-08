@@ -204,10 +204,12 @@ describe('VSP capability parity matrix anti-regression', () => {
       expect(entry.startsWith('RFC_')).toBe(true);
     }
     const bridge = rows.find(item => item.id === 'rfc.helper-bridge');
-    expect(bridge?.mcp.status).toBe('INTENTIONAL_RESTRICTION');
+    // 2026-10-10 所有者授权收编（helperCallRfm，allowlist 硬门 + DEV-only）→ EQUIVALENT。
+    // 守卫改为锁定：状态升级 + restrict 保留风险评审声明 + requires 仍声明 SAP 端前置。
+    expect(bridge?.mcp.status).toBe('EQUIVALENT');
     // helper bridge 不得被描述为“无 SAP 端前置条件”
     expect(String(bridge?.vsp.requires.join(' '))).toMatch(/SAP 端/);
-    expect(String(bridge?.mcp.restrictionReason)).toMatch(/SAP 端前置条件|helper/);
+    expect(String(bridge?.mcp.restrictionReason)).toMatch(/SAP 端前置条件|helper|allowlist/);
   });
 
   it('never marks controlled DDIC creation as a gap', () => {

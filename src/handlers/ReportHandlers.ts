@@ -2,6 +2,7 @@ import { ErrorCode, McpError } from '../lib/McpErrorCompat.js';
 import type { ToolDefinition } from '../types/tools.js';
 import type { ReportVariantsClient } from '../adt/ReportVariantsApi.js';
 import type { ReportJobClient, RunReportInput } from '../adt/ReportJobApi.js';
+import { HelperRfcBridge, HelperRfcBridgeError } from '../adt/HelperRfcApi.js';
 
 /**
  * ============================================================================
@@ -25,12 +26,13 @@ import type { ReportJobClient, RunReportInput } from '../adt/ReportJobApi.js';
  */
 
 /** 本处理器认领的工具名。 */
-const REPORT_TOOL_NAMES = new Set(['getReportVariants', 'runReport', 'submitReportJob']);
+const REPORT_TOOL_NAMES = new Set(['getReportVariants', 'runReport', 'submitReportJob', 'helperCallRfm']);
 
 export class ReportHandlers {
   constructor(
     private readonly variants: ReportVariantsClient,
-    private readonly reportJob: ReportJobClient
+    private readonly reportJob: ReportJobClient,
+    private readonly helperRfc?: HelperRfcBridge
   ) {}
 
   supports(toolName: string): boolean {
@@ -118,6 +120,31 @@ export class ReportHandlers {
           required: ['report']
         },
         ...executing
+      },
+      {
+        name: 'helperCallRfm',
+        description:
+          'Call one function module via the ZADT_VSP helper-bridge rfc domain (WebSocket): the CALL FUNCTION executes inside the SAP application process, so non-remote-enabled FMs are also reachable (unlike callRfm which goes through the SAP gateway and is gateway-restricted to remote-enabled). Hard allowlist gate (default: the same read-only standard-FM set as callRfm; extendable only via server-side constructor injection) - non-allowlisted FMs are rejected before any network round trip. Returns sy-subrc, export values, and table results. Executing operation: runs existing system code; DEV-only.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            function: {
+              type: 'string',
+              description: 'Function module name (must be on the helper-bridge allowlist).',
+              minLength: 1,
+              maxLength: 30
+            },
+            importing: {
+              type: 'object',
+              description: 'IMPORT parameters as an object of parameter name to string value.',
+              additionalProperties: { type: 'string' },
+              optional: true
+            }
+          },
+          required: ['function']
+        },
+        ...executing
       }
     ];
   }
@@ -128,8 +155,8 @@ export class ReportHandlers {
     return this.getTools().find(tool => tool.name === 'getReportVariants')!;
   }
 
-  /** 执行面（runReport/submitReportJob）：并入 coverageTools——legacy-full 与
-   *  workbench 显式名单（DEV-only，OTHER_MUTATION）。 */
+  /** 执行面（runReport/submitReportJob/helperCallRfm）：并入 coverageTools——
+   *  legacy-full 与 workbench 显式名单（DEV-only，OTHER_MUTATION）。 */
   getExecutionTools(): ToolDefinition[] {
     return this.getTools().filter(tool => tool.name !== 'getReportVariants');
   }
@@ -161,12 +188,33 @@ export class ReportHandlers {
           ...(params !== undefined ? { params } : {})
         }));
       }
+      if (toolName === 'helperCallRfm') {
+        if (!this.helperRfc) {
+          throw new McpError(ErrorCode.InternalError, `${toolName} requires the helper-bridge rfc capability, which is not wired on this profile.`);
+        }
+        const fm = typeof argumentsValue?.function === 'string' ? argumentsValue.function.trim().toUpperCase() : '';
+        if (!fm || fm.length > 30 || !/^[A-Z0-9_/]+$/.test(fm)) {
+          throw invalid(`${toolName} requires function: a function module name of at most 30 characters matching [A-Z0-9_/].`);
+        }
+        let importing: Record<string, string> | undefined;
+        if (argumentsValue?.importing !== undefined) {
+          if (typeof argumentsValue.importing !== 'object' || argumentsValue.importing === null || Array.isArray(argumentsValue.importing)) {
+            throw invalid(`${toolName} requires importing to be an object of parameter name to string value.`);
+          }
+          importing = {};
+          for (const [k, v] of Object.entries(argumentsValue.importing as Record<string, unknown>)) {
+            if (typeof v !== 'string') throw invalid(`${toolName} requires importing values to be strings (got ${k}).`);
+            importing[k] = v;
+          }
+        }
+        return this.success(await this.helperRfc.callFunction(fm, importing));
+      }
       throw new McpError(ErrorCode.MethodNotFound, `Unknown report tool: ${toolName}`);
     } catch (error) {
       if (error instanceof McpError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       // 调用方可排查的服务端语义按 InvalidParams 透传；其余脱敏
-      if (/is invalid|REPORT_NOT_FOUND|VALIDATION_FAILED|no active PROG version|job API failed|job submission failed/i.test(message)) {
+      if (/is invalid|REPORT_NOT_FOUND|VALIDATION_FAILED|no active PROG version|job API failed|job submission failed|not on the helper-bridge allowlist/i.test(message)) {
         // runReport/submitReportJob 共用 job 客户端——语义错误均透传
         throw new McpError(ErrorCode.InvalidParams, `${toolName}: ${message}`);
       }

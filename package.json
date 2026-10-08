@@ -69,7 +69,8 @@
     "test:fm-payload-real-dev": "node scripts/fm-test-data-payload-real-dev-smoke.mjs",
     "test:git-bridge-real-dev": "node scripts/git-bridge-real-dev-smoke.mjs",
     "test:cluster-impact-real-dev": "node scripts/cluster-impact-real-dev-smoke.mjs",
-    "test:report-real-dev": "node scripts/report-real-dev-smoke.mjs"
+    "test:report-real-dev": "node scripts/report-real-dev-smoke.mjs",
+    "test:helper-rfc-real-dev": "node scripts/helper-rfc-real-dev-smoke.mjs"
   },
   "keywords": [
     "abap",
@@ -100,6 +101,7 @@
     "node": ">=22.14.0"
   },
   "dependencies": {
+    "@abaplint/core": "2.120.70",
     "@kylinyz/open-rfc": "^0.2.4-kylin.2",
     "@modelcontextprotocol/server": "2.2.0",
     "axios": "^1.15.2",

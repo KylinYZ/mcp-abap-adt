@@ -1503,16 +1503,25 @@
         ]
       },
       "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "ZADT_VSP bridge 依赖 SAP 端预先安装的 helper 对象（存在 SAP 端前置条件），其任意 FM 触发路径绕过本项目的 ADT 审计与确认边界；不作为 RFC transport 的替代。2026-09-17 规划修订后，remote-enabled FM 的等价方向由 open-rfc 基座承接，本行限制仅针对非 remote-enabled FM 与 helper 底座，不受该修订影响。",
-        "liftCondition": "仅在专用 DEV 系统、明确授权、helper 安装诊断与前置检查先行并完成独立风险评审后评估；remote-enabled FM 走 open-rfc 基座，不依赖本行解除。"
+        "status": "EQUIVALENT",
+        "taskPath": [
+          "helperCallRfm"
+        ],
+        "profiles": [
+          "development-workbench",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV"
+        ],
+        "restrictionReason": "helperCallRfm 已真机验证（2026-10-10，sap-dev）：经 ZADT_VSP 桥 rfc 域（部署的 ZCL_VSP_RFC_SERVICE，call/getMetadata/search 三动作端到端通）调用 FM——CALL FUNCTION 在 SAP 应用服务进程内执行，非 remote-enabled FM 也可达（callRfm/open-rfc 直链受网关限制仅 remote-enabled）。**与 VSP 的差异（受控收紧，如实声明）**：VSP 桥面无 allowlist（任意 FM）；本项目在客户端侧加 allowlist 硬门（默认=callRfm 只读标准 FM 白名单，经构造注入扩展——部署者显式追加），白名单外零网络往返拒绝； 非 remote FM 的扩展按需经部署者注入。风险评审遗留：helper 面绕过 ADT 审计与网关限制的本质风险不变，allowlist 只收窄爆炸半径；扩展 FM 前须逐个评估。门控：DEV + workbench/legacy-full + 写槽串行。真机：RFC_PING subrc=0、RFC_SYSTEM_INFO exports 指纹（与 callRfm 直链对照一致）、allowlist 外拒绝。",
+        "liftCondition": ""
       },
       "priority": "P1",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation",
+        "real-dev-verified"
       ],
       "nextMilestone": ""
     },
@@ -2215,16 +2224,29 @@
         ]
       },
       "mcp": {
-        "status": "INTENTIONAL_RESTRICTION",
-        "taskPath": [],
-        "profiles": [],
-        "systemRoles": [],
-        "restrictionReason": "abaplint 引擎不可得：npm 包 abaplint 已于 2022-07 unpublish（2026-09-17 npm view 返回 404 实测），VSP 依赖其内部 Go 转译版（pkg/abaplint，非公开包），本项目无法复用。替代路径：ADT 在线语法检查 syntaxCheckCode/syntaxCheckCdsUrl（已在 catalog）覆盖发现语法错误的核心需求，但 abaplint 的离线规则集（风格与最佳实践检查）无等价物。",
-        "liftCondition": "出现可用的 abaplint 引擎或等价离线 ABAP 静态分析器后重新评估。"
+        "status": "EQUIVALENT",
+        "taskPath": [
+          "analyzeLint"
+        ],
+        "profiles": [
+          "development",
+          "diagnostic-readonly",
+          "development-workbench",
+          "operations-readonly",
+          "legacy-full"
+        ],
+        "systemRoles": [
+          "DEV",
+          "QAS",
+          "PRD"
+        ],
+        "restrictionReason": "analyzeLint 已真机验证（2026-10-10）：本地 abaplint 引擎（@abaplint/core 2.120.70 npm 依赖，Apache-2.0）对提交的 ABAP 源码做完整静态分析——解析错误/语法检查/规则违规（命名/废弃语句/行宽/缩进/退出检查等 40+ 规则，默认规则集对齐 abap-mcp-server 的 snippet 分析配置）；50KB 输入上限 + 10s 超时保护 + maxFindings 截断；文件类型从代码内容自动探测（CLAS/INTF/FUGR/PROG/DDLS/BDEF/DCLS）。纯客户端执行——无 SAP 交互，任意角色/环境可用（含 QAS/PRD）。先前\"npm 包 abaplint 已 unpublish\"的定性修正：unpublish 的是无 scoped 的 CLI 包装包（abaplint），引擎本体 @abaplint/core scoped 包持续发布（当前 2.120.70）。",
+        "liftCondition": ""
       },
       "priority": "P2",
       "evidence": [
-        "source-audit"
+        "source-audit",
+        "automation"
       ],
       "nextMilestone": ""
     },

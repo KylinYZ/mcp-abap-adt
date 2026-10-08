@@ -31,16 +31,16 @@ describe('tool catalog integrity and raw advanced role policy', () => {
   it.each([
     ['safe', 7],
     // development 202：201 + readClusterTable（cluster_read 收编，只读组合面）
-    ['development', 204],
+    ['development', 205],
     // diagnostic-readonly 147：146 + readClusterTable（只读诊断入口）
-    ['diagnostic-readonly', 149],
+    ['diagnostic-readonly', 150],
     // legacy-full 214：213 + readClusterTable（专家完整面）
-    ['legacy-full', 218],
+    ['legacy-full', 220],
     // development-workbench 176：175 + readClusterTable（workbench 显式名单）
-    ['development-workbench', 180],
+    ['development-workbench', 182],
     ['business-readonly', 18],
     // operations-readonly 55：54 + readClusterTable（运维诊断的集群表读取）
-    ['operations-readonly', 57]
+    ['operations-readonly', 58]
   ])('locks the DEV %s catalog at %i unique tools', (profile, expected) => {
     const server = configureServer('DEV', profile);
     const catalog = (server as any).toolCatalog as Array<{ name: string }>;

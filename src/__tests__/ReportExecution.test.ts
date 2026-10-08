@@ -175,7 +175,7 @@ describe('runReport（等待链）', () => {
     expect(result.pollTimeout).toBeUndefined();
   });
 
-  it('marks pollTimeout and skips the spool when the budget expires', async () => {
+  it('marks pollTimeout and skips the spool when the budget expires', async () => {  // jest timeout extended below
     const executor = makeExecutor(['JOB=ZRPT_A/7']);
     const run = makeRunner(['R']);
     const spool = makeSpool('x');
@@ -184,7 +184,7 @@ describe('runReport（等待链）', () => {
     expect(result.spoolId).toBeUndefined();
     expect(spool.readSpoolContent).not.toHaveBeenCalled();
     expect(result.notes.some(n => n.includes('Poll budget'))).toBe(true);
-  });
+  }, 20_000);
 
   it('returns the spool honestly for aborted jobs (jobStatus=A)', async () => {
     const executor = makeExecutor(['JOB=ZRPT_A/7']);

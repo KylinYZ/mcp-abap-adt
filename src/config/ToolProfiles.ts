@@ -74,6 +74,10 @@ export const DEVELOPMENT_WORKBENCH_TOOL_NAMES = new Set([
   'getReportVariants',
   'runReport',
   'submitReportJob',
+  // helper 桥 rfc 域（rfc.helper-bridge 收编）：allowlist 门控的受控 FM 调用
+  'helperCallRfm',
+  // 本地 abaplint 静态分析（analysis.lint 收编）：纯客户端只读，无 SAP 交互
+  'analyzeLint',
   // Health 聚合查询（analysis.history 行 health 子操作）：tests 信号真正执行
   // 单测——执行级门控与 runUnitCoverage 同面（workbench 显式收录 + legacy-full）
   'analyzeHealth',
@@ -192,7 +196,9 @@ export const OPERATIONS_READONLY_TOOL_NAMES = new Set([
   // 集群表通用读取（knowledge-queries 行：cluster_read 收编，运维诊断可用）
   'readClusterTable',
   // 报表变体清单（report.variants 收编，运维诊断可用）
-  'getReportVariants'
+  'getReportVariants',
+  // 本地 abaplint 静态分析（analysis.lint 收编，运维诊断可用）
+  'analyzeLint'
 ]);
 
 export function selectProfileTools(
